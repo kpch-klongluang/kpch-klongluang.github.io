@@ -209,6 +209,19 @@
           </div>
         </div>
 
+        <!-- แถบพิมพ์บันทึกข้อความสรุปรวม (เพิ่มเข้ามาใหม่สำหรับ ครู / ผอ. / นายทะเบียน / แอดมิน) -->
+        <div id="batchMemoBar" class="alert alert-primary border-0 rounded-4 d-none mb-3">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+            <div class="small">
+              <strong><i class="bi bi-file-earmark-text me-1"></i>เอกสารบันทึกข้อความสรุปรวม:</strong>
+              ติ๊กเลือกรายการที่ต้องการ หรือกดพิมพ์รายการที่อนุมัติแล้วทั้งหมดเป็นชุดเดียวกัน
+            </div>
+            <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="printBatchMemo()">
+              <i class="bi bi-printer me-1"></i>พิมพ์บันทึกข้อความสรุปรวม (พร้อมบัญชีรายชื่อ)
+            </button>
+          </div>
+        </div>
+
         <!-- แถบเครื่องมือนายทะเบียน -->
         <div id="registrarTools" class="alert alert-success border-0 rounded-4 d-none mb-3">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
@@ -428,7 +441,7 @@
     </div>
   </div>
 
-  <!-- พื้นที่พิมพ์ใบเสนอโครงการ A4 -->
+  <!-- พื้นที่พิมพ์ใบเสนอโครงการ & บันทึกข้อความ A4 -->
   <div id="printOnlyContainer"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
