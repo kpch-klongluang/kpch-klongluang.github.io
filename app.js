@@ -93,7 +93,7 @@ function renderNavbar() {
   }
 }
 
-// ==================== ส่วนนักศึกษา ====================
+// ==================== ส่วนหน้าแรก (นักศึกษา + ข่าวประกาศ) ====================
 function switchPublicTab(tab) {
   document.getElementById('tabBtnSubmit').classList.toggle('active', tab === 'submit');
   document.getElementById('tabBtnStatus').classList.toggle('active', tab === 'status');
@@ -101,13 +101,28 @@ function switchPublicTab(tab) {
   document.getElementById('publicStatusView').classList.toggle('d-none', tab !== 'status');
 }
 
-async function loadTeachersDropdown() {
+function renderAnnouncement(ann) {
+  const box = document.getElementById('announcementBox');
+  if (!ann || !ann.visible) {
+    box.classList.add('d-none');
+    return;
+  }
+  box.classList.remove('d-none');
+  document.getElementById('annBadgeText').innerText = ann.badge || '';
+  document.getElementById('annContentText').innerText = ann.content || '';
+}
+
+async function loadPublicData() {
   const sel = document.getElementById('f_teacher_id');
   const errEl = document.getElementById('teacherLoadError');
   try {
-    const list = await callApi('getTeachers');
+    const data = await callApi('getPublicData');
     errEl.classList.add('d-none');
-    if (!list || list.length === 0) {
+
+    renderAnnouncement(data.announcement);
+
+    const list = data.teachers || [];
+    if (list.length === 0) {
       sel.innerHTML = '<option value="">-- ยังไม่มีรายชื่อครูในระบบ --</option>';
       return;
     }
@@ -302,14 +317,14 @@ function handleLogout() {
   document.getElementById('dashboardSection').classList.add('d-none');
   document.getElementById('publicSection').classList.remove('d-none');
 
-  // รีเซ็ตแท็บหลังบ้านและโหลดรายชื่อครูหน้าแรกใหม่ทุกครั้งที่กดออก
   document.getElementById('dashSubmissionsView').classList.remove('d-none');
   document.getElementById('adminUsersView').classList.add('d-none');
+  document.getElementById('adminAnnView').classList.add('d-none');
   document.getElementById('adminLogsView').classList.add('d-none');
   document.querySelectorAll('#adminNavTabs button').forEach((b, idx) => b.classList.toggle('active', idx === 0));
 
   renderNavbar();
-  loadTeachersDropdown();
+  loadPublicData();
 }
 
 async function loadDashboard(silentOnExpire = false) {
@@ -335,14 +350,19 @@ async function loadDashboard(silentOnExpire = false) {
     document.getElementById('registrarTools').classList.toggle('d-none', !isReg);
     document.getElementById('thCheckbox').classList.toggle('d-none', !isReg);
 
-    // ถ้าไม่ใช่ Admin ต้องบังคับแสดงหน้าคำขอเสมอ ป้องกันค้างหน้าจัดการบุคลากร
     if (!isAdmin) {
       document.getElementById('dashSubmissionsView').classList.remove('d-none');
       document.getElementById('adminUsersView').classList.add('d-none');
+      document.getElementById('adminAnnView').classList.add('d-none');
       document.getElementById('adminLogsView').classList.add('d-none');
     } else {
       renderAdminUsers();
       renderAdminLogs();
+      if (res.announcement) {
+        document.getElementById('ann_visible').checked = !!res.announcement.visible;
+        document.getElementById('ann_badge').value = res.announcement.badge || '';
+        document.getElementById('ann_content').value = res.announcement.content || '';
+      }
     }
     renderDashboardList();
   } catch (err) {
@@ -576,7 +596,6 @@ async function printProjectPDF(reqId) {
     document.getElementById('printOnlyContainer').innerHTML = `
       <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
         <h3 style="margin:0; font-weight:bold;">แบบเสนอขออนุมัติกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)</h3>
-<div style="font-size:13pt; font-weight:bold;">ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง</div>
         <div style="font-size:12pt;">รหัสอ้างอิงเอกสาร: ${esc(item.req_id)} | วันที่ยื่นคำขอ: ${esc(item.created_at)}</div>
       </div>
       <table style="width:100%; border-collapse:collapse; margin-bottom:15px;" border="1" cellpadding="6">
@@ -606,17 +625,17 @@ async function printProjectPDF(reqId) {
         </div>
         <div class="sig-box">
           ลงชื่อ......................................................<br>
-          ( นาย เกียรติศักดิ์  หมั่นอุส่าห์)<br>ครูศูนย์การเรียนรู้<br>
+          (......................................................)<br>คณะกรรมการพิจารณา กพช. ท่านที่ 1<br>
           <small>อนุมัติระบบ: ${esc(item.comm1_approved_at || 'รอดำเนินการ')}</small>
         </div>
         <div class="sig-box">
           ลงชื่อ......................................................<br>
-          ( นาย ไชยพัฒน์  นัยเนตร )<br>ครูศูนย์การเรียนรู้<br>
+          (......................................................)<br>คณะกรรมการพิจารณา กพช. ท่านที่ 2<br>
           <small>อนุมัติระบบ: ${esc(item.comm2_approved_at || 'รอดำเนินการ')}</small>
         </div>
         <div class="sig-box">
           ลงชื่อ......................................................<br>
-          ( นางสาว นิศารัตน์  ดอนปัญญาไพร)<br>ครูศูนย์การเรียนรู้<br>
+          (......................................................)<br>คณะกรรมการพิจารณา กพช. ท่านที่ 3<br>
           <small>อนุมัติระบบ: ${esc(item.comm3_approved_at || 'รอดำเนินการ')}</small>
         </div>
       </div>
@@ -694,6 +713,7 @@ function switchAdminTab(tab, btn) {
   btn.classList.add('active');
   document.getElementById('dashSubmissionsView').classList.toggle('d-none', tab !== 'subs');
   document.getElementById('adminUsersView').classList.toggle('d-none', tab !== 'users');
+  document.getElementById('adminAnnView').classList.toggle('d-none', tab !== 'ann');
   document.getElementById('adminLogsView').classList.toggle('d-none', tab !== 'logs');
 }
 
@@ -788,6 +808,26 @@ async function handleSaveUser() {
   }
 }
 
+async function handleSaveAnnouncement() {
+  const visible = document.getElementById('ann_visible').checked;
+  const badge = document.getElementById('ann_badge').value.trim();
+  const content = document.getElementById('ann_content').value.trim();
+
+  showLoading('กำลังบันทึกข่าวประกาศ...');
+  try {
+    const res = await callApi('saveAnnouncement', {
+      token: authToken,
+      announcement: { visible, badge, content }
+    });
+    hideLoading();
+    renderAnnouncement(res.announcement);
+    safeAlert('สำเร็จ', 'อัปเดตข่าวประกาศเรียบร้อยแล้ว', 'success');
+  } catch (err) {
+    hideLoading();
+    safeAlert('ผิดพลาด', err.message, 'error');
+  }
+}
+
 async function handleChangeMyPassword() {
   const oldPass = document.getElementById('cp_old').value;
   const newPass = document.getElementById('cp_new').value;
@@ -819,7 +859,7 @@ async function handleChangeMyPassword() {
 // ==================== เริ่มทำงาน ====================
 function initApp() {
   renderNavbar();
-  loadTeachersDropdown();
+  loadPublicData();
   const savedToken = sessionStorage.getItem('kpch_token');
   if (savedToken) {
     authToken = savedToken;
