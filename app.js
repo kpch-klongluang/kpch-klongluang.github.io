@@ -576,6 +576,7 @@ async function printProjectPDF(reqId) {
     document.getElementById('printOnlyContainer').innerHTML = `
       <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
         <h3 style="margin:0; font-weight:bold;">แบบเสนอขออนุมัติกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)</h3>
+<div style="font-size:13pt; font-weight:bold;">ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง</div>
         <div style="font-size:12pt;">รหัสอ้างอิงเอกสาร: ${esc(item.req_id)} | วันที่ยื่นคำขอ: ${esc(item.created_at)}</div>
       </div>
       <table style="width:100%; border-collapse:collapse; margin-bottom:15px;" border="1" cellpadding="6">
