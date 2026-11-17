@@ -1,7 +1,8 @@
-// ⚠️ อย่าลืมนำลิงก์เว็บแอป (/exec) ของคุณมาใส่กลับในบรรทัดที่ 2 นี้นะครับ!
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 const SCHOOL_NAME = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
 const DIRECTOR_NAME = 'นางฑัศดาพร ลองชัย';
+const GARUDA_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Garuda_Emblem_of_Thailand_%28Monochrome_2%29.svg/240px-Garuda_Emblem_of_Thailand_%28Monochrome_2%29.svg.png';
+
 let compressedImages = [];
 let authToken = null;
 let currentUser = null;
@@ -34,7 +35,7 @@ const ROLE_LABELS = {
 // ==================== เชื่อมต่อ API Google Apps Script ====================
 async function callApi(action, params = {}) {
   if (!API_URL || API_URL.includes('วาง_URL_ของ')) {
-    throw new Error('กรุณาเปิดไฟล์ app.js แล้วนำลิงก์ /exec จาก Apps Script มาวางในตัวแปร API_URL บรรทัดที่ 2 ก่อนครับ');
+    throw new Error('กรุณาเปิดไฟล์ app.js แล้วนำลิงก์ /exec จาก Apps Script มาวางในตัวแปร API_URL บรรทัดที่ 1 ก่อนครับ');
   }
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -62,6 +63,24 @@ function getDriveThumb(url) {
   if (!url) return '';
   const m = url.match(/[-\w]{25,}/);
   return m ? `https://drive.google.com/thumbnail?id=${m[0]}&sz=w800` : url;
+}
+function formatThaiDate(dateInput) {
+  const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  if (!dateInput) {
+    const d = new Date();
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
+  }
+  const datePart = String(dateInput).split(' ')[0];
+  const parts = datePart.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d) && months[m]) {
+      return `${d} ${months[m]} ${y < 2400 ? y + 543 : y}`;
+    }
+  }
+  return String(dateInput);
 }
 function safeAlert(title, htmlText, icon) {
   Swal.fire({ title, html: htmlText, icon: icon || 'info', confirmButtonColor: '#6366f1' });
@@ -119,7 +138,6 @@ async function loadPublicData() {
   try {
     const data = await callApi('getPublicData');
     errEl.classList.add('d-none');
-
     renderAnnouncement(data.announcement);
 
     const list = data.teachers || [];
@@ -347,9 +365,12 @@ async function loadDashboard(silentOnExpire = false) {
 
     const isAdmin = currentUser.role === 'ADMIN';
     const isReg = currentUser.role === 'REGISTRAR';
+    const canBatchMemo = ['TEACHER', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
+
     document.getElementById('adminNavTabs').classList.toggle('d-none', !isAdmin);
     document.getElementById('registrarTools').classList.toggle('d-none', !isReg);
-    document.getElementById('thCheckbox').classList.toggle('d-none', !isReg);
+    document.getElementById('batchMemoBar').classList.toggle('d-none', !canBatchMemo);
+    document.getElementById('thCheckbox').classList.toggle('d-none', !canBatchMemo);
 
     if (!isAdmin) {
       document.getElementById('dashSubmissionsView').classList.remove('d-none');
@@ -402,7 +423,7 @@ function isMyPendingItem(item) {
 
 function renderDashboardList() {
   const kw = document.getElementById('dashSearchInput').value.toLowerCase().trim();
-  const isReg = currentUser.role === 'REGISTRAR';
+  const canCheck = ['TEACHER', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
 
   const filtered = dashItems.filter(item => {
     if (filterMode === 'PENDING' && !isMyPendingItem(item)) return false;
@@ -427,7 +448,7 @@ function renderDashboardList() {
     const canAct = isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
     return `
       <tr>
-        ${isReg ? `<td>${item.current_step === 'APPROVED_FOR_REGISTRAR' ? `<input type="checkbox" class="reg-check" value="${esc(item.req_id)}">` : ''}</td>` : ''}
+        ${canCheck ? `<td><input type="checkbox" class="reg-check" value="${esc(item.req_id)}"></td>` : ''}
         <td>
           <div class="fw-bold text-primary">${esc(item.req_id)}</div>
           <div class="small text-muted">${esc(item.created_at)}</div>
@@ -461,7 +482,7 @@ function renderDashboardList() {
       <div class="mobile-item-card">
         <div class="d-flex justify-content-between align-items-start mb-2">
           <div>
-            ${isReg && item.current_step === 'APPROVED_FOR_REGISTRAR' ? `<input type="checkbox" class="reg-check me-2" value="${esc(item.req_id)}">` : ''}
+            ${canCheck ? `<input type="checkbox" class="reg-check me-2" value="${esc(item.req_id)}">` : ''}
             <span class="fw-bold text-primary">${esc(item.req_id)}</span>
           </div>
           <span class="badge step-badge ${st.cls}">${st.text}</span>
@@ -531,7 +552,7 @@ function openDetailModal(reqId) {
   const canAct = isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
   document.getElementById('detailModalFooter').innerHTML = `
     <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printProjectPDF('${esc(item.req_id)}')">
-      <i class="bi bi-printer me-1"></i>พิมพ์ / โหลดโครงการ (PDF)
+      <i class="bi bi-printer me-1"></i>พิมพ์บันทึกข้อความ + โครงการ (PDF)
     </button>
     <div class="d-flex flex-wrap gap-2">
       ${canAct ? `
@@ -580,8 +601,9 @@ async function executeApproval(reqId, decision, reason) {
   }
 }
 
+// ==================== แบบที่ 1: พิมพ์บันทึกข้อความรายโครงการ + ภาพประกอบ ====================
 async function printProjectPDF(reqId) {
-  showLoading('กำลังจัดเตรียมเอกสารและรูปภาพ...');
+  showLoading('กำลังจัดเตรียมบันทึกข้อความและรูปภาพ...');
   try {
     const data = await callApi('getSubmissionForPrint', { token: authToken, req_id: reqId });
     hideLoading();
@@ -593,64 +615,273 @@ async function printProjectPDF(reqId) {
         <div style="font-size:11pt;">ภาพประกอบที่ ${i + 1}</div>
       </div>
     `).join('');
+    const todayThai = formatThaiDate();
+    const startThai = formatThaiDate(item.activity_date);
+    const endThai = formatThaiDate(item.activity_end_date);
 
     document.getElementById('printOnlyContainer').innerHTML = `
-      <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
-        <h3 style="margin:0; font-weight:bold;">แบบเสนอขออนุมัติกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)</h3>
-        <div style="font-size:12pt;">รหัสอ้างอิงเอกสาร: ${esc(item.req_id)} | วันที่ยื่นคำขอ: ${esc(item.created_at)}</div>
+      <!-- หน้าที่ 1: บันทึกข้อความรายโครงการ -->
+      <div class="memo-page">
+        <div class="memo-header">
+          <img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'">
+          <div class="memo-title">บันทึกข้อความ</div>
+        </div>
+        <div class="memo-field"><b>ส่วนราชการ</b> &nbsp;${SCHOOL_NAME}</div>
+        <div class="memo-field" style="display:flex; justify-content:space-between;">
+          <span><b>ที่</b> &nbsp;....................................................</span>
+          <span><b>วันที่</b> &nbsp;${todayThai}</span>
+        </div>
+        <div class="memo-field"><b>เรื่อง</b> &nbsp;ขออนุมัติรับรองผลการทำกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) รายบุคคล</div>
+        <div class="memo-divider"></div>
+
+        <div class="memo-field" style="margin-bottom:12px;"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME}</div>
+
+        <div class="memo-indent">
+          ด้วย <b>${esc(item.student_name)}</b> รหัสนักศึกษา <b>${esc(item.student_id)}</b> ระดับชั้น <b>${esc(item.level)}</b>
+          ได้ดำเนินการจัดทำกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) โครงการ/กิจกรรมเรื่อง <b>"${esc(item.activity_name)}"</b>
+          ระหว่างวันที่ ${startThai} ถึงวันที่ ${endThai} ณ ${esc(item.location || '-')} รวมจำนวน <b>${esc(item.hours)} ชั่วโมง</b>
+          และได้ยื่นบันทึกหลักฐานพร้อมภาพถ่ายประกอบผ่านระบบออนไลน์ (รหัสอ้างอิง: ${esc(item.req_id)}) เรียบร้อยแล้วนั้น
+        </div>
+        <div class="memo-indent">
+          ในการนี้ ข้าพเจ้าในฐานะครูประจำกลุ่มได้ตรวจสอบความถูกต้องของเอกสารและหลักฐานการทำกิจกรรมเบื้องต้นแล้ว
+          เห็นสมควรนำเสนอต่อคณะกรรมการพิจารณา กพช. และผู้อำนวยการสถานศึกษา เพื่อโปรดพิจารณาอนุมัติชั่วโมง กพช. ให้แก่นักศึกษาดังกล่าว ตามรายละเอียดที่แนบมาพร้อมนี้
+        </div>
+        <div class="memo-indent">
+          จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ
+        </div>
+
+        <div style="width:55%; margin-left:auto; text-align:center; margin-top:32px;">
+          ลงชื่อ......................................................<br>
+          (${esc(item.teacher_name)})<br>
+          ครูประจำกลุ่ม / ผู้เสนอโครงการ<br>
+          <small style="font-size:11pt;">(อนุมัติระบบ: ${esc(item.teacher_approved_at || 'รอการอนุมัติ')})</small>
+        </div>
+
+        <div style="border:1px solid #000; padding:12px 16px; margin-top:32px; page-break-inside:avoid;">
+          <b>ความเห็น / คำสั่งผู้อำนวยการสถานศึกษา</b><br>
+          <div style="margin:8px 0 18px 20px;">
+            [ &nbsp; ] อนุมัติ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] ไม่อนุมัติ / ปรับปรุงแก้ไข ...........................................................
+          </div>
+          <div style="width:60%; margin-left:auto; text-align:center;">
+            ลงชื่อ......................................................<br>
+            (${DIRECTOR_NAME})<br>
+            ผู้อำนวยการ${SCHOOL_NAME}<br>
+            <small style="font-size:11pt;">(อนุมัติระบบ: ${esc(item.director_approved_at || 'รอการอนุมัติ')})</small>
+          </div>
+        </div>
       </div>
-      <table style="width:100%; border-collapse:collapse; margin-bottom:15px;" border="1" cellpadding="6">
-        <tr>
-          <td style="width:50%;"><b>ชื่อ-สกุล นักศึกษา:</b> ${esc(item.student_name)}</td>
-          <td style="width:50%;"><b>รหัสนักศึกษา:</b> ${esc(item.student_id)} (${esc(item.level)})</td>
-        </tr>
-        <tr>
-          <td><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</td>
-          <td><b>จำนวนชั่วโมง กพช. ที่ขอ:</b> ${esc(item.hours)} ชั่วโมง</td>
-        </tr>
-        <tr>
-          <td><b>ระยะเวลาโครงการ:</b> ${esc(item.activity_date || '-')} ถึง ${esc(item.activity_end_date || '-')}</td>
-          <td><b>สถานที่:</b> ${esc(item.location || '-')}</td>
-        </tr>
-      </table>
-      <p><b>1. ชื่อกิจกรรม / โครงการ:</b> ${esc(item.activity_name)}</p>
-      <p><b>2. รายละเอียดการปฏิบัติกิจกรรมและผลที่ได้รับ:</b></p>
-      <div style="border:1px solid #000; padding:10px; min-height:80px; white-space:pre-line; margin-bottom:15px;">${esc(item.activity_detail)}</div>
-      <p><b>3. ภาพถ่ายหลักฐานการทำกิจกรรม:</b></p>
-      <div class="print-img-box" style="display:flex; flex-wrap:wrap; justify-content:space-around;">${imgsHtml}</div>
-      <div class="sig-grid">
-        <div class="sig-box">
-          ลงชื่อ......................................................<br>
-          (${esc(item.teacher_name)})<br>ครูประจำกลุ่ม / ผู้เสนอโครงการ<br>
-          <small>อนุมัติระบบ: ${esc(item.teacher_approved_at || 'รอดำเนินการ')}</small>
+
+      <!-- หน้าที่ 2: แบบเสนอโครงการ ภาพถ่าย และลายเซ็นคณะกรรมการ -->
+      <div>
+        <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px;">
+          <h4 style="margin:0; font-weight:bold;">รายละเอียดกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) และหลักฐานภาพถ่าย</h4>
+          <div style="font-size:12pt;">${SCHOOL_NAME} | รหัสอ้างอิง: ${esc(item.req_id)}</div>
         </div>
-        <div class="sig-box">
-          ลงชื่อ......................................................<br>
-          ( นายเกียรติศักดิ์  หมั่นอุส่าห์ )<br>ครูศูนย์การเรียนรู้<br>
-          <small>อนุมัติระบบ: ${esc(item.comm1_approved_at || 'รอดำเนินการ')}</small>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:12px; font-size:13pt;" border="1" cellpadding="5">
+          <tr>
+            <td style="width:50%;"><b>ชื่อ-สกุล นักศึกษา:</b> ${esc(item.student_name)}</td>
+            <td style="width:50%;"><b>รหัสนักศึกษา:</b> ${esc(item.student_id)} (${esc(item.level)})</td>
+          </tr>
+          <tr>
+            <td><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</td>
+            <td><b>จำนวนชั่วโมง กพช. ที่ขอ:</b> ${esc(item.hours)} ชั่วโมง</td>
+          </tr>
+          <tr>
+            <td><b>ระยะเวลาโครงการ:</b> ${startThai} ถึง ${endThai}</td>
+            <td><b>สถานที่:</b> ${esc(item.location || '-')}</td>
+          </tr>
+        </table>
+        <p style="font-size:13.5pt; margin-bottom:6px;"><b>1. ชื่อกิจกรรม / โครงการ:</b> ${esc(item.activity_name)}</p>
+        <p style="font-size:13.5pt; margin-bottom:4px;"><b>2. รายละเอียดการปฏิบัติกิจกรรมและผลที่ได้รับ:</b></p>
+        <div style="border:1px solid #000; padding:8px; min-height:70px; white-space:pre-line; margin-bottom:12px; font-size:13pt;">${esc(item.activity_detail)}</div>
+        <p style="font-size:13.5pt; margin-bottom:6px;"><b>3. ภาพถ่ายหลักฐานการทำกิจกรรม:</b></p>
+        <div class="print-img-box" style="display:flex; flex-wrap:wrap; justify-content:space-around;">${imgsHtml}</div>
+        <div class="sig-grid">
+          <div class="sig-box">
+            ลงชื่อ................................................<br>
+            ( นายเกียรติศักดิ์  หมั่นอุส่าห์ )<br>ครูศูนย์การเรียนรู้<br>
+            <small>อนุมัติระบบ: ${esc(item.comm1_approved_at || 'รอดำเนินการ')}</small>
+          </div>
+          <div class="sig-box">
+            ลงชื่อ................................................<br>
+            ( นายไชยพัฒน์  นัยเนตร )<br>ครูศูนย์การเรียนรู้<br>
+            <small>อนุมัติระบบ: ${esc(item.comm2_approved_at || 'รอดำเนินการ')}</small>
+          </div>
+          <div class="sig-box">
+            ลงชื่อ................................................<br>
+            ( นางสาวนิศารัตน์  ดอนปัญญาไพร )<br>ครูศูนย์การเรียนรู้<br>
+            <small>อนุมัติระบบ: ${esc(item.comm3_approved_at || 'รอดำเนินการ')}</small>
+          </div>
+          <div class="sig-box">
+            ลงชื่อ................................................<br>
+            (${DIRECTOR_NAME})<br>ผู้อำนวยการ${SCHOOL_NAME}<br>
+            <small>อนุมัติระบบ: ${esc(item.director_approved_at || 'รอดำเนินการ')}</small>
+          </div>
         </div>
-        <div class="sig-box">
-          ลงชื่อ......................................................<br>
-          (นายไชยพัฒน์  นัยเนตร )<br>ครูศูนย์การเรียนรู้<br>
-          <small>อนุมัติระบบ: ${esc(item.comm2_approved_at || 'รอดำเนินการ')}</small>
-        </div>
-        <div class="sig-box">
-          ลงชื่อ......................................................<br>
-          (นางสาวนิศารัตน์  ดอนปัญญาไพร )<br>ครูศูนย์การเรียนรู้<br>
-          <small>อนุมัติระบบ: ${esc(item.comm3_approved_at || 'รอดำเนินการ')}</small>
-        </div>
-      </div>
-      <div style="text-align:center; margin-top:10px; page-break-inside:avoid;">
-        <b>ความเห็นผู้อำนวยการสถานศึกษา:</b> [ ] อนุมัติ &nbsp;&nbsp;&nbsp; [ ] ไม่อนุมัติ<br><br>
-        ลงชื่อ......................................................<br>(ผู้อำนวยการสถานศึกษา)<br>
-        <small>อนุมัติระบบ: ${esc(item.director_approved_at || 'รอดำเนินการ')}</small>
       </div>
     `;
-    setTimeout(() => window.print(), 300);
+    setTimeout(() => window.print(), 450);
   } catch (err) {
     hideLoading();
     safeAlert('ผิดพลาด', err.message, 'error');
   }
+}
+
+// ==================== แบบที่ 2: พิมพ์บันทึกข้อความสรุปรวมเป็นชุด + บัญชีรายชื่อ ====================
+async function printBatchMemo() {
+  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  let targetItems = [];
+
+  if (checkedIds.length > 0) {
+    targetItems = dashItems.filter(x => checkedIds.includes(x.req_id));
+  } else {
+    targetItems = dashItems.filter(x => x.current_step === 'APPROVED_FOR_REGISTRAR' || x.current_step === 'COMPLETED');
+  }
+
+  if (targetItems.length === 0) {
+    return safeAlert(
+      'ไม่พบรายการสำหรับพิมพ์สรุปรวม',
+      'กรุณาติ๊กถูกหน้ารายการที่ต้องการ หรือรอให้รายการผ่านการอนุมัติจาก ผอ. ก่อนครับ',
+      'info'
+    );
+  }
+
+  const { value: formValues } = await Swal.fire({
+    title: `จัดทำบันทึกข้อความสรุปรวม (${targetItems.length} รายการ)`,
+    html: `
+      <div class="text-start small">
+        <label class="form-label fw-bold mb-1">ส่วนราชการ / กลุ่ม</label>
+        <input id="swal_dept" class="form-control mb-2" value="${esc(currentUser.group_name ? SCHOOL_NAME + ' (' + currentUser.group_name + ')' : SCHOOL_NAME)}">
+        <label class="form-label fw-bold mb-1">เลขที่หนังสือ (เว้นว่างไว้เติมปากกาได้)</label>
+        <input id="swal_docno" class="form-control mb-2" placeholder="เช่น ศธ ๐๒๑๐..../....">
+        <label class="form-label fw-bold mb-1">ภาคเรียน / ปีการศึกษา</label>
+        <input id="swal_term" class="form-control" value="2/2569">
+      </div>
+    `,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: '🖨️ สร้างเอกสารและพิมพ์',
+    cancelButtonText: 'ยกเลิก',
+    preConfirm: () => ({
+      dept: document.getElementById('swal_dept').value.trim() || SCHOOL_NAME,
+      docNo: document.getElementById('swal_docno').value.trim() || '....................................................',
+      term: document.getElementById('swal_term').value.trim() || '..../........'
+    })
+  });
+
+  if (!formValues) return;
+
+  const totalHours = targetItems.reduce((sum, r) => sum + (Number(r.hours) || 0), 0);
+  const todayThai = formatThaiDate();
+
+  const tableRowsHtml = targetItems.map((r, idx) => `
+    <tr>
+      <td style="text-align:center;">${idx + 1}</td>
+      <td>${esc(r.req_id)}</td>
+      <td>${esc(r.student_id)}</td>
+      <td>${esc(r.student_name)}</td>
+      <td style="text-align:center;">${esc(r.level)}</td>
+      <td>${esc(r.activity_name)}</td>
+      <td style="text-align:center;">${esc(r.activity_date || '-')} ถึง ${esc(r.activity_end_date || '-')}</td>
+      <td style="text-align:center;"><b>${esc(r.hours)}</b></td>
+      <td>${esc(r.teacher_name)}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('printOnlyContainer').innerHTML = `
+    <!-- หน้าที่ 1: บันทึกข้อความสรุปรวม -->
+    <div class="memo-page">
+      <div class="memo-header">
+        <img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'">
+        <div class="memo-title">บันทึกข้อความ</div>
+      </div>
+      <div class="memo-field"><b>ส่วนราชการ</b> &nbsp;${esc(formValues.dept)}</div>
+      <div class="memo-field" style="display:flex; justify-content:space-between;">
+        <span><b>ที่</b> &nbsp;${esc(formValues.docNo)}</span>
+        <span><b>วันที่</b> &nbsp;${todayThai}</span>
+      </div>
+      <div class="memo-field"><b>เรื่อง</b> &nbsp;ขออนุมัติผลการดำเนินกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) และบันทึกชั่วโมงเข้าระบบทะเบียน ประจำภาคเรียนที่ ${esc(formValues.term)}</div>
+      <div class="memo-divider"></div>
+
+      <div class="memo-field" style="margin-bottom:14px;"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME}</div>
+
+      <div class="memo-indent">
+        ตามที่${SCHOOL_NAME} ได้ดำเนินการจัดส่งและประเมินผลกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) ของนักศึกษาผ่านระบบออนไลน์
+        ประจำภาคเรียนที่ ${esc(formValues.term)} นั้น บัดนี้ นักศึกษาได้ส่งบันทึกหลักฐานการปฏิบัติกิจกรรมพร้อมภาพถ่ายประกอบครบถ้วนแล้ว
+      </div>
+      <div class="memo-indent">
+        ในการนี้ ครูประจำกลุ่มและคณะกรรมการพิจารณา กพช. ได้ร่วมกันตรวจสอบหลักฐานและพิจารณาอนุมัติผลการดำเนินกิจกรรมเรียบร้อยแล้ว
+        จำนวนทั้งสิ้น <b>${targetItems.length} ราย</b> รวมจำนวนชั่วโมง กพช. ทั้งหมด <b>${totalHours} ชั่วโมง</b>
+        รายละเอียดปรากฏตามบัญชีรายชื่อที่แนบมาพร้อมบันทึกข้อความนี้
+      </div>
+      <div class="memo-indent">
+        จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติรับรองผลการดำเนินกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)
+        และมอบหมายงานทะเบียนดำเนินการบันทึกชั่วโมง กพช. เข้าระบบทะเบียนนักศึกษาต่อไป
+      </div>
+
+      <div style="width:58%; margin-left:auto; text-align:center; margin-top:36px;">
+        ลงชื่อ......................................................<br>
+        (${esc(currentUser.full_name)})<br>
+        ตำแหน่ง ${ROLE_LABELS[currentUser.role] || currentUser.role}<br>
+        ผู้สรุปเสนอรายงาน
+      </div>
+
+      <div style="border:1px solid #000; padding:14px 18px; margin-top:36px; page-break-inside:avoid;">
+        <b>คำสั่ง / การอนุมัติผู้อำนวยการสถานศึกษา</b><br>
+        <div style="margin:10px 0 22px 20px;">
+          [ &nbsp; ] อนุมัติ และมอบหมายงานทะเบียนดำเนินการบันทึกชั่วโมง กพช. ต่อไป<br>
+          [ &nbsp; ] ไม่อนุมัติ / อื่นๆ ....................................................................................
+        </div>
+        <div style="width:60%; margin-left:auto; text-align:center;">
+          ลงชื่อ......................................................<br>
+          (${DIRECTOR_NAME})<br>
+          ผู้อำนวยการ${SCHOOL_NAME}<br>
+          วันที่ ............../................../..............
+        </div>
+      </div>
+    </div>
+
+    <!-- หน้าที่ 2+: บัญชีรายชื่อแนบท้าย -->
+    <div>
+      <div style="text-align:center; margin-bottom:10px;">
+        <h4 style="margin:0; font-weight:bold;">บัญชีรายชื่อนักศึกษาผู้ผ่านการพิจารณาอนุมัติกิจกรรม กพช. (ภาคเรียนที่ ${esc(formValues.term)})</h4>
+        <div style="font-size:12pt;">แนบท้ายบันทึกข้อความ ที่ ${esc(formValues.docNo)} ลงวันที่ ${todayThai} | ${SCHOOL_NAME}</div>
+      </div>
+
+      <table class="batch-table">
+        <thead>
+          <tr>
+            <th style="width:5%;">ที่</th>
+            <th style="width:13%;">รหัสอ้างอิง</th>
+            <th style="width:11%;">รหัสนักศึกษา</th>
+            <th style="width:16%;">ชื่อ-นามสกุล</th>
+            <th style="width:9%;">ระดับ</th>
+            <th style="width:19%;">ชื่อกิจกรรม/โครงการ</th>
+            <th style="width:12%;">ช่วงวันที่จัด</th>
+            <th style="width:5%;">ชม.</th>
+            <th style="width:10%;">ครูประจำกลุ่ม</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRowsHtml}
+          <tr>
+            <td colspan="7" style="text-align:right; font-weight:bold;">รวมทั้งสิ้น (${targetItems.length} รายการ)</td>
+            <td style="text-align:center; font-weight:bold;">${totalHours}</td>
+            <td>ชั่วโมง</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="width:45%; margin-left:auto; text-align:center; margin-top:28px; page-break-inside:avoid; font-size:13pt;">
+        ขอรับรองว่าข้อมูลรายชื่อข้างต้นถูกต้องครบถ้วน<br><br>
+        ลงชื่อ................................................ผู้จัดทำ<br>
+        (${esc(currentUser.full_name)})<br>
+        วันที่ ${todayThai}
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => window.print(), 450);
 }
 
 // ==================== นายทะเบียน ====================
@@ -684,11 +915,18 @@ function exportRegistrarCSV() {
 }
 
 function confirmRegistrarComplete() {
-  const ids = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
-  if (ids.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่กรอกลงทะเบียนเรียบร้อยแล้ว', 'warning');
+  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  const validIds = checkedIds.filter(id => {
+    const it = dashItems.find(x => x.req_id === id);
+    return it && it.current_step === 'APPROVED_FOR_REGISTRAR';
+  });
+
+  if (validIds.length === 0) {
+    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่มีสถานะ "ผอ.อนุมัติแล้ว (รอนายทะเบียน)" เพื่อปิดงานครับ', 'warning');
+  }
 
   Swal.fire({
-    title: `ยืนยันปิดงาน ${ids.length} รายการ?`,
+    title: `ยืนยันปิดงาน ${validIds.length} รายการ?`,
     text: 'รายการที่เลือกจะเปลี่ยนสถานะเป็น "บันทึกทะเบียนเรียบร้อย"',
     icon: 'question', showCancelButton: true,
     confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก'
@@ -696,7 +934,7 @@ function confirmRegistrarComplete() {
     if (res.isConfirmed) {
       showLoading('กำลังอัปเดตสถานะ...');
       try {
-        const r = await callApi('markRegistrarCompleted', { token: authToken, req_ids: ids });
+        const r = await callApi('markRegistrarCompleted', { token: authToken, req_ids: validIds });
         hideLoading();
         safeAlert('เรียบร้อย', `ปิดงานสำเร็จ ${r.count} รายการ`, 'success');
         await loadDashboard();
@@ -859,6 +1097,9 @@ async function handleChangeMyPassword() {
 
 // ==================== เริ่มทำงาน ====================
 function initApp() {
+  const preloadGaruda = new Image();
+  preloadGaruda.src = GARUDA_URL;
+
   renderNavbar();
   loadPublicData();
   const savedToken = sessionStorage.getItem('kpch_token');
