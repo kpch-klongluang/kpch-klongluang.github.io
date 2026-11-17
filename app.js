@@ -1,4 +1,4 @@
-// ⚠️ นำลิงก์เว็บแอป (/exec) ที่ได้จากการ Deploy ใน Apps Script มาวางแทนที่ในเครื่องหมายคำพูดด้านล่างนี้
+// ⚠️ อย่าลืมนำลิงก์เว็บแอป (/exec) ของคุณมาใส่กลับในบรรทัดที่ 2 นี้นะครับ!
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 
 let compressedImages = [];
@@ -301,7 +301,15 @@ function handleLogout() {
   sessionStorage.removeItem('kpch_token');
   document.getElementById('dashboardSection').classList.add('d-none');
   document.getElementById('publicSection').classList.remove('d-none');
+
+  // รีเซ็ตแท็บหลังบ้านและโหลดรายชื่อครูหน้าแรกใหม่ทุกครั้งที่กดออก
+  document.getElementById('dashSubmissionsView').classList.remove('d-none');
+  document.getElementById('adminUsersView').classList.add('d-none');
+  document.getElementById('adminLogsView').classList.add('d-none');
+  document.querySelectorAll('#adminNavTabs button').forEach((b, idx) => b.classList.toggle('active', idx === 0));
+
   renderNavbar();
+  loadTeachersDropdown();
 }
 
 async function loadDashboard(silentOnExpire = false) {
@@ -327,7 +335,12 @@ async function loadDashboard(silentOnExpire = false) {
     document.getElementById('registrarTools').classList.toggle('d-none', !isReg);
     document.getElementById('thCheckbox').classList.toggle('d-none', !isReg);
 
-    if (isAdmin) {
+    // ถ้าไม่ใช่ Admin ต้องบังคับแสดงหน้าคำขอเสมอ ป้องกันค้างหน้าจัดการบุคลากร
+    if (!isAdmin) {
+      document.getElementById('dashSubmissionsView').classList.remove('d-none');
+      document.getElementById('adminUsersView').classList.add('d-none');
+      document.getElementById('adminLogsView').classList.add('d-none');
+    } else {
       renderAdminUsers();
       renderAdminLogs();
     }
@@ -774,22 +787,6 @@ async function handleSaveUser() {
   }
 }
 
-// ==================== เริ่มทำงาน ====================
-function initApp() {
-  renderNavbar();
-  loadTeachersDropdown();
-  const savedToken = sessionStorage.getItem('kpch_token');
-  if (savedToken) {
-    authToken = savedToken;
-    loadDashboard(true);
-  }
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
-  initApp();
-}
 async function handleChangeMyPassword() {
   const oldPass = document.getElementById('cp_old').value;
   const newPass = document.getElementById('cp_new').value;
@@ -816,4 +813,21 @@ async function handleChangeMyPassword() {
     hideLoading();
     safeAlert('ผิดพลาด', err.message, 'error');
   }
+}
+
+// ==================== เริ่มทำงาน ====================
+function initApp() {
+  renderNavbar();
+  loadTeachersDropdown();
+  const savedToken = sessionStorage.getItem('kpch_token');
+  if (savedToken) {
+    authToken = savedToken;
+    loadDashboard(true);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
 }
