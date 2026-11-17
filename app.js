@@ -249,12 +249,12 @@ async function searchMyStatus() {
     area.innerHTML = rows.map(r => {
       const st = STEP_LABELS[r.current_step] || { text: r.current_step, cls: 'bg-secondary' };
       const steps = [
-        { label: 'ครู', done: !!r.teacher_approved_at },
-        { label: 'กก.1', done: !!r.comm1_approved_at },
-        { label: 'กก.2', done: !!r.comm2_approved_at },
-        { label: 'กก.3', done: !!r.comm3_approved_at },
-        { label: 'ผอ.', done: !!r.director_approved_at },
-        { label: 'ทะเบียน', done: r.current_step === 'COMPLETED' }
+        { label: 'ครูประจำกลุ่ม', done: !!r.teacher_approved_at },
+        { label: 'กรรมการ1', done: !!r.comm1_approved_at },
+        { label: 'กรรมการ2', done: !!r.comm2_approved_at },
+        { label: 'กรรมการ3', done: !!r.comm3_approved_at },
+        { label: 'ผู้อำนวยการ', done: !!r.director_approved_at },
+        { label: 'นายทะเบียน', done: r.current_step === 'COMPLETED' }
       ];
       const progHtml = steps.map(s => `
         <div class="prog-step ${s.done ? 'done' : (r.current_step === 'REJECTED' ? 'rejected' : '')}">
@@ -270,7 +270,7 @@ async function searchMyStatus() {
               <span class="badge bg-light text-primary border me-1">${esc(r.req_id)}</span>
               <strong>${esc(r.activity_name)}</strong>
               <div class="small text-muted mt-1">
-                ผู้ส่ง: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
+                ผู้ส่ง: ${esc(r.student_name)} | ครูประจำกลุ่ม: ${esc(r.teacher_name)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
                 ช่วงวันที่: ${esc(r.activity_date || '-')} ถึง ${esc(r.activity_end_date || '-')}
               </div>
             </div>
@@ -468,7 +468,7 @@ function renderDashboardList() {
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
         <div class="small text-muted mb-3">
           <b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)})<br>
-          <b>ครู:</b> ${esc(item.teacher_name)} | <b>ชั่วโมง:</b> ${esc(item.hours)} ชม.<br>
+          <b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)} | <b>ชั่วโมง:</b> ${esc(item.hours)} ชม.<br>
           <b>วันที่:</b> ${esc(item.activity_date || '-')} ถึง ${esc(item.activity_end_date || '-')}
         </div>
         <div class="d-flex gap-2">
@@ -522,7 +522,7 @@ function openDetailModal(reqId) {
     <hr>
     <div class="small text-muted">
       <b>ประวัติการอนุมัติ:</b><br>
-      ครู: ${esc(item.teacher_approved_at || '-')} | กก.1: ${esc(item.comm1_approved_at || '-')} | กก.2: ${esc(item.comm2_approved_at || '-')} | กก.3: ${esc(item.comm3_approved_at || '-')} | ผอ.: ${esc(item.director_approved_at || '-')}
+      ครูประจำกลุ่ม: ${esc(item.teacher_approved_at || '-')} | กก.1: ${esc(item.comm1_approved_at || '-')} | กก.2: ${esc(item.comm2_approved_at || '-')} | กก.3: ${esc(item.comm3_approved_at || '-')} | ผอ.: ${esc(item.director_approved_at || '-')}
     </div>
     ${item.reject_reason ? `<div class="alert alert-danger mt-2 mb-0 rounded-3"><b>เหตุผลที่ตีกลับ:</b> ${esc(item.reject_reason)}</div>` : ''}
   `;
