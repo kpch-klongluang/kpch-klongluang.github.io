@@ -129,16 +129,38 @@ input:focus, select:focus, textarea:focus {
 
 #printOnlyContainer { display: none; }
 
+@page {
+  size: A4;
+  margin: 1.5cm 2cm;
+}
+
 @media print {
   .no-print, .modal-backdrop { display: none !important; }
-  body { background: #fff !important; font-family: 'Sarabun', sans-serif !important; padding: 0; }
+  body { background: #fff !important; padding: 0; margin: 0; }
+  #printOnlyContainer, #printOnlyContainer * {
+    font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important;
+  }
   #printOnlyContainer {
-    display: block !important; width: 100%; padding: 15px 25px;
-    font-family: 'Sarabun', sans-serif; font-size: 14pt; color: #000;
+    display: block !important;
+    width: 100%;
+    padding: 0;
+    font-size: 16pt !important;
+    line-height: 1.35;
+    color: #000;
   }
+  .memo-page { page-break-after: always; }
+  .memo-header { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 8px; }
+  .memo-garuda { width: 56px; height: auto; }
+  .memo-title { font-size: 28pt !important; font-weight: 700; line-height: 1; flex: 1; text-align: center; padding-right: 56px; }
+  .memo-field { margin-bottom: 3px; font-size: 16pt !important; }
+  .memo-divider { border-top: 1.5px solid #000; margin: 6px 0 10px 0; }
+  .memo-indent { text-indent: 2.5cm; text-align: justify; margin-bottom: 8px; font-size: 16pt !important; }
   .print-img-box img {
-    max-height: 210px; max-width: 100%; object-fit: contain; border: 1px solid #999; padding: 3px;
+    max-height: 195px; max-width: 100%; object-fit: contain; border: 1px solid #999; padding: 3px;
   }
-  .sig-grid { display: flex; flex-wrap: wrap; justify-content: space-between; margin-top: 25px; }
-  .sig-box { width: 48%; text-align: center; margin-bottom: 25px; page-break-inside: avoid; }
+  .sig-grid { display: flex; flex-wrap: wrap; justify-content: space-between; margin-top: 18px; }
+  .sig-box { width: 48%; text-align: center; margin-bottom: 18px; page-break-inside: avoid; font-size: 15pt !important; }
+  .batch-table { width: 100%; border-collapse: collapse; font-size: 14pt !important; margin-top: 8px; }
+  .batch-table th, .batch-table td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
+  .batch-table th { background-color: #f1f5f9 !important; text-align: center; font-weight: 700; }
 }
