@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>ระบบบันทึกและอนุมัติ กพช.สกร.คลองหลวง </title>
+  <title>ระบบ กพช.ออนไลน์ สกร.คลองหลวง </title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -24,7 +24,7 @@
         <span class="bg-white text-primary rounded-circle d-inline-flex align-items-center justify-content-center" style="width:36px;height:36px;">
           <i class="bi bi-stars"></i>
         </span>
-        <span>ระบบ กพช.ออนไลน์ สกร.คลองหลวง </span>
+        <span>ระบบ กพช.ออนไลน์ สกร.คลองหลวง</span>
       </a>
       <div class="d-flex align-items-center gap-2" id="navUserArea">
         <button type="button" class="btn btn-light btn-sm rounded-pill px-3 fw-bold text-primary shadow-sm" onclick="openModalById('loginModal')">
@@ -39,19 +39,18 @@
 
     <!-- ==================== ส่วนหน้าแรก (นักศึกษา) ==================== -->
     <div id="publicSection">
-      <!-- 📢 กล่องข่าวประกาศ (แก้ไขข้อความประกาศตรงนี้ได้เลย) -->
-      <div class="mx-auto mb-4 p-3 p-md-4 shadow-sm" style="max-width: 820px; background: linear-gradient(135deg, #fffbeb 0%, #fdf2f8 100%); border: 2px solid #ffffff; border-radius: 20px;">
+
+      <!-- 📢 กล่องข่าวประกาศ (แอดมินแก้ได้จากหลังบ้าน) -->
+      <div id="announcementBox" class="mx-auto mb-4 p-3 p-md-4 shadow-sm" style="max-width: 820px; background: linear-gradient(135deg, #fffbeb 0%, #fdf2f8 100%); border: 2px solid #ffffff; border-radius: 20px;">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
           <span class="badge rounded-pill px-3 py-2 text-white" style="background: linear-gradient(90deg, #f59e0b, #ec4899); font-size: 0.9rem;">
             📢 ข่าวประกาศ / ประชาสัมพันธ์
           </span>
-          <span class="small text-muted fw-semibold">อัปเดตล่าสุด: ภาคเรียนที่ 2/2569</span>
+          <span class="small text-muted fw-semibold" id="annBadgeText">กำลังโหลดประกาศ...</span>
         </div>
-        <div class="small text-dark" style="line-height: 1.75;">
-          <div>📌 <b>กำหนดการส่ง กพช.:</b> นักศึกษาสามารถส่งบันทึกขอ กพช. ออนไลน์ได้ตั้งแต่วันนี้เป็นต้นไป</div>
-          <div>📸 <b>หมายเหตุ:</b> กรุณาแนบรูปถ่ายขณะทำกิจกรรม 2-3 ภาพ และเลือกครูประจำกลุ่มของตนเองให้ถูกต้อง</div>
-        </div>
+        <div class="small text-dark" id="annContentText" style="line-height: 1.75; white-space: pre-line;"></div>
       </div>
+
       <ul class="nav nav-pills justify-content-center mb-4 gap-2 flex-wrap">
         <li class="nav-item">
           <button type="button" class="nav-link cute-pill active" id="tabBtnSubmit" onclick="switchPublicTab('submit')">
@@ -65,7 +64,7 @@
         </li>
         <li class="nav-item">
           <button type="button" class="nav-link cute-pill cute-pill-staff" onclick="openModalById('loginModal')">
-            🔐 ระบบคุณครู
+            🔐 ระบบครู
           </button>
         </li>
       </ul>
@@ -189,6 +188,9 @@
           <button type="button" class="nav-link cute-pill" onclick="switchAdminTab('users', this)">👥 จัดการบุคลากร</button>
         </li>
         <li class="nav-item text-nowrap">
+          <button type="button" class="nav-link cute-pill" onclick="switchAdminTab('ann', this)">📢 ข่าวประกาศ</button>
+        </li>
+        <li class="nav-item text-nowrap">
           <button type="button" class="nav-link cute-pill" onclick="switchAdminTab('logs', this)">📜 ประวัติระบบ</button>
         </li>
       </ul>
@@ -267,6 +269,26 @@
         </div>
       </div>
 
+      <!-- มุมมองแอดมิน: แก้ไขข่าวประกาศ -->
+      <div id="adminAnnView" class="cute-card p-3 p-md-4 d-none">
+        <h5 class="fw-bold mb-3">📢 จัดการข่าวประกาศหน้าแรก</h5>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="ann_visible" checked>
+          <label class="form-check-label fw-semibold" for="ann_visible">แสดงกล่องข่าวประกาศบนหน้าแรก</label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold small">ข้อความกำกับมุมขวา (เช่น ภาคเรียน / วันที่อัปเดต)</label>
+          <input type="text" class="form-control" id="ann_badge" placeholder="เช่น อัปเดตล่าสุด: ภาคเรียนที่ 2/2569">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold small">รายละเอียดข่าวประกาศ (ขึ้นบรรทัดใหม่ได้ตามต้องการ)</label>
+          <textarea class="form-control" id="ann_content" rows="5" placeholder="พิมพ์ข้อความประกาศถึงนักศึกษา..."></textarea>
+        </div>
+        <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="handleSaveAnnouncement()">
+          <i class="bi bi-save me-1"></i>บันทึกข่าวประกาศ
+        </button>
+      </div>
+
       <!-- มุมมองแอดมิน: Audit Logs -->
       <div id="adminLogsView" class="cute-card p-3 p-md-4 d-none">
         <h5 class="fw-bold mb-3">📜 ประวัติการทำงานล่าสุด (Audit_Logs)</h5>
@@ -285,28 +307,22 @@
 
   </div>
 
-  <!-- Modal เข้าสู่ระบบเจ้าหน้าที่ -->
+  <!-- Modal เข้าสู่ระบบเจ้าหน้าที่ (พร้อมใช้งานจริง ไม่มีรหัสทดสอบ) -->
   <div class="modal fade no-print" id="loginModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content rounded-4 border-0 shadow">
         <div class="modal-header cute-navbar text-white border-0 rounded-top-4">
-          <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock me-2"></i>เข้าสู่ระบบหลังบ้าน</h5>
+          <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock me-2"></i>เข้าสู่ระบบเจ้าหน้าที่</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body p-4">
           <div class="mb-3">
             <label class="form-label fw-semibold small">ชื่อผู้ใช้ (Username)</label>
-            <input type="text" class="form-control" id="loginUser" placeholder="เช่น admin หรือ teacher1">
+            <input type="text" class="form-control" id="loginUser" placeholder="กรอกชื่อผู้ใช้">
           </div>
-          <div class="mb-3">
+          <div class="mb-1">
             <label class="form-label fw-semibold small">รหัสผ่าน (Password)</label>
             <input type="password" class="form-control" id="loginPass" placeholder="กรอกรหัสผ่าน" onkeydown="if(event.key==='Enter') handleLogin()">
-          </div>
-          <div class="alert alert-light border rounded-3 small mb-0">
-            <b>รหัสทดสอบเริ่มต้น:</b><br>
-            แอดมิน: <code>admin</code> / <code>admin1234</code><br>
-            ครู: <code>teacher1</code> / <code>1234</code> | กก.: <code>comm1</code>, <code>comm2</code>, <code>comm3</code> / <code>1234</code><br>
-            ผอ.: <code>director</code> / <code>1234</code> | นายทะเบียน: <code>registrar</code> / <code>1234</code>
           </div>
         </div>
         <div class="modal-footer border-0 pt-0 px-4 pb-4">
