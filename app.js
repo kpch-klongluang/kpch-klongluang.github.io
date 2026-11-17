@@ -1,7 +1,7 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 const SCHOOL_NAME = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
 const DIRECTOR_NAME = 'นางฑัศดาพร ลองชัย';
-const GARUDA_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Garuda_Emblem_of_Thailand_%28Monochrome_2%29.svg/240px-Garuda_Emblem_of_Thailand_%28Monochrome_2%29.svg.png';
+const GARUDA_URL = 'garuda.png';
 
 let compressedImages = [];
 let authToken = null;
@@ -81,6 +81,21 @@ function formatThaiDate(dateInput) {
     }
   }
   return String(dateInput);
+}
+function formatShortThaiDate(dateInput) {
+  if (!dateInput) return '-';
+  const shortMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const datePart = String(dateInput).split(' ')[0];
+  const parts = datePart.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d) && shortMonths[m]) {
+      return `${d} ${shortMonths[m]} ${y < 2400 ? y + 543 : y}`;
+    }
+  }
+  return datePart;
 }
 function safeAlert(title, htmlText, icon) {
   Swal.fire({ title, html: htmlText, icon: icon || 'info', confirmButtonColor: '#6366f1' });
@@ -290,7 +305,7 @@ async function searchMyStatus() {
               <strong>${esc(r.activity_name)}</strong>
               <div class="small text-muted mt-1">
                 ผู้ส่ง: ${esc(r.student_name)} | ครูประจำกลุ่ม: ${esc(r.teacher_name)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
-                ช่วงวันที่: ${esc(r.activity_date || '-')} ถึง ${esc(r.activity_end_date || '-')}
+                ช่วงวันที่: ${formatShortThaiDate(r.activity_date)} ถึง ${formatShortThaiDate(r.activity_end_date)}
               </div>
             </div>
             <span class="badge step-badge ${st.cls}">${st.text}</span>
@@ -460,7 +475,7 @@ function renderDashboardList() {
         <td class="small">${esc(item.teacher_name)}</td>
         <td>
           <div class="fw-semibold">${esc(item.activity_name)}</div>
-          <div class="small text-muted">${esc(item.activity_date || '-')} ถึง ${esc(item.activity_end_date || '-')} | <b>${esc(item.hours)} ชม.</b></div>
+          <div class="small text-muted">${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)} | <b>${esc(item.hours)} ชม.</b></div>
         </td>
         <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
         <td class="text-end text-nowrap">
@@ -491,7 +506,7 @@ function renderDashboardList() {
         <div class="small text-muted mb-3">
           <b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)})<br>
           <b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)} | <b>ชั่วโมง:</b> ${esc(item.hours)} ชม.<br>
-          <b>วันที่:</b> ${esc(item.activity_date || '-')} ถึง ${esc(item.activity_end_date || '-')}
+          <b>วันที่:</b> ${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)}
         </div>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="openDetailModal('${esc(item.req_id)}')">
@@ -532,7 +547,7 @@ function openDetailModal(reqId) {
       <div class="col-12 col-md-6"><b>ระดับชั้น:</b> ${esc(item.level)}</div>
       <div class="col-12 col-md-6"><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</div>
       <div class="col-12 col-md-6"><b>จำนวนชั่วโมงที่ขอ:</b> ${esc(item.hours)} ชั่วโมง</div>
-      <div class="col-12 col-md-6"><b>วันเริ่ม - สิ้นสุด:</b> ${esc(item.activity_date || '-')} ถึง ${esc(item.activity_end_date || '-')}</div>
+      <div class="col-12 col-md-6"><b>วันเริ่ม - สิ้นสุด:</b> ${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)}</div>
       <div class="col-12 col-md-6"><b>สถานที่:</b> ${esc(item.location || '-')}</div>
     </div>
     <h6 class="fw-bold">ชื่อกิจกรรม/โครงการ:</h6>
@@ -612,7 +627,7 @@ async function printProjectPDF(reqId) {
     const imgsHtml = imgs.map((b64, i) => `
       <div style="width: 48%; text-align:center; margin-bottom:10px;">
         <img src="${b64}">
-        <div style="font-size:11pt;">ภาพประกอบที่ ${i + 1}</div>
+        <div style="font-size:13pt;">ภาพประกอบที่ ${i + 1}</div>
       </div>
     `).join('');
     const todayThai = formatThaiDate();
@@ -634,7 +649,7 @@ async function printProjectPDF(reqId) {
         <div class="memo-field"><b>เรื่อง</b> &nbsp;ขออนุมัติรับรองผลการทำกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) รายบุคคล</div>
         <div class="memo-divider"></div>
 
-        <div class="memo-field" style="margin-bottom:12px;"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME}</div>
+        <div class="memo-field" style="margin-bottom:10px;"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME}</div>
 
         <div class="memo-indent">
           ด้วย <b>${esc(item.student_name)}</b> รหัสนักศึกษา <b>${esc(item.student_id)}</b> ระดับชั้น <b>${esc(item.level)}</b>
@@ -650,34 +665,34 @@ async function printProjectPDF(reqId) {
           จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ
         </div>
 
-        <div style="width:55%; margin-left:auto; text-align:center; margin-top:32px;">
+        <div style="width:60%; margin-left:auto; text-align:center; margin-top:20px;">
           ลงชื่อ......................................................<br>
           (${esc(item.teacher_name)})<br>
           ครูประจำกลุ่ม / ผู้เสนอโครงการ<br>
-          <small style="font-size:11pt;">(อนุมัติระบบ: ${esc(item.teacher_approved_at || 'รอการอนุมัติ')})</small>
+          <span style="font-size:13pt;">(อนุมัติระบบ: ${esc(item.teacher_approved_at || 'รอการอนุมัติ')})</span>
         </div>
 
-        <div style="border:1px solid #000; padding:12px 16px; margin-top:32px; page-break-inside:avoid;">
+        <div style="border:1px solid #000; padding:10px 14px; margin-top:20px; page-break-inside:avoid;">
           <b>ความเห็น / คำสั่งผู้อำนวยการสถานศึกษา</b><br>
-          <div style="margin:8px 0 18px 20px;">
-            [ &nbsp; ] อนุมัติ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] ไม่อนุมัติ / ปรับปรุงแก้ไข ...........................................................
+          <div style="margin:6px 0 12px 20px;">
+            [ &nbsp; ] อนุมัติ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] ไม่อนุมัติ / ปรับปรุงแก้ไข ....................................................
           </div>
           <div style="width:60%; margin-left:auto; text-align:center;">
             ลงชื่อ......................................................<br>
             (${DIRECTOR_NAME})<br>
             ผู้อำนวยการ${SCHOOL_NAME}<br>
-            <small style="font-size:11pt;">(อนุมัติระบบ: ${esc(item.director_approved_at || 'รอการอนุมัติ')})</small>
+            <span style="font-size:13pt;">(อนุมัติระบบ: ${esc(item.director_approved_at || 'รอการอนุมัติ')})</span>
           </div>
         </div>
       </div>
 
       <!-- หน้าที่ 2: แบบเสนอโครงการ ภาพถ่าย และลายเซ็นคณะกรรมการ -->
       <div>
-        <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px;">
-          <h4 style="margin:0; font-weight:bold;">รายละเอียดกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) และหลักฐานภาพถ่าย</h4>
-          <div style="font-size:12pt;">${SCHOOL_NAME} | รหัสอ้างอิง: ${esc(item.req_id)}</div>
+        <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px;">
+          <div style="font-size:18pt; font-weight:bold;">รายละเอียดกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) และหลักฐานภาพถ่าย</div>
+          <div style="font-size:14pt;">${SCHOOL_NAME} | รหัสอ้างอิง: ${esc(item.req_id)}</div>
         </div>
-        <table style="width:100%; border-collapse:collapse; margin-bottom:12px; font-size:13pt;" border="1" cellpadding="5">
+        <table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:15pt;" border="1" cellpadding="4">
           <tr>
             <td style="width:50%;"><b>ชื่อ-สกุล นักศึกษา:</b> ${esc(item.student_name)}</td>
             <td style="width:50%;"><b>รหัสนักศึกษา:</b> ${esc(item.student_id)} (${esc(item.level)})</td>
@@ -691,36 +706,36 @@ async function printProjectPDF(reqId) {
             <td><b>สถานที่:</b> ${esc(item.location || '-')}</td>
           </tr>
         </table>
-        <p style="font-size:13.5pt; margin-bottom:6px;"><b>1. ชื่อกิจกรรม / โครงการ:</b> ${esc(item.activity_name)}</p>
-        <p style="font-size:13.5pt; margin-bottom:4px;"><b>2. รายละเอียดการปฏิบัติกิจกรรมและผลที่ได้รับ:</b></p>
-        <div style="border:1px solid #000; padding:8px; min-height:70px; white-space:pre-line; margin-bottom:12px; font-size:13pt;">${esc(item.activity_detail)}</div>
-        <p style="font-size:13.5pt; margin-bottom:6px;"><b>3. ภาพถ่ายหลักฐานการทำกิจกรรม:</b></p>
+        <div style="margin-bottom:4px;"><b>1. ชื่อกิจกรรม / โครงการ:</b> ${esc(item.activity_name)}</div>
+        <div style="margin-bottom:4px;"><b>2. รายละเอียดการปฏิบัติกิจกรรมและผลที่ได้รับ:</b></div>
+        <div style="border:1px solid #000; padding:8px; min-height:60px; white-space:pre-line; margin-bottom:10px; font-size:15pt;">${esc(item.activity_detail)}</div>
+        <div style="margin-bottom:6px;"><b>3. ภาพถ่ายหลักฐานการทำกิจกรรม:</b></div>
         <div class="print-img-box" style="display:flex; flex-wrap:wrap; justify-content:space-around;">${imgsHtml}</div>
         <div class="sig-grid">
           <div class="sig-box">
             ลงชื่อ................................................<br>
             ( นายเกียรติศักดิ์  หมั่นอุส่าห์ )<br>ครูศูนย์การเรียนรู้<br>
-            <small>อนุมัติระบบ: ${esc(item.comm1_approved_at || 'รอดำเนินการ')}</small>
+            <span style="font-size:13pt;">อนุมัติระบบ: ${esc(item.comm1_approved_at || 'รอดำเนินการ')}</span>
           </div>
           <div class="sig-box">
             ลงชื่อ................................................<br>
             ( นายไชยพัฒน์  นัยเนตร )<br>ครูศูนย์การเรียนรู้<br>
-            <small>อนุมัติระบบ: ${esc(item.comm2_approved_at || 'รอดำเนินการ')}</small>
+            <span style="font-size:13pt;">อนุมัติระบบ: ${esc(item.comm2_approved_at || 'รอดำเนินการ')}</span>
           </div>
           <div class="sig-box">
             ลงชื่อ................................................<br>
             ( นางสาวนิศารัตน์  ดอนปัญญาไพร )<br>ครูศูนย์การเรียนรู้<br>
-            <small>อนุมัติระบบ: ${esc(item.comm3_approved_at || 'รอดำเนินการ')}</small>
+            <span style="font-size:13pt;">อนุมัติระบบ: ${esc(item.comm3_approved_at || 'รอดำเนินการ')}</span>
           </div>
           <div class="sig-box">
             ลงชื่อ................................................<br>
             (${DIRECTOR_NAME})<br>ผู้อำนวยการ${SCHOOL_NAME}<br>
-            <small>อนุมัติระบบ: ${esc(item.director_approved_at || 'รอดำเนินการ')}</small>
+            <span style="font-size:13pt;">อนุมัติระบบ: ${esc(item.director_approved_at || 'รอดำเนินการ')}</span>
           </div>
         </div>
       </div>
     `;
-    setTimeout(() => window.print(), 450);
+    setTimeout(() => window.print(), 600);
   } catch (err) {
     hideLoading();
     safeAlert('ผิดพลาด', err.message, 'error');
@@ -782,7 +797,7 @@ async function printBatchMemo() {
       <td>${esc(r.student_name)}</td>
       <td style="text-align:center;">${esc(r.level)}</td>
       <td>${esc(r.activity_name)}</td>
-      <td style="text-align:center;">${esc(r.activity_date || '-')} ถึง ${esc(r.activity_end_date || '-')}</td>
+      <td style="text-align:center;">${formatShortThaiDate(r.activity_date)} - ${formatShortThaiDate(r.activity_end_date)}</td>
       <td style="text-align:center;"><b>${esc(r.hours)}</b></td>
       <td>${esc(r.teacher_name)}</td>
     </tr>
@@ -803,7 +818,7 @@ async function printBatchMemo() {
       <div class="memo-field"><b>เรื่อง</b> &nbsp;ขออนุมัติผลการดำเนินกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) และบันทึกชั่วโมงเข้าระบบทะเบียน ประจำภาคเรียนที่ ${esc(formValues.term)}</div>
       <div class="memo-divider"></div>
 
-      <div class="memo-field" style="margin-bottom:14px;"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME}</div>
+      <div class="memo-field" style="margin-bottom:10px;"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME}</div>
 
       <div class="memo-indent">
         ตามที่${SCHOOL_NAME} ได้ดำเนินการจัดส่งและประเมินผลกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) ของนักศึกษาผ่านระบบออนไลน์
@@ -819,16 +834,16 @@ async function printBatchMemo() {
         และมอบหมายงานทะเบียนดำเนินการบันทึกชั่วโมง กพช. เข้าระบบทะเบียนนักศึกษาต่อไป
       </div>
 
-      <div style="width:58%; margin-left:auto; text-align:center; margin-top:36px;">
+      <div style="width:60%; margin-left:auto; text-align:center; margin-top:20px;">
         ลงชื่อ......................................................<br>
         (${esc(currentUser.full_name)})<br>
         ตำแหน่ง ${ROLE_LABELS[currentUser.role] || currentUser.role}<br>
         ผู้สรุปเสนอรายงาน
       </div>
 
-      <div style="border:1px solid #000; padding:14px 18px; margin-top:36px; page-break-inside:avoid;">
+      <div style="border:1px solid #000; padding:10px 14px; margin-top:20px; page-break-inside:avoid;">
         <b>คำสั่ง / การอนุมัติผู้อำนวยการสถานศึกษา</b><br>
-        <div style="margin:10px 0 22px 20px;">
+        <div style="margin:6px 0 12px 20px;">
           [ &nbsp; ] อนุมัติ และมอบหมายงานทะเบียนดำเนินการบันทึกชั่วโมง กพช. ต่อไป<br>
           [ &nbsp; ] ไม่อนุมัติ / อื่นๆ ....................................................................................
         </div>
@@ -843,23 +858,23 @@ async function printBatchMemo() {
 
     <!-- หน้าที่ 2+: บัญชีรายชื่อแนบท้าย -->
     <div>
-      <div style="text-align:center; margin-bottom:10px;">
-        <h4 style="margin:0; font-weight:bold;">บัญชีรายชื่อนักศึกษาผู้ผ่านการพิจารณาอนุมัติกิจกรรม กพช. (ภาคเรียนที่ ${esc(formValues.term)})</h4>
-        <div style="font-size:12pt;">แนบท้ายบันทึกข้อความ ที่ ${esc(formValues.docNo)} ลงวันที่ ${todayThai} | ${SCHOOL_NAME}</div>
+      <div style="text-align:center; margin-bottom:8px;">
+        <div style="font-size:17pt; font-weight:bold;">บัญชีรายชื่อนักศึกษาผู้ผ่านการพิจารณาอนุมัติกิจกรรม กพช. (ภาคเรียนที่ ${esc(formValues.term)})</div>
+        <div style="font-size:14pt;">แนบท้ายบันทึกข้อความ ที่ ${esc(formValues.docNo)} ลงวันที่ ${todayThai} | ${SCHOOL_NAME}</div>
       </div>
 
       <table class="batch-table">
         <thead>
           <tr>
-            <th style="width:5%;">ที่</th>
+            <th style="width:4%;">ที่</th>
             <th style="width:13%;">รหัสอ้างอิง</th>
-            <th style="width:11%;">รหัสนักศึกษา</th>
+            <th style="width:10%;">รหัสนักศึกษา</th>
             <th style="width:16%;">ชื่อ-นามสกุล</th>
-            <th style="width:9%;">ระดับ</th>
-            <th style="width:19%;">ชื่อกิจกรรม/โครงการ</th>
-            <th style="width:12%;">ช่วงวันที่จัด</th>
+            <th style="width:10%;">ระดับ</th>
+            <th style="width:17%;">ชื่อกิจกรรม/โครงการ</th>
+            <th style="width:14%;">ช่วงวันที่จัด</th>
             <th style="width:5%;">ชม.</th>
-            <th style="width:10%;">ครูประจำกลุ่ม</th>
+            <th style="width:11%;">ครูประจำกลุ่ม</th>
           </tr>
         </thead>
         <tbody>
@@ -867,21 +882,21 @@ async function printBatchMemo() {
           <tr>
             <td colspan="7" style="text-align:right; font-weight:bold;">รวมทั้งสิ้น (${targetItems.length} รายการ)</td>
             <td style="text-align:center; font-weight:bold;">${totalHours}</td>
-            <td>ชั่วโมง</td>
+            <td style="text-align:center;">ชั่วโมง</td>
           </tr>
         </tbody>
       </table>
 
-      <div style="width:45%; margin-left:auto; text-align:center; margin-top:28px; page-break-inside:avoid; font-size:13pt;">
+      <div style="width:65%; margin-left:auto; text-align:center; margin-top:26px; page-break-inside:avoid; font-size:16pt;">
         ขอรับรองว่าข้อมูลรายชื่อข้างต้นถูกต้องครบถ้วน<br><br>
-        ลงชื่อ................................................ผู้จัดทำ<br>
+        <span style="white-space:nowrap;">ลงชื่อ...........................................ผู้จัดทำ</span><br>
         (${esc(currentUser.full_name)})<br>
         วันที่ ${todayThai}
       </div>
     </div>
   `;
 
-  setTimeout(() => window.print(), 450);
+  setTimeout(() => window.print(), 600);
 }
 
 // ==================== นายทะเบียน ====================
@@ -900,7 +915,7 @@ function exportRegistrarCSV() {
   approved.forEach((r, idx) => {
     lines.push([
       idx + 1, r.req_id, r.student_id, r.student_name, r.level, r.teacher_name,
-      r.activity_name, r.activity_date, r.activity_end_date, r.location, r.hours, r.director_approved_at
+      r.activity_name, formatShortThaiDate(r.activity_date), formatShortThaiDate(r.activity_end_date), r.location, r.hours, r.director_approved_at
     ].map(csvEscape).join(','));
   });
 
