@@ -790,3 +790,30 @@ if (document.readyState === 'loading') {
 } else {
   initApp();
 }
+async function handleChangeMyPassword() {
+  const oldPass = document.getElementById('cp_old').value;
+  const newPass = document.getElementById('cp_new').value;
+  const confirmPass = document.getElementById('cp_confirm').value;
+
+  if (!oldPass || !newPass || !confirmPass) {
+    return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกรหัสผ่านให้ครบทุกช่อง', 'warning');
+  }
+  if (newPass.length < 4) {
+    return safeAlert('รหัสผ่านสั้นเกินไป', 'รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร', 'warning');
+  }
+  if (newPass !== confirmPass) {
+    return safeAlert('รหัสผ่านไม่ตรงกัน', 'กรุณากรอกรหัสผ่านใหม่และยืนยันรหัสผ่านให้ตรงกัน', 'warning');
+  }
+
+  showLoading('กำลังเปลี่ยนรหัสผ่าน...');
+  try {
+    await callApi('changePassword', { token: authToken, old_pass: oldPass, new_pass: newPass });
+    hideLoading();
+    ['cp_old', 'cp_new', 'cp_confirm'].forEach(id => document.getElementById(id).value = '');
+    closeModalById('changePassModal');
+    safeAlert('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว', 'success');
+  } catch (err) {
+    hideLoading();
+    safeAlert('ผิดพลาด', err.message, 'error');
+  }
+}
