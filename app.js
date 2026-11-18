@@ -1,6 +1,9 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 const SCHOOL_NAME = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
 const DIRECTOR_NAME = 'นางฑัศดาพร ลองชัย';
+const COMM_1_NAME = 'นายเกียรติศักดิ์  หมั่นอุส่าห์';
+const COMM_2_NAME = 'นายไชยพัฒน์  นัยเนตร';
+const COMM_3_NAME = 'นางสาวนิศารัตน์  ดอนปัญญาไพร';
 const GARUDA_URL = 'garuda.png';
 
 const EVAL_QUESTIONS_12 = [
@@ -1320,6 +1323,10 @@ function printForm12(req12Id) {
 
 // ==================== แบบประเมินผลการปฏิบัติโครงการ (กพช. 5 หน้า 1 และหน้า 2) ====================
 function buildKPCH5Html(item, isLastInPrint) {
+  const comm1Name = (adminUsers.find(u => u.role === 'COMM_1' && u.status === 'ACTIVE') || {}).full_name || COMM_1_NAME;
+  const comm2Name = (adminUsers.find(u => u.role === 'COMM_2' && u.status === 'ACTIVE') || {}).full_name || COMM_2_NAME;
+  const comm3Name = (adminUsers.find(u => u.role === 'COMM_3' && u.status === 'ACTIVE') || {}).full_name || COMM_3_NAME;
+
   const dotsStr = '.'.repeat(140);
   const dotSpan = `<span style="flex:1; min-width:12px; overflow:hidden; white-space:nowrap; letter-spacing:1px;">${dotsStr}</span>`;
   const makeDotFlex = (val, extraStyle = '') => {
@@ -1425,7 +1432,7 @@ function buildKPCH5Html(item, isLastInPrint) {
     <!-- กพช. 5 หน้า 2 -->
     <div class="${isLastInPrint ? '' : 'memo-page'}" style="font-size:15pt; line-height:1.5;">
       <div style="text-align:center; margin-bottom:10px;">- 2 -</div>
-      <div style="font-weight:bold; margin-bottom:8px;">ความเห็นของ</div>
+      <div style="font-weight:bold; margin-bottom:8px;">ความเห็นของคณะกรรมการ</div>
       <div style="display:flex; align-items:center; margin-bottom:10px; line-height:1.3;">${makeDotFlex('')}</div>
       <div style="display:flex; align-items:center; margin-bottom:10px; line-height:1.3;">${makeDotFlex('')}</div>
       <div style="display:flex; align-items:center; margin-bottom:26px; line-height:1.3;">${makeDotFlex('')}</div>
@@ -1441,7 +1448,7 @@ function buildKPCH5Html(item, isLastInPrint) {
           <span style="white-space:nowrap;">ลงชื่อ</span>
           <div style="text-align:center; margin:0 6px;">
             ${makeDotInline('', 'width:190px; line-height:1.3;')}<br>
-            (${Comm1})
+            (${esc(comm1Name)})
           </div>
           <span style="white-space:nowrap;">ประธานคณะกรรมการ</span>
         </div>
@@ -1452,7 +1459,7 @@ function buildKPCH5Html(item, isLastInPrint) {
           <span style="white-space:nowrap;">ลงชื่อ</span>
           <div style="text-align:center; margin:0 6px;">
             ${makeDotInline('', 'width:190px; line-height:1.3;')}<br>
-            (นายไชยพัฒน์  นัยเนตร)
+            (${esc(comm2Name)})
           </div>
           <span style="white-space:nowrap;">คณะกรรมการ</span>
         </div>
@@ -1463,7 +1470,7 @@ function buildKPCH5Html(item, isLastInPrint) {
           <span style="white-space:nowrap;">ลงชื่อ</span>
           <div style="text-align:center; margin:0 6px;">
             ${makeDotInline('', 'width:190px; line-height:1.3;')}<br>
-            (นางสาวนิศารัตน์  ดอนปัญญาไพร)
+            (${esc(comm3Name)})
           </div>
           <span style="white-space:nowrap;">คณะกรรมการและเลขานุการ</span>
         </div>
