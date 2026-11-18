@@ -1,3 +1,4 @@
+
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 const SCHOOL_NAME = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
 const DIRECTOR_NAME = 'นางฑัศดาพร ลองชัย';
@@ -45,7 +46,7 @@ const STEP_LABELS = {
 const STEP12_LABELS = {
   'WAIT_TEACHER_12': { text: 'รอครูอนุมัติ กพช.1-2', cls: 'bg-warning text-dark' },
   'APPROVED_12': { text: 'อนุมัติให้ทำกิจกรรมแล้ว', cls: 'bg-success text-white' },
-  'REJECTED_12': { text: 'ไม่อนุมติ / แก้ไข กพช.1-2', cls: 'bg-danger text-white' }
+  'REJECTED_12': { text: 'ไม่อนุมัติ / แก้ไข กพช.1-2', cls: 'bg-danger text-white' }
 };
 
 const ROLE_LABELS = {
@@ -1001,8 +1002,17 @@ function printForm12(req12Id) {
   const lastName = nameParts.slice(1).join(' ') || '-';
 
   const termObj = parseTermParts(item.term);
-  const blankDateLine = '........./................../................';
-  const regNameDisplay = registrarName ? esc(registrarName) : '...........................................';
+  const blankDateLine = `
+    <span style="display:inline-block; width:38px; border-bottom:1.5px dotted #000;"></span>/<span style="display:inline-block; width:75px; border-bottom:1.5px dotted #000;"></span>/<span style="display:inline-block; width:55px; border-bottom:1.5px dotted #000;"></span>
+  `;
+  const regNameDisplay = registrarName
+    ? esc(registrarName)
+    : '<span style="display:inline-block; width:170px; border-bottom:1.5px dotted #000;"></span>';
+
+  const fillRowStyle = 'display:flex; align-items:baseline; gap:10px; margin-bottom:12px;';
+  const fillFlexStyle = 'flex:1; border-bottom:1.5px dotted #000; text-align:center; padding:0 8px 1px 8px; line-height:1.25;';
+  const fillInlineStyle = 'display:inline-block; border-bottom:1.5px dotted #000; text-align:center; padding:0 12px 1px 12px; line-height:1.25;';
+  const sigDotStyle = 'display:inline-block; border-bottom:1.5px dotted #000; margin:0 6px;';
 
   let scores = [];
   try { scores = JSON.parse(item.eval_scores || '[]'); } catch (e) {}
@@ -1025,46 +1035,56 @@ function printForm12(req12Id) {
   const rejectChecked = item.status_12 === 'REJECTED_12';
 
   document.getElementById('printOnlyContainer').innerHTML = `
-    <div class="memo-page" style="padding: 10px 12px; line-height: 1.85; font-size: 16pt;">
+    <div class="memo-page" style="padding: 10px 16px; line-height: 1.9; font-size: 16pt;">
       <div style="text-align:right; font-weight:bold; margin-bottom:14px;">กพช. 1</div>
 
-      <div style="text-align:center; font-weight:bold; font-size:18pt; margin-bottom:8px;">
+      <div style="text-align:center; font-weight:bold; font-size:18pt; margin-bottom:10px;">
         แบบลงทะเบียนกิจกรรมพัฒนาคุณภาพชีวิต (รายบุคคล)
       </div>
-      <div style="text-align:center; margin-bottom:4px;">
-        <b>สถานศึกษา</b> ${dotVal(SCHOOL_NAME, 6)}
+      <div style="text-align:center; margin-bottom:6px;">
+        <b>สถานศึกษา</b>
+        <span style="${fillInlineStyle} min-width:340px; margin-left:6px;">${esc(SCHOOL_NAME)}</span>
       </div>
-      <div style="text-align:center; margin-bottom:26px;">
-        <b>ภาคเรียนที่</b> ${dotVal(termObj.no, 4)}/${dotVal(termObj.year, 5)}
-      </div>
-
-      <div style="display:flex; justify-content:space-between; white-space:nowrap; gap:8px; margin-bottom:14px;">
-        <span>ชื่อ ${dotVal(firstName, 4)}</span>
-        <span>สกุล ${dotVal(lastName, 4)}</span>
-        <span>รหัสประจำตัวนักศึกษา ${dotVal(item.student_id, 4)}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; white-space:nowrap; gap:12px; margin-bottom:14px;">
-        <span>ระดับ ${dotVal(item.level, 5)}</span>
-        <span>กลุ่ม/กศน.ตำบล ${dotVal(item.group_name || '-', 7)}</span>
-      </div>
-      <div style="margin-bottom:44px;">
-        ครูรับผิดชอบ ${dotVal(item.teacher_name, 10)}
+      <div style="text-align:center; margin-bottom:28px;">
+        <b>ภาคเรียนที่</b>
+        <span style="${fillInlineStyle} min-width:55px; margin-left:6px;">${esc(termObj.no)}</span>
+        <span style="margin:0 4px;">/</span>
+        <span style="${fillInlineStyle} min-width:85px;">${esc(termObj.year)}</span>
       </div>
 
-      <div style="text-align:center; margin-bottom:70px;">
-        <span style="white-space:nowrap;">ลงชื่อ.....................................................นักศึกษา</span><br>
+      <div style="${fillRowStyle}">
+        <span style="white-space:nowrap;">ชื่อ</span>
+        <span style="${fillFlexStyle}">${esc(firstName)}</span>
+        <span style="white-space:nowrap; margin-left:6px;">สกุล</span>
+        <span style="${fillFlexStyle}">${esc(lastName)}</span>
+        <span style="white-space:nowrap; margin-left:6px;">รหัสประจำตัวนักศึกษา</span>
+        <span style="${fillFlexStyle} flex:0.9;">${esc(item.student_id)}</span>
+      </div>
+      <div style="${fillRowStyle}">
+        <span style="white-space:nowrap;">ระดับ</span>
+        <span style="${fillFlexStyle}">${esc(item.level)}</span>
+        <span style="white-space:nowrap; margin-left:10px;">กลุ่ม/กศน.ตำบล</span>
+        <span style="${fillFlexStyle} flex:1.3;">${esc(item.group_name || '-')}</span>
+      </div>
+      <div style="${fillRowStyle} margin-bottom:44px;">
+        <span style="white-space:nowrap;">ครูรับผิดชอบ</span>
+        <span style="${fillFlexStyle}">${esc(item.teacher_name)}</span>
+      </div>
+
+      <div style="text-align:center; margin-bottom:68px;">
+        <span style="white-space:nowrap;">ลงชื่อ<span style="${sigDotStyle} width:210px;"></span>นักศึกษา</span><br>
         ( ${esc(item.student_name)} )<br>
         ${blankDateLine}
       </div>
 
       <div style="display:flex; justify-content:space-between; text-align:center; margin-top:40px; page-break-inside:avoid;">
         <div style="width:48%;">
-          <span style="white-space:nowrap;">ลงชื่อ..........................................ผู้รับลงทะเบียน</span><br>
+          <span style="white-space:nowrap;">ลงชื่อ<span style="${sigDotStyle} width:150px;"></span>ผู้รับลงทะเบียน</span><br>
           ( ${esc(item.teacher_name)} )<br>
           ${blankDateLine}
         </div>
         <div style="width:48%;">
-          <span style="white-space:nowrap;">ลงชื่อ..........................................นายทะเบียน</span><br>
+          <span style="white-space:nowrap;">ลงชื่อ<span style="${sigDotStyle} width:150px;"></span>นายทะเบียน</span><br>
           ( ${regNameDisplay} )<br>
           ${blankDateLine}
         </div>
@@ -1081,17 +1101,27 @@ function printForm12(req12Id) {
       </div>
 
       <div style="font-weight:bold; font-size:15pt; margin-bottom:4px;">ส่วนที่ 1 สำหรับผู้เรียน</div>
-      <div style="font-size:14.5pt; margin-bottom:8px; line-height:1.55;">
-        <div>ชื่อสถานศึกษา ${dotVal(SCHOOL_NAME, 12)}</div>
-        <div style="display:flex; justify-content:space-between; white-space:nowrap; gap:10px;">
-          <span>ชื่อ-สกุล ${dotVal(item.student_name, 6)}</span>
-          <span>รหัสประจำตัวนักศึกษา ${dotVal(item.student_id, 5)}</span>
+      <div style="font-size:14.5pt; margin-bottom:10px; line-height:1.55;">
+        <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:4px;">
+          <span style="white-space:nowrap;">ชื่อสถานศึกษา</span>
+          <span style="${fillFlexStyle}">${esc(SCHOOL_NAME)}</span>
         </div>
-        <div style="display:flex; justify-content:space-between; white-space:nowrap; gap:10px;">
-          <span>ระดับการศึกษา ${dotVal(item.level, 5)}</span>
-          <span>ศูนย์การเรียน ${dotVal(item.group_name || '-', 6)}</span>
+        <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:4px;">
+          <span style="white-space:nowrap;">ชื่อ-สกุล</span>
+          <span style="${fillFlexStyle}">${esc(item.student_name)}</span>
+          <span style="white-space:nowrap; margin-left:6px;">รหัสประจำตัวนักศึกษา</span>
+          <span style="${fillFlexStyle} flex:0.8;">${esc(item.student_id)}</span>
         </div>
-        <div>ครูผู้รับผิดชอบ ${dotVal(item.teacher_name, 14)}</div>
+        <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:4px;">
+          <span style="white-space:nowrap;">ระดับการศึกษา</span>
+          <span style="${fillFlexStyle}">${esc(item.level)}</span>
+          <span style="white-space:nowrap; margin-left:6px;">ศูนย์การเรียน</span>
+          <span style="${fillFlexStyle}">${esc(item.group_name || '-')}</span>
+        </div>
+        <div style="display:flex; align-items:baseline; gap:10px;">
+          <span style="white-space:nowrap;">ครูผู้รับผิดชอบ</span>
+          <span style="${fillFlexStyle}">${esc(item.teacher_name)}</span>
+        </div>
       </div>
 
       <table class="batch-table" style="font-size:13.5pt !important; margin-top:4px;">
@@ -1114,7 +1144,7 @@ function printForm12(req12Id) {
       </table>
 
       <div style="text-align:center; margin-top:12px; margin-bottom:12px; font-size:15pt;">
-        <span style="white-space:nowrap;">ลงชื่อ...............................................ผู้เรียน</span><br>
+        <span style="white-space:nowrap;">ลงชื่อ<span style="${sigDotStyle} width:190px;"></span>ผู้เรียน</span><br>
         ( ${esc(item.student_name)} )
       </div>
 
@@ -1122,11 +1152,12 @@ function printForm12(req12Id) {
         <b>ส่วนที่ 2 สำหรับสถานศึกษา</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
         <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle; font-weight:bold;">${passChecked ? '✓' : '&nbsp;'}</span> ผ่าน
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle; font-weight:bold;">${rejectChecked ? '✓' : '&nbsp;'}</span> เพิ่มเติมในเรื่อง ${rejectChecked ? esc(item.reject_reason_12) : '................................................'}
+        <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle; font-weight:bold;">${rejectChecked ? '✓' : '&nbsp;'}</span> เพิ่มเติมในเรื่อง
+        <span style="${fillInlineStyle} min-width:200px;">${rejectChecked ? esc(item.reject_reason_12) : '&nbsp;'}</span>
       </div>
 
       <div style="text-align:center; font-size:15pt; page-break-inside:avoid;">
-        <span style="white-space:nowrap;">ลงชื่อ...............................................ครูผู้รับผิดชอบ</span><br>
+        <span style="white-space:nowrap;">ลงชื่อ<span style="${sigDotStyle} width:190px;"></span>ครูผู้รับผิดชอบ</span><br>
         ( ${esc(item.teacher_name)} )
       </div>
     </div>
@@ -2133,3 +2164,4 @@ if (document.readyState === 'loading') {
 } else {
   initApp();
 }
+```
