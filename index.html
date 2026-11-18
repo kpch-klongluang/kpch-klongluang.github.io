@@ -49,6 +49,7 @@
           <span class="small text-muted fw-semibold" id="annBadgeText">กำลังโหลดประกาศ...</span>
         </div>
         <div class="small text-dark" id="annContentText" style="line-height: 1.75; white-space: pre-line;"></div>
+        <div id="annPdfArea" class="mt-3 d-none"></div>
       </div>
 
       <!-- เมนูหลักนักศึกษา -->
@@ -451,6 +452,19 @@
           </div>
         </div>
 
+        <!-- แถบเครื่องมือแอดมิน: ลบผลงานที่ติ๊กเลือก (เฉพาะ ADMIN) -->
+        <div id="adminDeleteSubBar" class="alert alert-danger border-0 rounded-4 d-none mb-3">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+            <div class="small">
+              <strong><i class="bi bi-trash3 me-1"></i>สิทธิ์ผู้ดูแลระบบ (Admin):</strong>
+              ติ๊กเลือกรายการที่กรอกผิดหรือข้อมูลทดสอบเพื่อลบถาวรออกจากระบบ
+            </div>
+            <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchDeleteSub()">
+              <i class="bi bi-trash me-1"></i>ลบผลงานที่ติ๊กเลือกทั้งหมด
+            </button>
+          </div>
+        </div>
+
         <div class="table-responsive d-none d-md-block">
           <table class="table table-hover align-middle">
             <thead class="table-light">
@@ -502,6 +516,19 @@
             </div>
             <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchApprove12()">
               <i class="bi bi-check-all me-1"></i>อนุมัติ กพช.1-2 ที่ติ๊กเลือกทั้งหมด
+            </button>
+          </div>
+        </div>
+
+        <!-- แถบเครื่องมือแอดมิน: ลบ กพช.1-2 ที่ติ๊กเลือก (เฉพาะ ADMIN) -->
+        <div id="adminDelete12Bar" class="alert alert-danger border-0 rounded-4 d-none mb-3">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+            <div class="small">
+              <strong><i class="bi bi-trash3 me-1"></i>สิทธิ์ผู้ดูแลระบบ (Admin):</strong>
+              ติ๊กเลือกรายการ กพช.1-2 ที่กรอกผิดหรือข้อมูลทดสอบเพื่อลบถาวรออกจากระบบ
+            </div>
+            <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchDelete12()">
+              <i class="bi bi-trash me-1"></i>ลบ กพช.1-2 ที่ติ๊กเลือกทั้งหมด
             </button>
           </div>
         </div>
@@ -563,6 +590,11 @@
         <div class="mb-3">
           <label class="form-label fw-semibold small">รายละเอียดข่าวประกาศ (ขึ้นบรรทัดใหม่ได้ตามต้องการ)</label>
           <textarea class="form-control" id="ann_content" rows="5" placeholder="พิมพ์ข้อความประกาศถึงนักศึกษา..."></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold small">📎 แนบไฟล์ประกาศ PDF (ไม่บังคับ - ขนาดไม่เกิน 8 MB)</label>
+          <input type="file" class="form-control" id="ann_pdf_file" accept="application/pdf,.pdf">
+          <div id="annCurrentPdfBox" class="mt-2 d-none"></div>
         </div>
         <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="handleSaveAnnouncement()">
           <i class="bi bi-save me-1"></i>บันทึกข่าวประกาศ
