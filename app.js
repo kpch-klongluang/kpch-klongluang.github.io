@@ -358,8 +358,31 @@ async function handlePre12Submit() {
     return safeAlert('กรุณายืนยัน', 'กรุณาติ๊กถูกช่องรับรองข้อมูลด้านล่างก่อนยื่นคำขอ', 'warning');
   }
 
-  showLoading('กำลังส่งคำขออนุมัติ กพช.1-2...');
+  showLoading('กำลังตรวจสอบข้อมูลและส่งคำขอ กพช.1-2...');
   try {
+    const elig = await callApi('checkEligibility', { student_id: sid });
+    const targetTerm = formatTermText(term);
+    const dup = (elig.approvals12 || []).find(x =>
+      formatTermText(x.term) === targetTerm &&
+      ['WAIT_TEACHER_12', 'APPROVED_12'].includes(x.status_12)
+    );
+    if (dup) {
+      hideLoading();
+      if (dup.status_12 === 'APPROVED_12') {
+        return safeAlert(
+          'มีสิทธิ์ กพช.1-2 ในภาคเรียนนี้แล้ว ✅',
+          `รหัสนักศึกษา <b>${esc(sid)}</b> ได้รับอนุมัติ กพช.1-2 ประจำภาคเรียนที่ <b>${esc(targetTerm)}</b> แล้ว (รหัส: <b>${esc(dup.req12_id)}</b>)<br>ไม่ต้องขอซ้ำในภาคเรียนเดียวกัน สามารถไปที่แท็บ <b>"2. ส่งบันทึกผล กพช."</b> ได้เลยครับ`,
+          'info'
+        );
+      } else {
+        return safeAlert(
+          'ยื่นคำขอในภาคเรียนนี้ไว้แล้ว ⏳',
+          `รหัสนักศึกษา <b>${esc(sid)}</b> ได้ยื่นขอ กพช.1-2 ประจำภาคเรียนที่ <b>${esc(targetTerm)}</b> ไว้แล้ว (รหัส: <b>${esc(dup.req12_id)}</b>)<br>กรุณารอครูประจำกลุ่มกดอนุมัติ (ไม่ต้องยื่นขอซ้ำครับ)`,
+          'warning'
+        );
+      }
+    }
+
     const res = await callApi('submitPreApproval12', {
       payload: {
         student_id: sid, student_name: sname, level: lvl, teacher_id: tid, group_name: grp,
@@ -371,7 +394,7 @@ async function handlePre12Submit() {
     hideLoading();
     safeAlert(
       'ยื่นขอ กพช.1-2 สำเร็จ! 📋',
-      `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req12_id)}</b><br>กรุณารอครูประจำกลุ่มกดอนุมัติก่อนจึงจะส่งบันทึกผลงานได้ (เช็กผลได้ที่แท็บ "เช็กสถานะ")`,
+      `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req12_id)}</b> (ภาคเรียนที่ ${esc(targetTerm)})<br>กรุณารอครูประจำกลุ่มกดอนุมัติก่อนจึงจะส่งบันทึกผลงานได้ (1 ภาคเรียนขอครั้งเดียว ใช้ส่งได้ทุกกิจกรรมในภาคเรียนนี้)`,
       'success'
     );
     ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_activity_name','p12_start_date','p12_end_date'].forEach(id => {
@@ -414,7 +437,7 @@ async function checkEligibilityUI() {
       banner.innerHTML = `
         <div class="alert alert-danger mb-0 rounded-3 small">
           <div class="fw-bold mb-1">❌ ยังไม่พบคำขออนุมัติทำ กพช. (กพช.1-2) ของรหัส ${esc(sid)}</div>
-          <div>นักศึกษาต้องยื่นขอ กพช.1-2 และได้รับอนุมัติจากครูก่อน จึงจะส่งบันทึกผลงานได้</div>
+          <div>นักศึกษาต้องยื่นขอ กพช.1-2 และได้รับอนุมัติจากครูก่อน จึงจะส่งบันทึกผลงานได้ (ภาคเรียนละ 1 ครั้ง)</div>
           <button type="button" class="btn btn-danger btn-sm rounded-pill mt-2 fw-bold" onclick="goToPre12WithId('${esc(sid)}')">
             📋 ไปหน้าขออนุมัติ กพช.1-2 ทันที
           </button>
@@ -423,44 +446,31 @@ async function checkEligibilityUI() {
       return;
     }
 
-    const avail = res.availableApproved12 || [];
-    if (avail.length === 0) {
+    const approvedList = (res.approvals12 || []).filter(x => x.status_12 === 'APPROVED_12');
+    if (approvedList.length === 0) {
       const latest = res.approvals12[0];
       const st = STEP12_LABELS[latest.status_12] || { text: latest.status_12 };
-      if (latest.is_used) {
-        resetSubmitLock('คำขอ กพช.1-2 ที่อนุมัติถูกใช้ส่งผลงานครบแล้ว');
-        banner.innerHTML = `
-          <div class="alert alert-info mb-0 rounded-3 small">
-            <div class="fw-bold mb-1">ℹ️ คุณได้ส่งบันทึกผลงานสำหรับ กพช.1-2 ที่ได้รับอนุมัติครบแล้ว</div>
-            <div>หากต้องการทำกิจกรรม/โครงการใหม่ กรุณายื่นขอ กพช.1-2 เพิ่มเติมก่อนครับ</div>
-            <button type="button" class="btn btn-primary btn-sm rounded-pill mt-2 fw-bold" onclick="goToPre12WithId('${esc(sid)}')">
-              📋 ขออนุมัติ กพช.1-2 โครงการใหม่
-            </button>
-          </div>
-        `;
-      } else {
-        resetSubmitLock('รอครูอนุมัติ กพช.1-2 ก่อนจึงจะส่งผลงานได้');
-        banner.innerHTML = `
-          <div class="alert alert-warning mb-0 rounded-3 small">
-            <div class="fw-bold mb-1">⏳ ยังไม่สามารถส่งบันทึกผลงานได้ (สถานะล่าสุด: ${st.text})</div>
-            <div>รหัสคำขอ: <b>${esc(latest.req12_id)}</b> | โครงการ: ${esc(latest.activity_name)}</div>
-            ${latest.status_12 === 'REJECTED_12' ? `<div class="text-danger mt-1"><b>เหตุผลที่ไม่ผ่าน:</b> ${esc(latest.reject_reason_12)} <button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="goToPre12WithId('${esc(sid)}')">ยื่นขอใหม่</button></div>` : '<div>กรุณารอครูประจำกลุ่มกดอนุมัติ กพช.1-2 ให้เรียบร้อยก่อนครับ</div>'}
-          </div>
-        `;
-      }
+      resetSubmitLock('รอครูอนุมัติ กพช.1-2 ก่อนจึงจะส่งผลงานได้');
+      banner.innerHTML = `
+        <div class="alert alert-warning mb-0 rounded-3 small">
+          <div class="fw-bold mb-1">⏳ ยังไม่สามารถส่งบันทึกผลงานได้ (สถานะล่าสุด: ${st.text})</div>
+          <div>รหัสคำขอ: <b>${esc(latest.req12_id)}</b> (ภาคเรียน ${esc(formatTermText(latest.term))}) | โครงการ: ${esc(latest.activity_name)}</div>
+          ${latest.status_12 === 'REJECTED_12' ? `<div class="text-danger mt-1"><b>เหตุผลที่ไม่ผ่าน:</b> ${esc(latest.reject_reason_12)} <button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="goToPre12WithId('${esc(sid)}')">ยื่นขอใหม่</button></div>` : '<div>กรุณารอครูประจำกลุ่มกดอนุมัติ กพช.1-2 ให้เรียบร้อยก่อนครับ</div>'}
+        </div>
+      `;
       return;
     }
 
-    currentEligibleList12 = avail;
+    currentEligibleList12 = approvedList;
     banner.innerHTML = `
       <div class="alert alert-success mb-0 rounded-3 small">
-        <b>✅ ผ่านการตรวจสอบสิทธิ์ กพช.1-2 แล้ว!</b> (พบ ${avail.length} โครงการที่อนุมัติและรอส่งผลงาน)
+        <b>✅ ผ่านการตรวจสอบสิทธิ์ กพช.1-2 แล้ว!</b> (ใช้สิทธิ์ภาคเรียนที่อนุมัติส่งผลงานได้ต่อเนื่อง ไม่ต้องขอ กพช.1-2 ซ้ำ)
       </div>
     `;
     const wrap = document.getElementById('ref12SelectWrap');
     const sel = document.getElementById('f_ref_12_id');
     wrap.classList.remove('d-none');
-    sel.innerHTML = avail.map(x => `<option value="${esc(x.req12_id)}">${esc(x.req12_id)} - ${esc(x.activity_name)} (${esc(x.hours)} ชม.)</option>`).join('');
+    sel.innerHTML = approvedList.map(x => `<option value="${esc(x.req12_id)}">${esc(x.req12_id)} (ภาคเรียน ${esc(formatTermText(x.term))}) - ${esc(x.activity_name)}</option>`).join('');
     onSelectApproved12();
 
     const btn = document.getElementById('btnSubmitKPCH');
@@ -485,10 +495,17 @@ function onSelectApproved12() {
   document.getElementById('f_level').value = found.level || '';
   document.getElementById('f_teacher_id').value = found.teacher_id || '';
   document.getElementById('f_hours').value = found.hours || '';
-  document.getElementById('f_activity_name').value = found.activity_name || '';
-  document.getElementById('f_activity_date').value = toInputDate(found.plan_start_date);
-  document.getElementById('f_activity_end_date').value = toInputDate(found.plan_end_date);
-  document.getElementById('f_location').value = found.location || '';
+  if (!found.is_used) {
+    document.getElementById('f_activity_name').value = found.activity_name || '';
+    document.getElementById('f_activity_date').value = toInputDate(found.plan_start_date);
+    document.getElementById('f_activity_end_date').value = toInputDate(found.plan_end_date);
+    document.getElementById('f_location').value = found.location || '';
+  } else {
+    document.getElementById('f_activity_name').value = '';
+    document.getElementById('f_activity_date').value = '';
+    document.getElementById('f_activity_end_date').value = '';
+    document.getElementById('f_location').value = '';
+  }
 }
 
 async function handleImageSelection(input) {
@@ -632,13 +649,13 @@ async function searchMyStatus() {
                 <span class="badge bg-light text-primary border me-1">${esc(r.req12_id)}</span>
                 <strong>${esc(r.activity_name)}</strong>
                 <div class="small text-muted mt-1">
-                  ผู้ขอ: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | ภาคเรียน: ${esc(formatTermText(r.term))} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
+                  ผู้ขอ: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | ภาคเรียน: ${esc(formatTermText(r.term))} ${r.hours ? `| จำนวน: <b>${esc(r.hours)} ชม.</b>` : ''}<br>
                   แผนวันที่: ${formatShortThaiDate(r.plan_start_date)} ถึง ${formatShortThaiDate(r.plan_end_date)}
                 </div>
               </div>
               <span class="badge step-badge ${st.cls}">${st.text}</span>
             </div>
-            ${r.status_12 === 'APPROVED_12' ? `<div class="small text-success fw-semibold mt-2">✅ อนุมัติเมื่อ: ${esc(r.approved_at_12)} — สามารถไปส่งผลงานที่แท็บ "2. ส่งบันทึกผล กพช." ได้เลย</div>` : ''}
+            ${r.status_12 === 'APPROVED_12' ? `<div class="small text-success fw-semibold mt-2">✅ อนุมัติเมื่อ: ${esc(r.approved_at_12)} — ใช้สิทธิ์ส่งผลงานในภาคเรียน ${esc(formatTermText(r.term))} ได้ที่แท็บ "2. ส่งบันทึกผล กพช." (ไม่ต้องขอซ้ำ)</div>` : ''}
             ${r.status_12 === 'REJECTED_12' ? `<div class="alert alert-danger mt-2 mb-0 py-2 small rounded-3"><b>เหตุผลที่ไม่ผ่าน:</b> ${esc(r.reject_reason_12)}</div>` : ''}
           </div>
         `;
