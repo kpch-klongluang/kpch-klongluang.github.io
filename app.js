@@ -1075,7 +1075,7 @@ function printForm12(req12Id) {
       <div style="${fillRowStyle}">
         <span style="white-space:nowrap;">ระดับ</span>
         ${makeDotFlex(item.level)}
-        <span style="white-space:nowrap; margin-left:10px;">กลุ่ม/กศน.ตำบล</span>
+        <span style="white-space:nowrap; margin-left:10px;">กลุ่ม/ศกร.ตำบล</span>
         ${makeDotFlex(item.group_name || '-', 'flex:1.3;')}
       </div>
       <div style="${fillRowStyle} margin-bottom:44px;">
