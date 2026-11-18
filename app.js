@@ -1425,7 +1425,7 @@ function buildKPCH5Html(item, isLastInPrint) {
     <!-- กพช. 5 หน้า 2 -->
     <div class="${isLastInPrint ? '' : 'memo-page'}" style="font-size:15pt; line-height:1.5;">
       <div style="text-align:center; margin-bottom:10px;">- 2 -</div>
-      <div style="font-weight:bold; margin-bottom:8px;">ความเห็นของคณะกรรมการ</div>
+      <div style="font-weight:bold; margin-bottom:8px;">ความเห็นของ</div>
       <div style="display:flex; align-items:center; margin-bottom:10px; line-height:1.3;">${makeDotFlex('')}</div>
       <div style="display:flex; align-items:center; margin-bottom:10px; line-height:1.3;">${makeDotFlex('')}</div>
       <div style="display:flex; align-items:center; margin-bottom:26px; line-height:1.3;">${makeDotFlex('')}</div>
@@ -1441,7 +1441,7 @@ function buildKPCH5Html(item, isLastInPrint) {
           <span style="white-space:nowrap;">ลงชื่อ</span>
           <div style="text-align:center; margin:0 6px;">
             ${makeDotInline('', 'width:190px; line-height:1.3;')}<br>
-            (${DIRECTOR_NAME})
+            (${Comm1})
           </div>
           <span style="white-space:nowrap;">ประธานคณะกรรมการ</span>
         </div>
@@ -1452,7 +1452,7 @@ function buildKPCH5Html(item, isLastInPrint) {
           <span style="white-space:nowrap;">ลงชื่อ</span>
           <div style="text-align:center; margin:0 6px;">
             ${makeDotInline('', 'width:190px; line-height:1.3;')}<br>
-            (นายเกียรติศักดิ์  หมั่นอุส่าห์)
+            (นายไชยพัฒน์  นัยเนตร)
           </div>
           <span style="white-space:nowrap;">คณะกรรมการ</span>
         </div>
