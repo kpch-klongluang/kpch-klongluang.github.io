@@ -45,7 +45,7 @@ const STEP_LABELS = {
 const STEP12_LABELS = {
   'WAIT_TEACHER_12': { text: 'รอครูอนุมัติ กพช.1-2', cls: 'bg-warning text-dark' },
   'APPROVED_12': { text: 'อนุมัติให้ทำกิจกรรมแล้ว', cls: 'bg-success text-white' },
-  'REJECTED_12': { text: 'ไม่อนุมัติ / แก้ไข กพช.1-2', cls: 'bg-danger text-white' }
+  'REJECTED_12': { text: 'ไม่อนุมติ / แก้ไข กพช.1-2', cls: 'bg-danger text-white' }
 };
 
 const ROLE_LABELS = {
@@ -243,15 +243,12 @@ async function handlePre12Submit() {
   const tid = document.getElementById('p12_teacher_id').value;
   const grp = document.getElementById('p12_group_name').value.trim();
   const term = document.getElementById('p12_term').value.trim();
-  const hrs = document.getElementById('p12_hours').value;
   const actName = document.getElementById('p12_activity_name').value.trim();
   const startDate = document.getElementById('p12_start_date').value;
   const endDate = document.getElementById('p12_end_date').value;
-  const loc = document.getElementById('p12_location').value.trim();
-  const detail = document.getElementById('p12_plan_detail').value.trim();
   const evalOk = document.getElementById('p12_self_eval_ok').checked;
 
-  if (!sid || !sname || !lvl || !tid || !grp || !hrs || !actName || !startDate || !endDate || !detail) {
+  if (!sid || !sname || !lvl || !tid || !grp || !actName || !startDate || !endDate) {
     return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง', 'warning');
   }
   if (endDate < startDate) {
@@ -276,8 +273,8 @@ async function handlePre12Submit() {
     const res = await callApi('submitPreApproval12', {
       payload: {
         student_id: sid, student_name: sname, level: lvl, teacher_id: tid, group_name: grp,
-        term, hours: hrs, activity_name: actName, plan_start_date: startDate,
-        plan_end_date: endDate, location: loc, plan_detail: detail,
+        term, hours: '', activity_name: actName, plan_start_date: startDate,
+        plan_end_date: endDate, location: '', plan_detail: '',
         eval_scores: evalScores, self_eval_ok: evalOk
       }
     });
@@ -287,7 +284,7 @@ async function handlePre12Submit() {
       `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req12_id)}</b><br>กรุณารอครูประจำกลุ่มกดอนุมัติก่อนจึงจะส่งบันทึกผลงานได้ (เช็กผลได้ที่แท็บ "เช็กสถานะ")`,
       'success'
     );
-    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_hours','p12_activity_name','p12_start_date','p12_end_date','p12_location','p12_plan_detail'].forEach(id => {
+    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_activity_name','p12_start_date','p12_end_date'].forEach(id => {
       document.getElementById(id).value = '';
     });
     for (let i = 1; i <= 10; i++) {
