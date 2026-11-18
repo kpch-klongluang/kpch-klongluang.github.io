@@ -118,7 +118,18 @@
 
           <div class="col-12 col-md-3">
             <label class="form-label fw-semibold small">ภาคเรียนที่</label>
-            <input type="text" class="form-control" id="p12_term" value="2/2569">
+            <select class="form-select" id="p12_term">
+              <option value="1/2569">1/2569</option>
+              <option value="2/2569" selected>2/2569</option>
+              <option value="1/2570">1/2570</option>
+              <option value="2/2570">2/2570</option>
+              <option value="1/2571">1/2571</option>
+              <option value="2/2571">2/2571</option>
+              <option value="1/2572">1/2572</option>
+              <option value="2/2572">2/2572</option>
+              <option value="1/2573">1/2573</option>
+              <option value="2/2573">2/2573</option>
+            </select>
           </div>
           <div class="col-12 col-md-9">
             <label class="form-label fw-semibold small">ชื่อกิจกรรม / โครงการ กพช. ที่จะขอทำ <span class="text-danger">*</span></label>
@@ -351,13 +362,29 @@
       <!-- มุมมอง 1: รายการบันทึกผลงาน กพช. -->
       <div id="dashSubmissionsView" class="cute-card p-3 p-md-4">
         <div class="row g-2 align-items-center mb-3" id="subFilterRow">
-          <div class="col-12 col-md-6">
-            <div class="btn-group w-100 w-md-auto" id="filterStatusBtns">
+          <div class="col-12 col-lg-auto" id="filterStatusBtnsWrap">
+            <div class="btn-group w-100 w-lg-auto" id="filterStatusBtns">
               <button type="button" class="btn btn-primary btn-sm active" onclick="setFilterMode('PENDING', this)">⏳ รอดำเนินการ</button>
               <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setFilterMode('HISTORY', this)">📁 ดำเนินการแล้ว/ทั้งหมด</button>
             </div>
           </div>
-          <div class="col-12 col-md-6">
+          <div class="col-12 col-lg-auto d-none" id="presentSubFilterWrap">
+            <div class="btn-group w-100 w-lg-auto" id="presentSubBtns">
+              <button type="button" class="btn btn-primary btn-sm active" id="btnPresentWait" onclick="setPresentSubMode('WAIT', this)">⏳ รอนำส่ง</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPresentSent" onclick="setPresentSubMode('SENT', this)">✅ ส่งแล้ว / ประวัติ</button>
+            </div>
+          </div>
+          <div class="col-12 col-md-4 col-lg-3">
+            <select id="dashTermFilter" class="form-select form-select-sm" onchange="renderDashboardList()">
+              <option value="ALL">📅 ทุกภาคเรียน / ปีการศึกษา</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 col-lg-3 d-none" id="dashTeacherFilterWrap">
+            <select id="dashTeacherFilter" class="form-select form-select-sm" onchange="renderDashboardList()">
+              <option value="ALL">👩‍🏫 ครูประจำกลุ่มทั้งหมด</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4 col-lg">
             <input type="text" id="dashSearchInput" class="form-control form-control-sm" placeholder="ค้นหาชื่อ นศ. / รหัส / ชื่อกิจกรรม..." oninput="renderDashboardList()">
           </div>
         </div>
@@ -365,15 +392,15 @@
         <!-- แถบครูนำเสนอส่งต่อทะเบียน (หลัง ผอ. อนุมัติแล้ว) -->
         <div id="teacherPresentBar" class="alert alert-info border-0 rounded-4 d-none mb-3">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-            <div class="small">
+            <div class="small" id="teacherPresentDesc">
               <strong><i class="bi bi-folder-check me-1"></i>ขั้นครูตรวจสอบและนำเสนอส่งทะเบียน:</strong>
-              ติ๊กเลือกรายการที่ ผอ. อนุมัติแล้ว เพื่อพิมพ์เอกสารปะหน้า+รายละเอียดครบชุดในครั้งเดียว แล้วกดส่งต่อนายทะเบียน
+              ติ๊กเลือกรายการที่ต้องการ เพื่อพิมพ์เอกสารปะหน้า+รายละเอียดครบชุด หรือกดส่งต่อนายทะเบียน
             </div>
             <div class="d-flex flex-wrap gap-2">
               <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="printTeacherPresentPackage()">
                 <i class="bi bi-printer me-1"></i>พิมพ์ชุดส่งทะเบียน (ปะหน้า + รายละเอียดครบชุด)
               </button>
-              <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="confirmPresentToRegistrar()">
+              <button type="button" id="btnConfirmPresentReg" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="confirmPresentToRegistrar()">
                 <i class="bi bi-send-check me-1"></i>ยืนยันส่งต่อนายทะเบียน
               </button>
             </div>
@@ -411,11 +438,11 @@
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
             <div>
               <strong><i class="bi bi-file-earmark-excel me-1"></i>เครื่องมือนายทะเบียน</strong>
-              <div class="small">ดาวน์โหลดรายชื่อที่ครูนำเสนอส่งทะเบียนแล้วทั้งหมดในครั้งเดียว หรือติ๊กเลือกปิดงาน</div>
+              <div class="small">ดาวน์โหลดรายชื่อที่ครูนำเสนอส่งทะเบียนแล้ว (ตามครู/ภาคเรียนที่เลือก) หรือติ๊กเลือกปิดงาน</div>
             </div>
             <div class="d-flex flex-wrap gap-2">
               <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="exportRegistrarCSV()">
-                <i class="bi bi-download me-1"></i>โหลด Excel (.CSV) ทั้งหมดที่รอลงทะเบียน
+                <i class="bi bi-download me-1"></i>โหลด Excel (.CSV) ที่รอลงทะเบียน
               </button>
               <button type="button" class="btn btn-dark btn-sm rounded-pill px-3 fw-bold" onclick="confirmRegistrarComplete()">
                 <i class="bi bi-check2-all me-1"></i>ยืนยันบันทึกทะเบียนแล้ว (ที่ติ๊ก)
@@ -450,13 +477,18 @@
       <!-- มุมมอง 2: รายการคำขออนุมัติทำ กพช.1-2 (สำหรับครู & แอดมิน) -->
       <div id="dash12View" class="cute-card p-3 p-md-4 d-none">
         <div class="row g-2 align-items-center mb-3">
-          <div class="col-12 col-md-6">
-            <div class="btn-group w-100 w-md-auto" id="filter12Btns">
+          <div class="col-12 col-lg-auto">
+            <div class="btn-group w-100 w-lg-auto" id="filter12Btns">
               <button type="button" class="btn btn-primary btn-sm active" onclick="setFilter12Mode('PENDING', this)">⏳ รออนุมัติ กพช.1-2</button>
               <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setFilter12Mode('HISTORY', this)">📁 ทั้งหมด</button>
             </div>
           </div>
-          <div class="col-12 col-md-6">
+          <div class="col-12 col-md-5 col-lg-3">
+            <select id="dash12TermFilter" class="form-select form-select-sm" onchange="render12List()">
+              <option value="ALL">📅 ทุกภาคเรียน / ปีการศึกษา</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-7 col-lg">
             <input type="text" id="dash12SearchInput" class="form-control form-control-sm" placeholder="ค้นหารหัส กพช.1-2 / ชื่อ นศ. / กิจกรรม..." oninput="render12List()">
           </div>
         </div>
