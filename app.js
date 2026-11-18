@@ -28,6 +28,7 @@ let registrarName = '';
 let filterMode = 'PENDING';
 let filter12Mode = 'PENDING';
 let teacherTabMode = 'sub';
+let presentSubMode = 'WAIT';
 let currentEligibleList12 = [];
 
 const STEP_LABELS = {
@@ -140,6 +141,92 @@ function parseTermParts(termVal) {
 function formatTermText(termVal) {
   const t = parseTermParts(termVal);
   return `${t.no}/${t.year}`;
+}
+function getItemTerm(item) {
+  if (item.term) return formatTermText(item.term);
+  if (item.ref_12_id && dash12Items.length > 0) {
+    const ref12 = dash12Items.find(x => x.req12_id === item.ref_12_id);
+    if (ref12 && ref12.term) return formatTermText(ref12.term);
+  }
+  const rawDate = String(item.activity_date || item.created_at || '').split(' ')[0];
+  let m = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  let yearNum, month;
+  if (m) {
+    yearNum = parseInt(m[1], 10);
+    month = parseInt(m[2], 10);
+  } else {
+    m = rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) {
+      month = parseInt(m[2], 10);
+      yearNum = parseInt(m[3], 10);
+    }
+  }
+  if (yearNum && month) {
+    const thaiYear = yearNum < 2400 ? yearNum + 543 : yearNum;
+    if (month >= 5 && month <= 10) return `1/${thaiYear}`;
+    if (month >= 11) return `2/${thaiYear}`;
+    return `2/${thaiYear - 1}`;
+  }
+  return '';
+}
+function matchesTermFilter(itemTerm, filterVal) {
+  if (!filterVal || filterVal === 'ALL') return true;
+  if (filterVal.startsWith('TERM:')) return itemTerm === filterVal.slice(5);
+  if (filterVal.startsWith('YEAR:')) {
+    const targetYear = filterVal.slice(5);
+    const parts = String(itemTerm || '').split('/');
+    return parts[1] === targetYear;
+  }
+  return true;
+}
+function populateTermDropdown(selectEl, items, termGetter) {
+  if (!selectEl) return;
+  const prev = selectEl.value || 'ALL';
+  const termSet = new Set();
+  const yearSet = new Set();
+  items.forEach(it => {
+    const t = termGetter(it);
+    if (t && t.includes('/')) {
+      termSet.add(t);
+      const y = t.split('/')[1];
+      if (y && /^\d{4}$/.test(y)) yearSet.add(y);
+    }
+  });
+  const terms = Array.from(termSet).sort((a, b) => {
+    const [ta, ya] = a.split('/').map(Number);
+    const [tb, yb] = b.split('/').map(Number);
+    if (yb !== ya) return yb - ya;
+    return tb - ta;
+  });
+  const years = Array.from(yearSet).sort((a, b) => Number(b) - Number(a));
+
+  let html = '<option value="ALL">📅 ทุกภาคเรียน / ปีการศึกษา</option>';
+  if (terms.length > 0) {
+    html += '<optgroup label="เลือกตามภาคเรียน">';
+    html += terms.map(t => `<option value="TERM:${esc(t)}">ภาคเรียนที่ ${esc(t)}</option>`).join('');
+    html += '</optgroup>';
+  }
+  if (years.length > 0) {
+    html += '<optgroup label="รวมทั้งปีการศึกษา">';
+    html += years.map(y => `<option value="YEAR:${esc(y)}">รวมปีการศึกษา ${esc(y)}</option>`).join('');
+    html += '</optgroup>';
+  }
+  selectEl.innerHTML = html;
+  selectEl.value = Array.from(selectEl.options).some(o => o.value === prev) ? prev : 'ALL';
+}
+function populateDashTeacherFilter() {
+  const sel = document.getElementById('dashTeacherFilter');
+  if (!sel) return;
+  const prev = sel.value || 'ALL';
+  const tSet = new Set();
+  dashItems.forEach(it => {
+    const name = String(it.teacher_name || '').trim();
+    if (name) tSet.add(name);
+  });
+  const teachers = Array.from(tSet).sort((a, b) => a.localeCompare(b, 'th'));
+  sel.innerHTML = '<option value="ALL">👩‍🏫 ครูประจำกลุ่มทั้งหมด</option>' +
+    teachers.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  sel.value = Array.from(sel.options).some(o => o.value === prev) ? prev : 'ALL';
 }
 function dotVal(text, dotCount = 5) {
   const d = '.'.repeat(dotCount);
@@ -620,6 +707,7 @@ async function handleLogin() {
     closeModalById('loginModal');
     document.getElementById('loginPass').value = '';
     teacherTabMode = 'sub';
+    presentSubMode = 'WAIT';
     await loadDashboard();
   } catch (err) {
     hideLoading();
@@ -632,6 +720,7 @@ function handleLogout() {
   authToken = null;
   currentUser = null;
   teacherTabMode = 'sub';
+  presentSubMode = 'WAIT';
   sessionStorage.removeItem('kpch_token');
   document.getElementById('dashboardSection').classList.add('d-none');
   document.getElementById('publicSection').classList.remove('d-none');
@@ -642,6 +731,17 @@ function handleLogout() {
   document.getElementById('adminAnnView').classList.add('d-none');
   document.getElementById('adminLogsView').classList.add('d-none');
   document.querySelectorAll('#adminNavTabs button, #teacherNavTabs button').forEach((b, idx) => b.classList.toggle('active', idx === 0));
+  document.querySelectorAll('#presentSubBtns button').forEach((b, idx) => {
+    b.classList.toggle('btn-primary', idx === 0);
+    b.classList.toggle('active', idx === 0);
+    b.classList.toggle('btn-outline-secondary', idx !== 0);
+  });
+  const tf = document.getElementById('dashTermFilter');
+  const t12f = document.getElementById('dash12TermFilter');
+  const tchf = document.getElementById('dashTeacherFilter');
+  if (tf) tf.value = 'ALL';
+  if (t12f) t12f.value = 'ALL';
+  if (tchf) tchf.value = 'ALL';
 
   renderNavbar();
   loadPublicData();
@@ -657,8 +757,23 @@ function updateSubmissionsBarsVisibility() {
   const canBatchMemo = ['DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
   const canCheckSub = canBatchApproveSub || canBatchMemo || isTeacherPresentTab || isTeacher;
 
-  document.getElementById('subFilterRow').classList.toggle('d-none', isTeacherPresentTab);
+  document.getElementById('subFilterRow').classList.remove('d-none');
+  document.getElementById('filterStatusBtnsWrap').classList.toggle('d-none', isTeacherPresentTab);
+  document.getElementById('presentSubFilterWrap').classList.toggle('d-none', !isTeacherPresentTab);
+  document.getElementById('dashTeacherFilterWrap').classList.toggle('d-none', !(isReg || isAdmin));
+
   document.getElementById('teacherPresentBar').classList.toggle('d-none', !(isTeacherPresentTab || isAdmin));
+  const btnConfirmReg = document.getElementById('btnConfirmPresentReg');
+  if (btnConfirmReg) {
+    btnConfirmReg.classList.toggle('d-none', isTeacherPresentTab && presentSubMode === 'SENT');
+  }
+  const presentDesc = document.getElementById('teacherPresentDesc');
+  if (presentDesc) {
+    presentDesc.innerHTML = (isTeacherPresentTab && presentSubMode === 'SENT')
+      ? '<strong><i class="bi bi-clock-history me-1"></i>ประวัติรายการที่ส่งต่อนายทะเบียนแล้ว:</strong> สามารถติ๊กเลือกรายการเพื่อพิมพ์ชุดส่งทะเบียนย้อนหลังได้'
+      : '<strong><i class="bi bi-folder-check me-1"></i>ขั้นครูตรวจสอบและนำเสนอส่งทะเบียน:</strong> ติ๊กเลือกรายการที่ต้องการ เพื่อพิมพ์เอกสารปะหน้า+รายละเอียดครบชุด หรือกดส่งต่อนายทะเบียน';
+  }
+
   document.getElementById('batchApproveSubBar').classList.toggle('d-none', !canBatchApproveSub);
   document.getElementById('batchMemoBar').classList.toggle('d-none', !canBatchMemo);
   document.getElementById('registrarTools').classList.toggle('d-none', !isReg);
@@ -694,6 +809,7 @@ async function loadDashboard(silentOnExpire = false) {
     if (isTeacher) {
       const waitSub = dashItems.filter(x => x.current_step === 'WAIT_TEACHER').length;
       const waitPresent = dashItems.filter(x => x.current_step === 'WAIT_TEACHER_PRESENT').length;
+      const sentPresent = dashItems.filter(x => ['APPROVED_FOR_REGISTRAR', 'COMPLETED'].includes(x.current_step)).length;
       const wait12 = dash12Items.filter(x => x.status_12 === 'WAIT_TEACHER_12').length;
 
       const bSub = document.getElementById('badgeWaitSub');
@@ -703,6 +819,11 @@ async function loadDashboard(silentOnExpire = false) {
       bSub.innerText = waitSub; bSub.classList.toggle('d-none', waitSub === 0);
       bPres.innerText = waitPresent; bPres.classList.toggle('d-none', waitPresent === 0);
       b12.innerText = wait12; b12.classList.toggle('d-none', wait12 === 0);
+
+      const bWaitBtn = document.getElementById('btnPresentWait');
+      const bSentBtn = document.getElementById('btnPresentSent');
+      if (bWaitBtn) bWaitBtn.innerText = `⏳ รอนำส่ง (${waitPresent})`;
+      if (bSentBtn) bSentBtn.innerText = `✅ ส่งแล้ว / ประวัติ (${sentPresent})`;
     }
 
     if (!isAdmin && !isTeacher) {
@@ -721,6 +842,10 @@ async function loadDashboard(silentOnExpire = false) {
         document.getElementById('ann_content').value = res.announcement.content || '';
       }
     }
+
+    populateTermDropdown(document.getElementById('dashTermFilter'), dashItems, getItemTerm);
+    populateTermDropdown(document.getElementById('dash12TermFilter'), dash12Items, x => formatTermText(x.term));
+    populateDashTeacherFilter();
 
     updateSubmissionsBarsVisibility();
     renderDashboardList();
@@ -750,6 +875,18 @@ function switchTeacherTab(tab, btn) {
     updateSubmissionsBarsVisibility();
     renderDashboardList();
   }
+}
+
+function setPresentSubMode(mode, btn) {
+  presentSubMode = mode;
+  document.querySelectorAll('#presentSubBtns button').forEach(b => {
+    b.classList.remove('btn-primary', 'active');
+    b.classList.add('btn-outline-secondary');
+  });
+  btn.classList.remove('btn-outline-secondary');
+  btn.classList.add('btn-primary', 'active');
+  updateSubmissionsBarsVisibility();
+  renderDashboardList();
 }
 
 function setFilterMode(mode, btn) {
@@ -792,8 +929,10 @@ function toggleAll12Checks(master) {
 
 function render12List() {
   const kw = document.getElementById('dash12SearchInput').value.toLowerCase().trim();
+  const termVal = document.getElementById('dash12TermFilter')?.value || 'ALL';
   const filtered = dash12Items.filter(item => {
     if (filter12Mode === 'PENDING' && item.status_12 !== 'WAIT_TEACHER_12') return false;
+    if (!matchesTermFilter(formatTermText(item.term), termVal)) return false;
     if (kw) {
       const text = `${item.req12_id} ${item.student_id} ${item.student_name} ${item.activity_name} ${item.teacher_name}`.toLowerCase();
       if (!text.includes(kw)) return false;
@@ -829,7 +968,7 @@ function render12List() {
         <td class="small">${esc(formatTermText(item.term))}</td>
         <td>
           <div class="fw-semibold">${esc(item.activity_name)}</div>
-          <div class="small text-muted">${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} | <b>${esc(item.hours)} ชม.</b></div>
+          <div class="small text-muted">${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} ${item.hours ? `| <b>${esc(item.hours)} ชม.</b>` : ''}</div>
         </td>
         <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
         <td class="text-end text-nowrap">
@@ -859,7 +998,7 @@ function render12List() {
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
         <div class="small text-muted mb-3">
           <b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ภาค:</b> ${esc(formatTermText(item.term))}<br>
-          <b>แผนวันที่:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} | <b>${esc(item.hours)} ชม.</b>
+          <b>แผนวันที่:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} ${item.hours ? `| <b>${esc(item.hours)} ชม.</b>` : ''}
         </div>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="open12DetailModal('${esc(item.req12_id)}')">
@@ -922,13 +1061,12 @@ function open12DetailModal(req12Id) {
       <div class="col-12 col-md-6"><b>ระดับชั้น:</b> ${esc(item.level)} | <b>ภาคเรียน:</b> ${esc(formatTermText(item.term))}</div>
       <div class="col-12 col-md-6"><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</div>
       <div class="col-12 col-md-6"><b>กลุ่ม/ศูนย์การเรียน:</b> ${esc(item.group_name || '-')}</div>
-      <div class="col-12 col-md-6"><b>ช่วงเวลาตามแผน:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} (${esc(item.hours)} ชม.)</div>
+      <div class="col-12 col-md-6"><b>ช่วงเวลาตามแผน:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} ${item.hours ? `(${esc(item.hours)} ชม.)` : ''}</div>
       <div class="col-12 col-md-6"><b>สถานที่:</b> ${esc(item.location || '-')}</div>
     </div>
     <h6 class="fw-bold">ชื่อกิจกรรม / โครงการที่จะทำ:</h6>
     <p>${esc(item.activity_name)}</p>
-    <h6 class="fw-bold">วัตถุประสงค์ / แผนการดำเนินกิจกรรม:</h6>
-    <p style="white-space: pre-line;" class="border p-3 rounded-3 bg-white">${esc(item.plan_detail)}</p>
+    ${item.plan_detail ? `<h6 class="fw-bold">วัตถุประสงค์ / แผนการดำเนินกิจกรรม:</h6><p style="white-space: pre-line;" class="border p-3 rounded-3 bg-white">${esc(item.plan_detail)}</p>` : ''}
     <h6 class="fw-bold mt-3">ผลประเมินตนเอง (กพช. 2) ทั้ง 10 ข้อ:</h6>
     <div class="table-responsive mb-2">
       <table class="table table-bordered table-sm small mb-0">
@@ -1358,24 +1496,40 @@ function toggleAllChecks(master) {
   document.querySelectorAll('.reg-check').forEach(cb => cb.checked = master.checked);
 }
 
-function renderDashboardList() {
-  const kw = document.getElementById('dashSearchInput').value.toLowerCase().trim();
+function getFilteredDashItems() {
+  const kw = (document.getElementById('dashSearchInput')?.value || '').toLowerCase().trim();
+  const termVal = document.getElementById('dashTermFilter')?.value || 'ALL';
+  const teacherVal = document.getElementById('dashTeacherFilter')?.value || 'ALL';
   const isTeacher = currentUser.role === 'TEACHER';
   const isPresentTab = isTeacher && teacherTabMode === 'present';
-  const canCheck = ['TEACHER', 'COMM_1', 'COMM_2', 'COMM_3', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
+  const showTeacherFilter = ['REGISTRAR', 'ADMIN'].includes(currentUser.role);
 
-  const filtered = dashItems.filter(item => {
+  return dashItems.filter(item => {
     if (isPresentTab) {
-      if (item.current_step !== 'WAIT_TEACHER_PRESENT') return false;
+      if (presentSubMode === 'SENT') {
+        if (!['APPROVED_FOR_REGISTRAR', 'COMPLETED'].includes(item.current_step)) return false;
+      } else {
+        if (item.current_step !== 'WAIT_TEACHER_PRESENT') return false;
+      }
     } else if (filterMode === 'PENDING' && !isMyPendingItem(item)) {
       return false;
     }
+    if (!matchesTermFilter(getItemTerm(item), termVal)) return false;
+    if (showTeacherFilter && teacherVal !== 'ALL' && String(item.teacher_name || '').trim() !== teacherVal) return false;
     if (kw) {
       const text = `${item.req_id} ${item.ref_12_id || ''} ${item.student_id} ${item.student_name} ${item.activity_name} ${item.teacher_name}`.toLowerCase();
       if (!text.includes(kw)) return false;
     }
     return true;
   });
+}
+
+function renderDashboardList() {
+  const isTeacher = currentUser.role === 'TEACHER';
+  const isPresentTab = isTeacher && teacherTabMode === 'present';
+  const canCheck = ['TEACHER', 'COMM_1', 'COMM_2', 'COMM_3', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
+
+  const filtered = getFilteredDashItems();
 
   const tbody = document.getElementById('dashTableBody');
   const mobileBox = document.getElementById('dashMobileCards');
@@ -1390,14 +1544,15 @@ function renderDashboardList() {
 
   tbody.innerHTML = filtered.map(item => {
     const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
-    const canAct = isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
+    const canAct = !isPresentTab && isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
+    const termTxt = getItemTerm(item);
     return `
       <tr>
         ${canCheck ? `<td><input type="checkbox" class="reg-check" value="${esc(item.req_id)}"></td>` : ''}
         <td>
           <div class="fw-bold text-primary">${esc(item.req_id)}</div>
           ${item.ref_12_id ? `<div class="small text-success">กพช.1-2: ${esc(item.ref_12_id)}</div>` : ''}
-          <div class="small text-muted">${esc(item.created_at)}</div>
+          <div class="small text-muted">${esc(item.created_at)} ${termTxt ? `<span class="badge bg-light text-dark border ms-1">ภาค ${esc(termTxt)}</span>` : ''}</div>
         </td>
         <td>
           <div class="fw-semibold">${esc(item.student_name)}</div>
@@ -1423,13 +1578,15 @@ function renderDashboardList() {
 
   mobileBox.innerHTML = filtered.map(item => {
     const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
-    const canAct = isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
+    const canAct = !isPresentTab && isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
+    const termTxt = getItemTerm(item);
     return `
       <div class="mobile-item-card">
         <div class="d-flex justify-content-between align-items-start mb-2">
           <div>
             ${canCheck ? `<input type="checkbox" class="reg-check me-2" value="${esc(item.req_id)}">` : ''}
             <span class="fw-bold text-primary">${esc(item.req_id)}</span>
+            ${termTxt ? `<span class="badge bg-light text-dark border ms-1">ภาค ${esc(termTxt)}</span>` : ''}
           </div>
           <span class="badge step-badge ${st.cls}">${st.text}</span>
         </div>
@@ -1490,12 +1647,22 @@ async function printTeacherPresentPackage() {
   let targetIds = checkedIds;
 
   if (targetIds.length === 0) {
-    targetIds = dashItems.filter(x => x.current_step === 'WAIT_TEACHER_PRESENT').map(x => x.req_id);
+    const isTeacher = currentUser.role === 'TEACHER';
+    const isPresentTab = isTeacher && teacherTabMode === 'present';
+    const visibleList = getFilteredDashItems();
+    if (isPresentTab && presentSubMode === 'SENT') {
+      targetIds = visibleList.map(x => x.req_id);
+    } else {
+      targetIds = visibleList.filter(x => x.current_step === 'WAIT_TEACHER_PRESENT').map(x => x.req_id);
+    }
   }
 
   if (targetIds.length === 0) {
-    return safeAlert('ไม่พบรายการ', 'กรุณาติ๊กเลือกรายการที่ต้องการนำเสนอส่งทะเบียนก่อนครับ', 'warning');
+    return safeAlert('ไม่พบรายการ', 'กรุณาติ๊กเลือกรายการที่ต้องการพิมพ์ชุดส่งทะเบียนก่อนครับ', 'warning');
   }
+
+  const termFilterVal = document.getElementById('dashTermFilter')?.value || 'ALL';
+  const defaultTerm = termFilterVal.startsWith('TERM:') ? termFilterVal.slice(5) : '2/2569';
 
   const { value: formValues } = await Swal.fire({
     title: `พิมพ์ชุดเอกสารส่งทะเบียน (${targetIds.length} รายการ)`,
@@ -1513,7 +1680,7 @@ async function printTeacherPresentPackage() {
         <label class="form-label fw-bold mb-1">เลขที่หนังสือ (แก้ไขตัวเลขหลัง / ได้)</label>
         <input id="swal_docno" class="form-control mb-2" value="ศธ. 07058.02/......" placeholder="เช่น ศธ. 07058.02/123">
         <label class="form-label fw-bold mb-1">ภาคเรียน / ปีการศึกษา</label>
-        <input id="swal_term" class="form-control" value="2/2569">
+        <input id="swal_term" class="form-control" value="${esc(defaultTerm)}">
       </div>
     `,
     focusConfirm: false,
@@ -1765,11 +1932,13 @@ function openDetailModal(reqId) {
   `).join('');
 
   const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
+  const termTxt = getItemTerm(item);
   document.getElementById('detailModalBody').innerHTML = `
     <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div>
         <span class="badge step-badge ${st.cls}">${st.text}</span>
         ${item.ref_12_id ? `<span class="badge bg-success bg-opacity-10 text-success border border-success ms-1">ผ่าน กพช.1-2: ${esc(item.ref_12_id)}</span>` : ''}
+        ${termTxt ? `<span class="badge bg-light text-dark border ms-1">ภาค ${esc(termTxt)}</span>` : ''}
       </div>
       <span class="text-muted small">ส่งเมื่อ: ${esc(item.created_at)}</span>
     </div>
@@ -1912,7 +2081,7 @@ async function printProjectPDF(reqId) {
             ลงชื่อ......................................................<br>
             (${DIRECTOR_NAME})<br>
             ผู้อำนวยการ${SCHOOL_NAME}<br>
-            <span style="font-size:13pt;">(อนุมัติระบบ: ${esc(item.director_approved_at || 'รอการอนุมติ')})</span>
+            <span style="font-size:13pt;">(อนุมัติระบบ: ${esc(item.director_approved_at || 'รอการอนุมัติ')})</span>
           </div>
         </div>
       </div>
@@ -1960,7 +2129,15 @@ async function printBatchMemo() {
   if (checkedIds.length > 0) {
     targetItems = dashItems.filter(x => checkedIds.includes(x.req_id));
   } else {
-    targetItems = dashItems.filter(x => ['WAIT_TEACHER_PRESENT', 'APPROVED_FOR_REGISTRAR', 'COMPLETED'].includes(x.current_step));
+    const termVal = document.getElementById('dashTermFilter')?.value || 'ALL';
+    const teacherVal = document.getElementById('dashTeacherFilter')?.value || 'ALL';
+    const showTeacherFilter = ['REGISTRAR', 'ADMIN'].includes(currentUser.role);
+    targetItems = dashItems.filter(x => {
+      if (!['WAIT_TEACHER_PRESENT', 'APPROVED_FOR_REGISTRAR', 'COMPLETED'].includes(x.current_step)) return false;
+      if (!matchesTermFilter(getItemTerm(x), termVal)) return false;
+      if (showTeacherFilter && teacherVal !== 'ALL' && String(x.teacher_name || '').trim() !== teacherVal) return false;
+      return true;
+    });
   }
 
   if (targetItems.length === 0) {
@@ -1971,6 +2148,9 @@ async function printBatchMemo() {
     );
   }
 
+  const termFilterVal = document.getElementById('dashTermFilter')?.value || 'ALL';
+  const defaultTerm = termFilterVal.startsWith('TERM:') ? termFilterVal.slice(5) : '2/2569';
+
   const { value: formValues } = await Swal.fire({
     title: `จัดทำบันทึกข้อความสรุปรวม (${targetItems.length} รายการ)`,
     html: `
@@ -1980,7 +2160,7 @@ async function printBatchMemo() {
         <label class="form-label fw-bold mb-1">เลขที่หนังสือ (แก้ไขตัวเลขหลัง / ได้)</label>
         <input id="swal_docno" class="form-control mb-2" value="ศธ. 07058.02/......" placeholder="เช่น ศธ. 07058.02/123">
         <label class="form-label fw-bold mb-1">ภาคเรียน / ปีการศึกษา</label>
-        <input id="swal_term" class="form-control" value="2/2569">
+        <input id="swal_term" class="form-control" value="${esc(defaultTerm)}">
       </div>
     `,
     focusConfirm: false,
@@ -2109,16 +2289,23 @@ async function printBatchMemo() {
 
 // ==================== นายทะเบียน ====================
 function exportRegistrarCSV() {
-  const approved = dashItems.filter(x => x.current_step === 'APPROVED_FOR_REGISTRAR');
-  if (approved.length === 0) return safeAlert('แจ้งเตือน', 'ไม่มีรายการที่รอลงทะเบียนในขณะนี้', 'info');
+  const termVal = document.getElementById('dashTermFilter')?.value || 'ALL';
+  const teacherVal = document.getElementById('dashTeacherFilter')?.value || 'ALL';
+  const approved = dashItems.filter(x => {
+    if (x.current_step !== 'APPROVED_FOR_REGISTRAR') return false;
+    if (!matchesTermFilter(getItemTerm(x), termVal)) return false;
+    if (teacherVal !== 'ALL' && String(x.teacher_name || '').trim() !== teacherVal) return false;
+    return true;
+  });
+  if (approved.length === 0) return safeAlert('แจ้งเตือน', 'ไม่มีรายการที่รอลงทะเบียนตามเงื่อนไขที่เลือกในขณะนี้', 'info');
 
-  const headers = ['ลำดับ', 'รหัสคำขอ', 'รหัส กพช.1-2', 'รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ระดับชั้น', 'ครูประจำกลุ่ม', 'ชื่อกิจกรรม', 'วันที่เริ่มโครงการ', 'วันสิ้นสุดโครงการ', 'สถานที่', 'จำนวนชั่วโมง', 'วันที่ ผอ.อนุมัติ', 'วันที่ครูนำเสนอ'];
+  const headers = ['ลำดับ', 'รหัสคำขอ', 'รหัส กพช.1-2', 'ภาคเรียน', 'รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ระดับชั้น', 'ครูประจำกลุ่ม', 'ชื่อกิจกรรม', 'วันที่เริ่มโครงการ', 'วันสิ้นสุดโครงการ', 'สถานที่', 'จำนวนชั่วโมง', 'วันที่ ผอ.อนุมัติ', 'วันที่ครูนำเสนอ'];
   const csvEscape = v => `"${String(v || '').replace(/"/g, '""')}"`;
 
   const lines = [headers.map(csvEscape).join(',')];
   approved.forEach((r, idx) => {
     lines.push([
-      idx + 1, r.req_id, r.ref_12_id || '-', r.student_id, r.student_name, r.level, r.teacher_name,
+      idx + 1, r.req_id, r.ref_12_id || '-', getItemTerm(r) || '-', r.student_id, r.student_name, r.level, r.teacher_name,
       r.activity_name, formatShortThaiDate(r.activity_date), formatShortThaiDate(r.activity_end_date), r.location, r.hours, r.director_approved_at, r.teacher_presented_at || '-'
     ].map(csvEscape).join(','));
   });
