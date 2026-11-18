@@ -1,15 +1,18 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 const SCHOOL_NAME = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
 const DIRECTOR_NAME = 'นางฑัศดาพร ลองชัย';
-const GARUDA_URL = 'garuda.png';
+const GARUDA_URL = 'https://upload.wikimedia.org/wikipedia/commons/3/3c/Garuda_Emblem_of_Thailand_%28Monochrome_2%29.svg';
 
 let compressedImages = [];
 let authToken = null;
 let currentUser = null;
 let dashItems = [];
+let dash12Items = [];
 let adminUsers = [];
 let adminLogs = [];
 let filterMode = 'PENDING';
+let filter12Mode = 'PENDING';
+let currentEligibleList12 = [];
 
 const STEP_LABELS = {
   'WAIT_TEACHER': { text: 'รอครูประจำกลุ่มอนุมัติ', cls: 'bg-warning text-dark' },
@@ -20,6 +23,12 @@ const STEP_LABELS = {
   'APPROVED_FOR_REGISTRAR': { text: 'ผอ.อนุมัติแล้ว (รอนายทะเบียน)', cls: 'bg-success text-white' },
   'COMPLETED': { text: 'บันทึกทะเบียนเรียบร้อย', cls: 'bg-dark text-white' },
   'REJECTED': { text: 'ถูกตีกลับให้แก้ไข', cls: 'bg-danger text-white' }
+};
+
+const STEP12_LABELS = {
+  'WAIT_TEACHER_12': { text: 'รอครูอนุมัติ กพช.1-2', cls: 'bg-warning text-dark' },
+  'APPROVED_12': { text: 'อนุมัติให้ทำกิจกรรมแล้ว', cls: 'bg-success text-white' },
+  'REJECTED_12': { text: 'ไม่อนุมัติ / แก้ไข กพช.1-2', cls: 'bg-danger text-white' }
 };
 
 const ROLE_LABELS = {
@@ -35,7 +44,7 @@ const ROLE_LABELS = {
 // ==================== เชื่อมต่อ API Google Apps Script ====================
 async function callApi(action, params = {}) {
   if (!API_URL || API_URL.includes('วาง_URL_ของ')) {
-    throw new Error('กรุณาเปิดไฟล์ app.js แล้วนำลิงก์ /exec จาก Apps Script มาวางในตัวแปร API_URL บรรทัดที่ 1 ก่อนครับ');
+    throw new Error('กรุณานำลิงก์ /exec จาก Apps Script มาวางในตัวแปร API_URL บรรทัดที่ 1 ก่อนครับ');
   }
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -97,6 +106,10 @@ function formatShortThaiDate(dateInput) {
   }
   return datePart;
 }
+function toInputDate(val) {
+  if (!val) return '';
+  return String(val).split(' ')[0];
+}
 function safeAlert(title, htmlText, icon) {
   Swal.fire({ title, html: htmlText, icon: icon || 'info', confirmButtonColor: '#6366f1' });
 }
@@ -128,10 +141,12 @@ function renderNavbar() {
   }
 }
 
-// ==================== ส่วนหน้าแรก (นักศึกษา + ข่าวประกาศ) ====================
+// ==================== ส่วนหน้าแรก (นักศึกษา: กพช.1-2 + ส่งผล + เช็กสถานะ) ====================
 function switchPublicTab(tab) {
+  document.getElementById('tabBtnPre12').classList.toggle('active', tab === 'pre12');
   document.getElementById('tabBtnSubmit').classList.toggle('active', tab === 'submit');
   document.getElementById('tabBtnStatus').classList.toggle('active', tab === 'status');
+  document.getElementById('publicPre12View').classList.toggle('d-none', tab !== 'pre12');
   document.getElementById('publicSubmitView').classList.toggle('d-none', tab !== 'submit');
   document.getElementById('publicStatusView').classList.toggle('d-none', tab !== 'status');
 }
@@ -148,7 +163,8 @@ function renderAnnouncement(ann) {
 }
 
 async function loadPublicData() {
-  const sel = document.getElementById('f_teacher_id');
+  const sel1 = document.getElementById('p12_teacher_id');
+  const sel2 = document.getElementById('f_teacher_id');
   const errEl = document.getElementById('teacherLoadError');
   try {
     const data = await callApi('getPublicData');
@@ -156,17 +172,176 @@ async function loadPublicData() {
     renderAnnouncement(data.announcement);
 
     const list = data.teachers || [];
-    if (list.length === 0) {
-      sel.innerHTML = '<option value="">-- ยังไม่มีรายชื่อครูในระบบ --</option>';
-      return;
-    }
-    sel.innerHTML = '<option value="">-- กรุณาเลือกครูประจำกลุ่ม --</option>' +
-      list.map(t => `<option value="${esc(t.user_id)}">${esc(t.full_name)} (${esc(t.group_name)})</option>`).join('');
+    const html = list.length === 0
+      ? '<option value="">-- ยังไม่มีรายชื่อครูในระบบ --</option>'
+      : '<option value="">-- กรุณาเลือกครูประจำกลุ่ม --</option>' +
+        list.map(t => `<option value="${esc(t.user_id)}">${esc(t.full_name)} (${esc(t.group_name)})</option>`).join('');
+
+    sel1.innerHTML = html;
+    sel2.innerHTML = html;
   } catch (err) {
-    sel.innerHTML = '<option value="">-- โหลดรายชื่อครูไม่สำเร็จ --</option>';
+    const errOpt = '<option value="">-- โหลดรายชื่อครูไม่สำเร็จ --</option>';
+    sel1.innerHTML = errOpt;
+    sel2.innerHTML = errOpt;
     errEl.innerText = err.message;
     errEl.classList.remove('d-none');
   }
+}
+
+// --- 1. ยื่นขออนุมัติทำ กพช. (กพช.1-2) ---
+async function handlePre12Submit() {
+  const sid = document.getElementById('p12_student_id').value.trim();
+  const sname = document.getElementById('p12_student_name').value.trim();
+  const lvl = document.getElementById('p12_level').value;
+  const tid = document.getElementById('p12_teacher_id').value;
+  const term = document.getElementById('p12_term').value.trim();
+  const hrs = document.getElementById('p12_hours').value;
+  const actName = document.getElementById('p12_activity_name').value.trim();
+  const startDate = document.getElementById('p12_start_date').value;
+  const endDate = document.getElementById('p12_end_date').value;
+  const loc = document.getElementById('p12_location').value.trim();
+  const detail = document.getElementById('p12_plan_detail').value.trim();
+  const evalOk = document.getElementById('p12_self_eval_ok').checked;
+
+  if (!sid || !sname || !lvl || !tid || !hrs || !actName || !startDate || !endDate || !detail) {
+    return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง', 'warning');
+  }
+  if (endDate < startDate) {
+    return safeAlert('วันที่ไม่ถูกต้อง', 'วันที่คาดว่าจะสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม', 'warning');
+  }
+  if (!evalOk) {
+    return safeAlert('กรุณายืนยัน', 'กรุณาติ๊กถูกช่องรับรองการประเมินตนเอง กพช.1-2 ด้านล่างก่อนยื่นคำขอ', 'warning');
+  }
+
+  showLoading('กำลังส่งคำขออนุมัติ กพช.1-2...');
+  try {
+    const res = await callApi('submitPreApproval12', {
+      payload: {
+        student_id: sid, student_name: sname, level: lvl, teacher_id: tid,
+        term, hours: hrs, activity_name: actName, plan_start_date: startDate,
+        plan_end_date: endDate, location: loc, plan_detail: detail, self_eval_ok: evalOk
+      }
+    });
+    hideLoading();
+    safeAlert(
+      'ยื่นขอ กพช.1-2 สำเร็จ! 📋',
+      `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req12_id)}</b><br>กรุณารอครูประจำกลุ่มกดอนุมัติก่อนจึงจะส่งบันทึกผลงานได้ (เช็กผลได้ที่แท็บ "เช็กสถานะ")`,
+      'success'
+    );
+    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_hours','p12_activity_name','p12_start_date','p12_end_date','p12_location','p12_plan_detail'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('p12_self_eval_ok').checked = false;
+  } catch (err) {
+    hideLoading();
+    safeAlert('เกิดข้อผิดพลาด', err.message, 'error');
+  }
+}
+
+// --- 2. ตรวจสอบสิทธิ์ กพช.1-2 ก่อนให้ส่งบันทึกผลงาน ---
+function resetSubmitLock(btnText) {
+  const btn = document.getElementById('btnSubmitKPCH');
+  btn.disabled = true;
+  btn.innerHTML = `<i class="bi bi-lock me-2"></i>${btnText || 'กรุณาตรวจสอบสิทธิ์ กพช.1-2 ด้านบนก่อนส่งผลงาน'}`;
+  document.getElementById('ref12SelectWrap').classList.add('d-none');
+  document.getElementById('f_ref_12_id').innerHTML = '';
+  currentEligibleList12 = [];
+}
+
+async function checkEligibilityUI() {
+  const sid = document.getElementById('f_student_id').value.trim();
+  const banner = document.getElementById('eligibilityBanner');
+  if (!sid) {
+    return safeAlert('แจ้งเตือน', 'กรุณากรอกรหัสนักศึกษาก่อนกดตรวจสอบสิทธิ์', 'warning');
+  }
+
+  showLoading('กำลังตรวจสอบสิทธิ์ กพช.1-2...');
+  try {
+    const res = await callApi('checkEligibility', { student_id: sid });
+    hideLoading();
+    banner.classList.remove('d-none');
+
+    if (!res.hasAny12) {
+      resetSubmitLock('ไม่สามารถส่งได้ (ยังไม่ได้ขออนุมัติ กพช.1-2)');
+      banner.innerHTML = `
+        <div class="alert alert-danger mb-0 rounded-3 small">
+          <div class="fw-bold mb-1">❌ ยังไม่พบคำขออนุมัติทำ กพช. (กพช.1-2) ของรหัส ${esc(sid)}</div>
+          <div>นักศึกษาต้องยื่นขอ กพช.1-2 และได้รับอนุมัติจากครูก่อน จึงจะส่งบันทึกผลงานได้</div>
+          <button type="button" class="btn btn-danger btn-sm rounded-pill mt-2 fw-bold" onclick="goToPre12WithId('${esc(sid)}')">
+            📋 ไปหน้าขออนุมัติ กพช.1-2 ทันที
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    const avail = res.availableApproved12 || [];
+    if (avail.length === 0) {
+      const latest = res.approvals12[0];
+      const st = STEP12_LABELS[latest.status_12] || { text: latest.status_12 };
+      if (latest.is_used) {
+        resetSubmitLock('คำขอ กพช.1-2 ที่อนุมัติถูกใช้ส่งผลงานครบแล้ว');
+        banner.innerHTML = `
+          <div class="alert alert-info mb-0 rounded-3 small">
+            <div class="fw-bold mb-1">ℹ️ คุณได้ส่งบันทึกผลงานสำหรับ กพช.1-2 ที่ได้รับอนุมัติครบแล้ว</div>
+            <div>หากต้องการทำกิจกรรม/โครงการใหม่ กรุณายื่นขอ กพช.1-2 เพิ่มเติมก่อนครับ</div>
+            <button type="button" class="btn btn-primary btn-sm rounded-pill mt-2 fw-bold" onclick="goToPre12WithId('${esc(sid)}')">
+              📋 ขออนุมัติ กพช.1-2 โครงการใหม่
+            </button>
+          </div>
+        `;
+      } else {
+        resetSubmitLock('รอครูอนุมัติ กพช.1-2 ก่อนจึงจะส่งผลงานได้');
+        banner.innerHTML = `
+          <div class="alert alert-warning mb-0 rounded-3 small">
+            <div class="fw-bold mb-1">⏳ ยังไม่สามารถส่งบันทึกผลงานได้ (สถานะล่าสุด: ${st.text})</div>
+            <div>รหัสคำขอ: <b>${esc(latest.req12_id)}</b> | โครงการ: ${esc(latest.activity_name)}</div>
+            ${latest.status_12 === 'REJECTED_12' ? `<div class="text-danger mt-1"><b>เหตุผลที่ไม่ผ่าน:</b> ${esc(latest.reject_reason_12)} <button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="goToPre12WithId('${esc(sid)}')">ยื่นขอใหม่</button></div>` : '<div>กรุณารอครูประจำกลุ่มกดอนุมัติ กพช.1-2 ให้เรียบร้อยก่อนครับ</div>'}
+          </div>
+        `;
+      }
+      return;
+    }
+
+    // ผ่านการอนุมัติ กพช.1-2 แล้ว!
+    currentEligibleList12 = avail;
+    banner.innerHTML = `
+      <div class="alert alert-success mb-0 rounded-3 small">
+        <b>✅ ผ่านการตรวจสอบสิทธิ์ กพช.1-2 แล้ว!</b> (พบ ${avail.length} โครงการที่อนุมัติและรอส่งผลงาน)
+      </div>
+    `;
+    const wrap = document.getElementById('ref12SelectWrap');
+    const sel = document.getElementById('f_ref_12_id');
+    wrap.classList.remove('d-none');
+    sel.innerHTML = avail.map(x => `<option value="${esc(x.req12_id)}">${esc(x.req12_id)} - ${esc(x.activity_name)} (${esc(x.hours)} ชม.)</option>`).join('');
+    onSelectApproved12();
+
+    const btn = document.getElementById('btnSubmitKPCH');
+    btn.disabled = false;
+    btn.innerHTML = `<i class="bi bi-send-heart me-2"></i>ส่งบันทึกขอ กพช.`;
+  } catch (err) {
+    hideLoading();
+    safeAlert('ผิดพลาด', err.message, 'error');
+  }
+}
+
+function goToPre12WithId(sid) {
+  document.getElementById('p12_student_id').value = sid;
+  switchPublicTab('pre12');
+}
+
+function onSelectApproved12() {
+  const id = document.getElementById('f_ref_12_id').value;
+  const found = currentEligibleList12.find(x => x.req12_id === id);
+  if (!found) return;
+  document.getElementById('f_student_name').value = found.student_name || '';
+  document.getElementById('f_level').value = found.level || '';
+  document.getElementById('f_teacher_id').value = found.teacher_id || '';
+  document.getElementById('f_hours').value = found.hours || '';
+  document.getElementById('f_activity_name').value = found.activity_name || '';
+  document.getElementById('f_activity_date').value = toInputDate(found.plan_start_date);
+  document.getElementById('f_activity_end_date').value = toInputDate(found.plan_end_date);
+  document.getElementById('f_location').value = found.location || '';
 }
 
 async function handleImageSelection(input) {
@@ -225,6 +400,7 @@ function compressImageFile(file, maxSize, quality) {
 
 async function handleStudentSubmit() {
   const sid = document.getElementById('f_student_id').value.trim();
+  const ref12Id = document.getElementById('f_ref_12_id').value;
   const sname = document.getElementById('f_student_name').value.trim();
   const lvl = document.getElementById('f_level').value;
   const tid = document.getElementById('f_teacher_id').value;
@@ -235,6 +411,9 @@ async function handleStudentSubmit() {
   const loc = document.getElementById('f_location').value.trim();
   const detail = document.getElementById('f_activity_detail').value.trim();
 
+  if (!ref12Id) {
+    return safeAlert('ยังไม่ได้รับอนุมัติ กพช.1-2', 'กรุณาตรวจสอบสิทธิ์ กพช.1-2 ก่อนส่งบันทึกผลงานครับ', 'warning');
+  }
   if (!sid || !sname || !lvl || !tid || !hrs || !actName || !startDate || !endDate || !detail) {
     return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * และวันที่เริ่ม-สิ้นสุดโครงการให้ครบ', 'warning');
   }
@@ -249,6 +428,7 @@ async function handleStudentSubmit() {
   try {
     const res = await callApi('submitKPCH', {
       payload: {
+        ref_12_id: ref12Id,
         student_id: sid, student_name: sname, level: lvl, teacher_id: tid,
         hours: hrs, activity_name: actName, activity_date: startDate,
         activity_end_date: endDate, location: loc, activity_detail: detail,
@@ -261,7 +441,9 @@ async function handleStudentSubmit() {
       document.getElementById(id).value = '';
     });
     document.getElementById('imagePreviewBox').innerHTML = '';
+    document.getElementById('eligibilityBanner').classList.add('d-none');
     compressedImages = [];
+    resetSubmitLock();
   } catch (err) {
     hideLoading();
     safeAlert('เกิดข้อผิดพลาด', err.message, 'error');
@@ -273,48 +455,91 @@ async function searchMyStatus() {
   if (!sid) return safeAlert('แจ้งเตือน', 'กรุณากรอกรหัสนักศึกษา', 'warning');
   showLoading('กำลังค้นหาข้อมูล...');
   try {
-    const rows = await callApi('checkStatus', { student_id: sid });
+    const res = await callApi('checkStatus', { student_id: sid });
     hideLoading();
+    const list12 = res.approvals12 || [];
+    const listSubs = res.submissions || [];
     const area = document.getElementById('statusResultArea');
-    if (!rows || rows.length === 0) {
-      area.innerHTML = '<div class="alert alert-secondary rounded-4 text-center">ไม่พบประวัติการส่งคำขอของรหัสนักศึกษานี้</div>';
-      return;
-    }
-    area.innerHTML = rows.map(r => {
-      const st = STEP_LABELS[r.current_step] || { text: r.current_step, cls: 'bg-secondary' };
-      const steps = [
-        { label: 'ครูประจำกลุ่ม', done: !!r.teacher_approved_at },
-        { label: 'กรรมการ1', done: !!r.comm1_approved_at },
-        { label: 'กรรมการ2', done: !!r.comm2_approved_at },
-        { label: 'กรรมการ3', done: !!r.comm3_approved_at },
-        { label: 'ผู้อำนวยการ', done: !!r.director_approved_at },
-        { label: 'นายทะเบียน', done: r.current_step === 'COMPLETED' }
-      ];
-      const progHtml = steps.map(s => `
-        <div class="prog-step ${s.done ? 'done' : (r.current_step === 'REJECTED' ? 'rejected' : '')}">
-          <div>${s.done ? '✅' : (r.current_step === 'REJECTED' ? '❌' : '⏳')}</div>
-          <div>${s.label}</div>
-        </div>
-      `).join('');
 
-      return `
-        <div class="mobile-item-card">
-          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-            <div>
-              <span class="badge bg-light text-primary border me-1">${esc(r.req_id)}</span>
-              <strong>${esc(r.activity_name)}</strong>
-              <div class="small text-muted mt-1">
-                ผู้ส่ง: ${esc(r.student_name)} | ครูประจำกลุ่ม: ${esc(r.teacher_name)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
-                ช่วงวันที่: ${formatShortThaiDate(r.activity_date)} ถึง ${formatShortThaiDate(r.activity_end_date)}
-              </div>
-            </div>
-            <span class="badge step-badge ${st.cls}">${st.text}</span>
-          </div>
-          <div class="cute-progress-bar">${progHtml}</div>
-          ${r.current_step === 'REJECTED' ? `<div class="alert alert-danger mt-2 mb-0 py-2 small rounded-3"><b>เหตุผลที่ตีกลับ:</b> ${esc(r.reject_reason)}</div>` : ''}
+    if (list12.length === 0 && listSubs.length === 0) {
+      area.innerHTML = `
+        <div class="alert alert-warning rounded-4 text-center">
+          <div class="fw-bold mb-1">❌ ยังไม่พบประวัติการขออนุมัติทำ กพช. (กพช.1-2) ของรหัสนักศึกษา ${esc(sid)}</div>
+          <div class="small mb-2">นักศึกษาต้องยื่นขออนุมัติ กพช.1-2 ก่อนลงมือทำกิจกรรมนะครับ</div>
+          <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold" onclick="goToPre12WithId('${esc(sid)}')">📋 ไปยื่นขอ กพช.1-2 ตอนนี้</button>
         </div>
       `;
-    }).join('');
+      return;
+    }
+
+    let html = '<h6 class="fw-bold text-primary mb-2">📋 1. สถานะคำขออนุมัติทำ กพช. (กพช.1-2)</h6>';
+    if (list12.length === 0) {
+      html += '<div class="alert alert-secondary small rounded-3">ยังไม่มีรายการขอ กพช.1-2</div>';
+    } else {
+      html += list12.map(r => {
+        const st = STEP12_LABELS[r.status_12] || { text: r.status_12, cls: 'bg-secondary' };
+        return `
+          <div class="mobile-item-card">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+              <div>
+                <span class="badge bg-light text-primary border me-1">${esc(r.req12_id)}</span>
+                <strong>${esc(r.activity_name)}</strong>
+                <div class="small text-muted mt-1">
+                  ผู้ขอ: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | ภาคเรียน: ${esc(r.term)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
+                  แผนวันที่: ${formatShortThaiDate(r.plan_start_date)} ถึง ${formatShortThaiDate(r.plan_end_date)}
+                </div>
+              </div>
+              <span class="badge step-badge ${st.cls}">${st.text}</span>
+            </div>
+            ${r.status_12 === 'APPROVED_12' ? `<div class="small text-success fw-semibold mt-2">✅ อนุมัติเมื่อ: ${esc(r.approved_at_12)} — สามารถไปส่งผลงานที่แท็บ "2. ส่งบันทึกผล กพช." ได้เลย</div>` : ''}
+            ${r.status_12 === 'REJECTED_12' ? `<div class="alert alert-danger mt-2 mb-0 py-2 small rounded-3"><b>เหตุผลที่ไม่ผ่าน:</b> ${esc(r.reject_reason_12)}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    html += '<h6 class="fw-bold text-primary mt-4 mb-2">📸 2. สถานะการส่งบันทึกผลงาน กพช. (หลังทำเสร็จ)</h6>';
+    if (listSubs.length === 0) {
+      html += '<div class="alert alert-light border small rounded-3">ยังไม่มีการส่งบันทึกผลงานพร้อมรูปภาพ</div>';
+    } else {
+      html += listSubs.map(r => {
+        const st = STEP_LABELS[r.current_step] || { text: r.current_step, cls: 'bg-secondary' };
+        const steps = [
+          { label: 'ครูประจำกลุ่ม', done: !!r.teacher_approved_at },
+          { label: 'กรรมการ1', done: !!r.comm1_approved_at },
+          { label: 'กรรมการ2', done: !!r.comm2_approved_at },
+          { label: 'กรรมการ3', done: !!r.comm3_approved_at },
+          { label: 'ผู้อำนวยการ', done: !!r.director_approved_at },
+          { label: 'นายทะเบียน', done: r.current_step === 'COMPLETED' }
+        ];
+        const progHtml = steps.map(s => `
+          <div class="prog-step ${s.done ? 'done' : (r.current_step === 'REJECTED' ? 'rejected' : '')}">
+            <div>${s.done ? '✅' : (r.current_step === 'REJECTED' ? '❌' : '⏳')}</div>
+            <div>${s.label}</div>
+          </div>
+        `).join('');
+
+        return `
+          <div class="mobile-item-card">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+              <div>
+                <span class="badge bg-light text-primary border me-1">${esc(r.req_id)}</span>
+                ${r.ref_12_id ? `<span class="badge bg-light text-secondary border me-1">อ้างอิง ${esc(r.ref_12_id)}</span>` : ''}
+                <strong>${esc(r.activity_name)}</strong>
+                <div class="small text-muted mt-1">
+                  ผู้ส่ง: ${esc(r.student_name)} | ครูประจำกลุ่ม: ${esc(r.teacher_name)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
+                  ช่วงวันที่: ${formatShortThaiDate(r.activity_date)} ถึง ${formatShortThaiDate(r.activity_end_date)}
+                </div>
+              </div>
+              <span class="badge step-badge ${st.cls}">${st.text}</span>
+            </div>
+            <div class="cute-progress-bar">${progHtml}</div>
+            ${r.current_step === 'REJECTED' ? `<div class="alert alert-danger mt-2 mb-0 py-2 small rounded-3"><b>เหตุผลที่ตีกลับ:</b> ${esc(r.reject_reason)}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+    area.innerHTML = html;
   } catch (err) {
     hideLoading();
     safeAlert('ผิดพลาด', err.message, 'error');
@@ -352,10 +577,11 @@ function handleLogout() {
   document.getElementById('publicSection').classList.remove('d-none');
 
   document.getElementById('dashSubmissionsView').classList.remove('d-none');
+  document.getElementById('dash12View').classList.add('d-none');
   document.getElementById('adminUsersView').classList.add('d-none');
   document.getElementById('adminAnnView').classList.add('d-none');
   document.getElementById('adminLogsView').classList.add('d-none');
-  document.querySelectorAll('#adminNavTabs button').forEach((b, idx) => b.classList.toggle('active', idx === 0));
+  document.querySelectorAll('#adminNavTabs button, #teacherNavTabs button').forEach((b, idx) => b.classList.toggle('active', idx === 0));
 
   renderNavbar();
   loadPublicData();
@@ -368,6 +594,7 @@ async function loadDashboard(silentOnExpire = false) {
     hideLoading();
     currentUser = res.user;
     dashItems = res.items || [];
+    dash12Items = res.items12 || [];
     adminUsers = res.users || [];
     adminLogs = res.logs || [];
 
@@ -379,20 +606,32 @@ async function loadDashboard(silentOnExpire = false) {
     document.getElementById('dashSubtitle').innerText = `สวัสดีคุณ ${currentUser.full_name} (${currentUser.group_name || '-'})`;
 
     const isAdmin = currentUser.role === 'ADMIN';
+    const isTeacher = currentUser.role === 'TEACHER';
     const isReg = currentUser.role === 'REGISTRAR';
     const canBatchMemo = ['TEACHER', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
 
     document.getElementById('adminNavTabs').classList.toggle('d-none', !isAdmin);
+    document.getElementById('teacherNavTabs').classList.toggle('d-none', !isTeacher);
     document.getElementById('registrarTools').classList.toggle('d-none', !isReg);
     document.getElementById('batchMemoBar').classList.toggle('d-none', !canBatchMemo);
     document.getElementById('thCheckbox').classList.toggle('d-none', !canBatchMemo);
 
-    if (!isAdmin) {
+    if (isTeacher) {
+      const waitSub = dashItems.filter(x => x.current_step === 'WAIT_TEACHER').length;
+      const wait12 = dash12Items.filter(x => x.status_12 === 'WAIT_TEACHER_12').length;
+      const bSub = document.getElementById('badgeWaitSub');
+      const b12 = document.getElementById('badgeWait12');
+      bSub.innerText = waitSub; bSub.classList.toggle('d-none', waitSub === 0);
+      b12.innerText = wait12; b12.classList.toggle('d-none', wait12 === 0);
+    }
+
+    if (!isAdmin && !isTeacher) {
       document.getElementById('dashSubmissionsView').classList.remove('d-none');
+      document.getElementById('dash12View').classList.add('d-none');
       document.getElementById('adminUsersView').classList.add('d-none');
       document.getElementById('adminAnnView').classList.add('d-none');
       document.getElementById('adminLogsView').classList.add('d-none');
-    } else {
+    } else if (isAdmin) {
       renderAdminUsers();
       renderAdminLogs();
       if (res.announcement) {
@@ -402,6 +641,7 @@ async function loadDashboard(silentOnExpire = false) {
       }
     }
     renderDashboardList();
+    if (isTeacher || isAdmin) render12List();
   } catch (err) {
     hideLoading();
     if (silentOnExpire) {
@@ -412,6 +652,13 @@ async function loadDashboard(silentOnExpire = false) {
       safeAlert('ผิดพลาด', err.message, 'error');
     }
   }
+}
+
+function switchTeacherTab(tab, btn) {
+  document.querySelectorAll('#teacherNavTabs button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('dashSubmissionsView').classList.toggle('d-none', tab !== 'sub');
+  document.getElementById('dash12View').classList.toggle('d-none', tab !== 'req12');
 }
 
 function setFilterMode(mode, btn) {
@@ -425,6 +672,17 @@ function setFilterMode(mode, btn) {
   renderDashboardList();
 }
 
+function setFilter12Mode(mode, btn) {
+  filter12Mode = mode;
+  document.querySelectorAll('#filter12Btns button').forEach(b => {
+    b.classList.remove('btn-primary', 'active');
+    b.classList.add('btn-outline-secondary');
+  });
+  btn.classList.remove('btn-outline-secondary');
+  btn.classList.add('btn-primary', 'active');
+  render12List();
+}
+
 function isMyPendingItem(item) {
   const r = currentUser.role;
   if (r === 'TEACHER') return item.current_step === 'WAIT_TEACHER';
@@ -436,6 +694,234 @@ function isMyPendingItem(item) {
   return true;
 }
 
+// --- ตาราง กพช.1-2 (สำหรับครูและแอดมิน) ---
+function render12List() {
+  const kw = document.getElementById('dash12SearchInput').value.toLowerCase().trim();
+  const filtered = dash12Items.filter(item => {
+    if (filter12Mode === 'PENDING' && item.status_12 !== 'WAIT_TEACHER_12') return false;
+    if (kw) {
+      const text = `${item.req12_id} ${item.student_id} ${item.student_name} ${item.activity_name} ${item.teacher_name}`.toLowerCase();
+      if (!text.includes(kw)) return false;
+    }
+    return true;
+  });
+
+  const tbody = document.getElementById('dash12TableBody');
+  const mobileBox = document.getElementById('dash12MobileCards');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีคำขอ กพช.1-2 ในหมวดหมู่นี้</td></tr>`;
+    mobileBox.innerHTML = `<div class="text-center py-4 text-muted">ไม่มีคำขอ กพช.1-2 ในหมวดหมู่นี้</div>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(item => {
+    const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
+    const canAct = item.status_12 === 'WAIT_TEACHER_12';
+    return `
+      <tr>
+        <td>
+          <div class="fw-bold text-primary">${esc(item.req12_id)}</div>
+          <div class="small text-muted">${esc(item.created_at)}</div>
+        </td>
+        <td>
+          <div class="fw-semibold">${esc(item.student_name)}</div>
+          <div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div>
+        </td>
+        <td class="small">${esc(item.term)}</td>
+        <td>
+          <div class="fw-semibold">${esc(item.activity_name)}</div>
+          <div class="small text-muted">${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} | <b>${esc(item.hours)} ชม.</b></div>
+        </td>
+        <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
+        <td class="text-end text-nowrap">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="open12DetailModal('${esc(item.req12_id)}')">
+            <i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูแผน'}
+          </button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${esc(item.req12_id)}')">
+            <i class="bi bi-printer"></i> กพช.1-2
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  mobileBox.innerHTML = filtered.map(item => {
+    const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
+    const canAct = item.status_12 === 'WAIT_TEACHER_12';
+    return `
+      <div class="mobile-item-card">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <span class="fw-bold text-primary">${esc(item.req12_id)}</span>
+          <span class="badge step-badge ${st.cls}">${st.text}</span>
+        </div>
+        <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
+        <div class="small text-muted mb-3">
+          <b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ภาค:</b> ${esc(item.term)}<br>
+          <b>แผนวันที่:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} | <b>${esc(item.hours)} ชม.</b>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="open12DetailModal('${esc(item.req12_id)}')">
+            <i class="bi bi-eye me-1"></i>${canAct ? 'ดูแผน / อนุมัติ' : 'ดูรายละเอียด'}
+          </button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
+            <i class="bi bi-printer"></i> กพช.1-2
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function open12DetailModal(req12Id) {
+  const item = dash12Items.find(x => x.req12_id === req12Id);
+  if (!item) return;
+
+  document.getElementById('mdReqId').innerText = item.req12_id;
+  const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
+  document.getElementById('detailModalBody').innerHTML = `
+    <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="badge step-badge ${st.cls}">${st.text}</span>
+      <span class="text-muted small">ยื่นขอเมื่อ: ${esc(item.created_at)}</span>
+    </div>
+    <div class="row g-2 mb-3 bg-light p-3 rounded-3 small">
+      <div class="col-12 col-md-6"><b>นักศึกษา:</b> ${esc(item.student_name)} (${esc(item.student_id)})</div>
+      <div class="col-12 col-md-6"><b>ระดับชั้น:</b> ${esc(item.level)} | <b>ภาคเรียน:</b> ${esc(item.term)}</div>
+      <div class="col-12 col-md-6"><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</div>
+      <div class="col-12 col-md-6"><b>ชั่วโมงที่ขอทำ:</b> ${esc(item.hours)} ชั่วโมง</div>
+      <div class="col-12 col-md-6"><b>ช่วงเวลาตามแผน:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)}</div>
+      <div class="col-12 col-md-6"><b>สถานที่:</b> ${esc(item.location || '-')}</div>
+    </div>
+    <h6 class="fw-bold">ชื่อกิจกรรม / โครงการที่จะทำ:</h6>
+    <p>${esc(item.activity_name)}</p>
+    <h6 class="fw-bold">วัตถุประสงค์ / แผนการดำเนินกิจกรรม:</h6>
+    <p style="white-space: pre-line;" class="border p-3 rounded-3 bg-white">${esc(item.plan_detail)}</p>
+    <div class="alert alert-info py-2 small mb-2"><b>การประเมินตนเอง กพช.1-2:</b> ✅ ${esc(item.self_eval_ok)}</div>
+    ${item.approved_at_12 ? `<div class="small text-success">อนุมัติให้ทำกิจกรรมเมื่อ: ${esc(item.approved_at_12)}</div>` : ''}
+    ${item.reject_reason_12 ? `<div class="alert alert-danger mt-2 mb-0 rounded-3"><b>เหตุผลที่ไม่ผ่าน:</b> ${esc(item.reject_reason_12)}</div>` : ''}
+  `;
+
+  const canAct = item.status_12 === 'WAIT_TEACHER_12' && ['TEACHER', 'ADMIN'].includes(currentUser.role);
+  document.getElementById('detailModalFooter').innerHTML = `
+    <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
+      <i class="bi bi-printer me-1"></i>พิมพ์แบบ กพช.1-2
+    </button>
+    <div class="d-flex flex-wrap gap-2">
+      ${canAct ? `
+        <button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'REJECT')">
+          <i class="bi bi-x-circle me-1"></i>ไม่อนุมัติ
+        </button>
+        <button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'APPROVE')">
+          <i class="bi bi-check-circle me-1"></i>อนุมัติให้ทำกิจกรรม
+        </button>
+      ` : ''}
+      <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">ปิด</button>
+    </div>
+  `;
+  openModalById('detailModal');
+}
+
+function submitDecision12(req12Id, decision) {
+  if (decision === 'APPROVE') {
+    Swal.fire({
+      title: 'อนุมัติคำขอ กพช.1-2?',
+      text: `อนุญาตให้นักศึกษาดำเนินกิจกรรมตามคำขอ ${req12Id} ใช่หรือไม่`,
+      icon: 'question', showCancelButton: true,
+      confirmButtonText: 'ยืนยันอนุมัติ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#10b981'
+    }).then(res => { if (res.isConfirmed) executeApproval12(req12Id, 'APPROVE', ''); });
+  } else {
+    Swal.fire({
+      title: 'ระบุเหตุผลที่ไม่ผ่าน / ให้แก้ไข กพช.1-2', input: 'textarea',
+      inputPlaceholder: 'เช่น แผนกิจกรรมยังไม่ชัดเจน กรุณาปรับแก้ไข...',
+      showCancelButton: true, confirmButtonText: 'ส่งคืนแก้ไข', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#ef4444',
+      inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลด้วยครับ'; }
+    }).then(res => { if (res.isConfirmed) executeApproval12(req12Id, 'REJECT', res.value); });
+  }
+}
+
+async function executeApproval12(req12Id, decision, reason) {
+  showLoading('กำลังบันทึกผล กพช.1-2...');
+  try {
+    await callApi('processApproval12', { token: authToken, req12_id: req12Id, decision, reason });
+    hideLoading();
+    closeModalById('detailModal');
+    safeAlert('สำเร็จ', 'บันทึกผลการพิจารณา กพช.1-2 เรียบร้อยแล้ว', 'success');
+    await loadDashboard();
+  } catch (err) {
+    hideLoading();
+    safeAlert('ผิดพลาด', err.message, 'error');
+  }
+}
+
+function printForm12(req12Id) {
+  const item = dash12Items.find(x => x.req12_id === req12Id);
+  if (!item) return;
+  const startThai = formatThaiDate(item.plan_start_date);
+  const endThai = formatThaiDate(item.plan_end_date);
+  const todayThai = formatThaiDate();
+
+  document.getElementById('printOnlyContainer').innerHTML = `
+    <div>
+      <div class="memo-header">
+        <img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'">
+        <div class="memo-title" style="font-size:22pt !important;">แบบคำขออนุมัติและประเมินตนเอง กพช. (กพช.1-2)</div>
+      </div>
+      <div style="text-align:center; font-size:15pt; margin-bottom:10px;">
+        <b>${SCHOOL_NAME}</b> | ภาคเรียนที่ ${esc(item.term)} | รหัสอ้างอิง: ${esc(item.req12_id)}
+      </div>
+      <div class="memo-divider"></div>
+
+      <table style="width:100%; border-collapse:collapse; margin-bottom:12px; font-size:15pt;" border="1" cellpadding="5">
+        <tr>
+          <td style="width:50%;"><b>ชื่อ-สกุล นักศึกษา:</b> ${esc(item.student_name)}</td>
+          <td style="width:50%;"><b>รหัสนักศึกษา:</b> ${esc(item.student_id)}</td>
+        </tr>
+        <tr>
+          <td><b>ระดับชั้น:</b> ${esc(item.level)}</td>
+          <td><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</td>
+        </tr>
+        <tr>
+          <td><b>วันที่คาดว่าจะจัด:</b> ${startThai} ถึง ${endThai}</td>
+          <td><b>จำนวนชั่วโมงที่ขอทำ:</b> ${esc(item.hours)} ชั่วโมง</td>
+        </tr>
+        <tr>
+          <td colspan="2"><b>สถานที่ดำเนินการ:</b> ${esc(item.location || '-')}</td>
+        </tr>
+      </table>
+
+      <div style="margin-bottom:6px;"><b>1. ชื่อกิจกรรม / โครงการที่จะขออนุมัติทำ กพช.:</b> ${esc(item.activity_name)}</div>
+      <div style="margin-bottom:4px;"><b>2. วัตถุประสงค์ / แผนการดำเนินกิจกรรมโดยสังเขป:</b></div>
+      <div style="border:1px solid #000; padding:10px; min-height:90px; white-space:pre-line; margin-bottom:12px;">${esc(item.plan_detail)}</div>
+
+      <div style="border:1px solid #000; padding:10px; margin-bottom:20px;">
+        <b>3. การรับรองและประเมินตนเองเบื้องต้นของผู้เรียน (กพช.1-2):</b><br>
+        [ ✓ ] ${esc(item.self_eval_ok)}<br>
+        <div style="width:55%; margin-left:auto; text-align:center; margin-top:16px;">
+          ลงชื่อ......................................................ผู้ขออนุมัติ<br>
+          (${esc(item.student_name)})<br>
+          วันที่ยื่นคำขอ: ${formatThaiDate(item.created_at)}
+        </div>
+      </div>
+
+      <div style="border:1px solid #000; padding:12px; page-break-inside:avoid;">
+        <b>4. ความเห็นของครูประจำกลุ่ม / ผู้รับผิดชอบกิจกรรม:</b><br>
+        <div style="margin:8px 0 14px 20px;">
+          [ ${item.status_12 === 'APPROVED_12' ? '✓' : ' '} ] อนุมัติให้ดำเนินกิจกรรมตามแผนได้ &nbsp;&nbsp;&nbsp;
+          [ ${item.status_12 === 'REJECTED_12' ? '✓' : ' '} ] ไม่อนุมัติ / ปรับปรุงแก้ไข
+        </div>
+        <div style="width:55%; margin-left:auto; text-align:center;">
+          ลงชื่อ......................................................<br>
+          (${esc(item.teacher_name)})<br>
+          ครูประจำกลุ่ม<br>
+          <span style="font-size:13pt;">(${item.approved_at_12 ? 'อนุมัติในระบบ: ' + esc(item.approved_at_12) : 'วันที่ ' + todayThai})</span>
+        </div>
+      </div>
+    </div>
+  `;
+  setTimeout(() => window.print(), 500);
+}
+
+// --- ตารางส่งผลงาน กพช. (6 ขั้นตอน) ---
 function renderDashboardList() {
   const kw = document.getElementById('dashSearchInput').value.toLowerCase().trim();
   const canCheck = ['TEACHER', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
@@ -443,7 +929,7 @@ function renderDashboardList() {
   const filtered = dashItems.filter(item => {
     if (filterMode === 'PENDING' && !isMyPendingItem(item)) return false;
     if (kw) {
-      const text = `${item.req_id} ${item.student_id} ${item.student_name} ${item.activity_name} ${item.teacher_name}`.toLowerCase();
+      const text = `${item.req_id} ${item.ref_12_id || ''} ${item.student_id} ${item.student_name} ${item.activity_name} ${item.teacher_name}`.toLowerCase();
       if (!text.includes(kw)) return false;
     }
     return true;
@@ -466,6 +952,7 @@ function renderDashboardList() {
         ${canCheck ? `<td><input type="checkbox" class="reg-check" value="${esc(item.req_id)}"></td>` : ''}
         <td>
           <div class="fw-bold text-primary">${esc(item.req_id)}</div>
+          ${item.ref_12_id ? `<div class="small text-success">กพช.1-2: ${esc(item.ref_12_id)}</div>` : ''}
           <div class="small text-muted">${esc(item.created_at)}</div>
         </td>
         <td>
@@ -539,7 +1026,10 @@ function openDetailModal(reqId) {
   const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
   document.getElementById('detailModalBody').innerHTML = `
     <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <span class="badge step-badge ${st.cls}">${st.text}</span>
+      <div>
+        <span class="badge step-badge ${st.cls}">${st.text}</span>
+        ${item.ref_12_id ? `<span class="badge bg-success bg-opacity-10 text-success border border-success ms-1">ผ่าน กพช.1-2: ${esc(item.ref_12_id)}</span>` : ''}
+      </div>
       <span class="text-muted small">ส่งเมื่อ: ${esc(item.created_at)}</span>
     </div>
     <div class="row g-2 mb-3 bg-light p-3 rounded-3 small">
@@ -635,7 +1125,6 @@ async function printProjectPDF(reqId) {
     const endThai = formatThaiDate(item.activity_end_date);
 
     document.getElementById('printOnlyContainer').innerHTML = `
-      <!-- หน้าที่ 1: บันทึกข้อความรายโครงการ -->
       <div class="memo-page">
         <div class="memo-header">
           <img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'">
@@ -653,7 +1142,7 @@ async function printProjectPDF(reqId) {
 
         <div class="memo-indent">
           ด้วย <b>${esc(item.student_name)}</b> รหัสนักศึกษา <b>${esc(item.student_id)}</b> ระดับชั้น <b>${esc(item.level)}</b>
-          ได้ดำเนินการจัดทำกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) โครงการ/กิจกรรมเรื่อง <b>"${esc(item.activity_name)}"</b>
+          ซึ่งได้รับอนุมัติ กพช.1-2 (รหัส: ${esc(item.ref_12_id || '-')}) ได้ดำเนินการจัดทำกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) โครงการ/กิจกรรมเรื่อง <b>"${esc(item.activity_name)}"</b>
           ระหว่างวันที่ ${startThai} ถึงวันที่ ${endThai} ณ ${esc(item.location || '-')} รวมจำนวน <b>${esc(item.hours)} ชั่วโมง</b>
           และได้ยื่นบันทึกหลักฐานพร้อมภาพถ่ายประกอบผ่านระบบออนไลน์ (รหัสอ้างอิง: ${esc(item.req_id)}) เรียบร้อยแล้วนั้น
         </div>
@@ -686,11 +1175,10 @@ async function printProjectPDF(reqId) {
         </div>
       </div>
 
-      <!-- หน้าที่ 2: แบบเสนอโครงการ ภาพถ่าย และลายเซ็นคณะกรรมการ -->
       <div>
         <div style="text-align:center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 10px;">
           <div style="font-size:18pt; font-weight:bold;">รายละเอียดกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) และหลักฐานภาพถ่าย</div>
-          <div style="font-size:14pt;">${SCHOOL_NAME} | รหัสอ้างอิง: ${esc(item.req_id)}</div>
+          <div style="font-size:14pt;">${SCHOOL_NAME} | รหัสอ้างอิง: ${esc(item.req_id)} ${item.ref_12_id ? `| กพช.1-2: ${esc(item.ref_12_id)}` : ''}</div>
         </div>
         <table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:15pt;" border="1" cellpadding="4">
           <tr>
@@ -804,7 +1292,6 @@ async function printBatchMemo() {
   `).join('');
 
   document.getElementById('printOnlyContainer').innerHTML = `
-    <!-- หน้าที่ 1: บันทึกข้อความสรุปรวม -->
     <div class="memo-page">
       <div class="memo-header">
         <img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'">
@@ -856,7 +1343,6 @@ async function printBatchMemo() {
       </div>
     </div>
 
-    <!-- หน้าที่ 2+: บัญชีรายชื่อแนบท้าย -->
     <div>
       <div style="text-align:center; margin-bottom:8px;">
         <div style="font-size:17pt; font-weight:bold;">บัญชีรายชื่อนักศึกษาผู้ผ่านการพิจารณาอนุมัติกิจกรรม กพช. (ภาคเรียนที่ ${esc(formValues.term)})</div>
@@ -908,13 +1394,13 @@ function exportRegistrarCSV() {
   const approved = dashItems.filter(x => x.current_step === 'APPROVED_FOR_REGISTRAR');
   if (approved.length === 0) return safeAlert('แจ้งเตือน', 'ไม่มีรายการที่รอลงทะเบียนในขณะนี้', 'info');
 
-  const headers = ['ลำดับ', 'รหัสคำขอ', 'รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ระดับชั้น', 'ครูประจำกลุ่ม', 'ชื่อกิจกรรม', 'วันที่เริ่มโครงการ', 'วันสิ้นสุดโครงการ', 'สถานที่', 'จำนวนชั่วโมง', 'วันที่ ผอ.อนุมัติ'];
+  const headers = ['ลำดับ', 'รหัสคำขอ', 'รหัส กพช.1-2', 'รหัสนักศึกษา', 'ชื่อ-นามสกุล', 'ระดับชั้น', 'ครูประจำกลุ่ม', 'ชื่อกิจกรรม', 'วันที่เริ่มโครงการ', 'วันสิ้นสุดโครงการ', 'สถานที่', 'จำนวนชั่วโมง', 'วันที่ ผอ.อนุมัติ'];
   const csvEscape = v => `"${String(v || '').replace(/"/g, '""')}"`;
 
   const lines = [headers.map(csvEscape).join(',')];
   approved.forEach((r, idx) => {
     lines.push([
-      idx + 1, r.req_id, r.student_id, r.student_name, r.level, r.teacher_name,
+      idx + 1, r.req_id, r.ref_12_id || '-', r.student_id, r.student_name, r.level, r.teacher_name,
       r.activity_name, formatShortThaiDate(r.activity_date), formatShortThaiDate(r.activity_end_date), r.location, r.hours, r.director_approved_at
     ].map(csvEscape).join(','));
   });
@@ -966,6 +1452,7 @@ function switchAdminTab(tab, btn) {
   document.querySelectorAll('#adminNavTabs button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('dashSubmissionsView').classList.toggle('d-none', tab !== 'subs');
+  document.getElementById('dash12View').classList.toggle('d-none', tab !== 'req12');
   document.getElementById('adminUsersView').classList.toggle('d-none', tab !== 'users');
   document.getElementById('adminAnnView').classList.toggle('d-none', tab !== 'ann');
   document.getElementById('adminLogsView').classList.toggle('d-none', tab !== 'logs');
