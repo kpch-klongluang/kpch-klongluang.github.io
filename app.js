@@ -1,7 +1,7 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 const SCHOOL_NAME = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
 const DIRECTOR_NAME = 'นางฑัศดาพร ลองชัย';
-const GARUDA_URL = 'garuda.png';
+const GARUDA_URL = 'https://upload.wikimedia.org/wikipedia/commons/3/3c/Garuda_Emblem_of_Thailand_%28Monochrome_2%29.svg';
 
 const EVAL_QUESTIONS_12 = [
   'ท่านคิดว่า กิจกรรม กพช. มีประโยชน์เพียงใด',
@@ -121,19 +121,28 @@ function formatShortThaiDate(dateInput) {
   }
   return datePart;
 }
-function formatSlashThaiDate(dateInput) {
-  if (!dateInput) return '........./................../................';
-  const datePart = String(dateInput).split(' ')[0];
-  const parts = datePart.split('-');
-  if (parts.length === 3) {
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    const d = parseInt(parts[2], 10);
-    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-      return `${d} / ${m} / ${y < 2400 ? y + 543 : y}`;
-    }
+function parseTermParts(termVal) {
+  const raw = String(termVal || '').replace(/^'/, '').trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const p = raw.split(' ')[0].split('-');
+    const y = parseInt(p[0], 10);
+    const m = parseInt(p[1], 10);
+    return { no: String(m), year: String(y < 2400 ? y + 543 : y) };
   }
-  return '........./................../................';
+  if (raw.includes('/')) {
+    const p = raw.split('/');
+    return { no: p[0].trim() || '....', year: p[1].trim() || '........' };
+  }
+  return { no: raw || '....', year: '........' };
+}
+function formatTermText(termVal) {
+  const t = parseTermParts(termVal);
+  return `${t.no}/${t.year}`;
+}
+function dotVal(text, dotCount = 5) {
+  const d = '.'.repeat(dotCount);
+  const v = esc(text);
+  return v ? `${d}${v}${d}` : '.'.repeat(dotCount * 3);
 }
 function toInputDate(val) {
   if (!val) return '';
@@ -248,7 +257,6 @@ async function handlePre12Submit() {
     return safeAlert('วันที่ไม่ถูกต้อง', 'วันที่คาดว่าจะสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม', 'warning');
   }
 
-  // เก็บผลประเมิน กพช.2 ทั้ง 10 ข้อ
   const evalScores = [];
   for (let i = 1; i <= 10; i++) {
     const checked = document.querySelector(`input[name="eval_q${i}"]:checked`);
@@ -537,7 +545,7 @@ async function searchMyStatus() {
                 <span class="badge bg-light text-primary border me-1">${esc(r.req12_id)}</span>
                 <strong>${esc(r.activity_name)}</strong>
                 <div class="small text-muted mt-1">
-                  ผู้ขอ: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | ภาคเรียน: ${esc(r.term)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
+                  ผู้ขอ: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | ภาคเรียน: ${esc(formatTermText(r.term))} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
                   แผนวันที่: ${formatShortThaiDate(r.plan_start_date)} ถึง ${formatShortThaiDate(r.plan_end_date)}
                 </div>
               </div>
@@ -661,13 +669,17 @@ async function loadDashboard(silentOnExpire = false) {
     const isAdmin = currentUser.role === 'ADMIN';
     const isTeacher = currentUser.role === 'TEACHER';
     const isReg = currentUser.role === 'REGISTRAR';
+    const canBatchApproveSub = ['TEACHER', 'COMM_1', 'COMM_2', 'COMM_3', 'DIRECTOR'].includes(currentUser.role);
     const canBatchMemo = ['TEACHER', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
+    const canCheckSub = canBatchApproveSub || canBatchMemo;
 
     document.getElementById('adminNavTabs').classList.toggle('d-none', !isAdmin);
     document.getElementById('teacherNavTabs').classList.toggle('d-none', !isTeacher);
     document.getElementById('registrarTools').classList.toggle('d-none', !isReg);
+    document.getElementById('batchApproveSubBar').classList.toggle('d-none', !canBatchApproveSub);
     document.getElementById('batchMemoBar').classList.toggle('d-none', !canBatchMemo);
-    document.getElementById('thCheckbox').classList.toggle('d-none', !canBatchMemo);
+    document.getElementById('thCheckbox').classList.toggle('d-none', !canCheckSub);
+    document.getElementById('mobileCheckAllSubWrap').classList.toggle('d-none', !canCheckSub);
 
     if (isTeacher) {
       const waitSub = dashItems.filter(x => x.current_step === 'WAIT_TEACHER').length;
@@ -747,7 +759,11 @@ function isMyPendingItem(item) {
   return true;
 }
 
-// --- ตาราง กพช.1-2 (สำหรับครูและแอดมิน) ---
+// ==================== ตาราง กพช.1-2 + อนุมัติหลายรายการ ====================
+function toggleAll12Checks(master) {
+  document.querySelectorAll('.chk-12').forEach(cb => cb.checked = master.checked);
+}
+
 function render12List() {
   const kw = document.getElementById('dash12SearchInput').value.toLowerCase().trim();
   const filtered = dash12Items.filter(item => {
@@ -761,9 +777,11 @@ function render12List() {
 
   const tbody = document.getElementById('dash12TableBody');
   const mobileBox = document.getElementById('dash12MobileCards');
+  const masterCb = document.getElementById('checkAll12Box');
+  if (masterCb) masterCb.checked = false;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีคำขอ กพช.1-2 ในหมวดหมู่นี้</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">ไม่มีคำขอ กพช.1-2 ในหมวดหมู่นี้</td></tr>`;
     mobileBox.innerHTML = `<div class="text-center py-4 text-muted">ไม่มีคำขอ กพช.1-2 ในหมวดหมู่นี้</div>`;
     return;
   }
@@ -773,6 +791,7 @@ function render12List() {
     const canAct = item.status_12 === 'WAIT_TEACHER_12';
     return `
       <tr>
+        <td>${canAct ? `<input type="checkbox" class="chk-12" value="${esc(item.req12_id)}">` : ''}</td>
         <td>
           <div class="fw-bold text-primary">${esc(item.req12_id)}</div>
           <div class="small text-muted">${esc(item.created_at)}</div>
@@ -781,7 +800,7 @@ function render12List() {
           <div class="fw-semibold">${esc(item.student_name)}</div>
           <div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div>
         </td>
-        <td class="small">${esc(item.term)}</td>
+        <td class="small">${esc(formatTermText(item.term))}</td>
         <td>
           <div class="fw-semibold">${esc(item.activity_name)}</div>
           <div class="small text-muted">${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} | <b>${esc(item.hours)} ชม.</b></div>
@@ -805,12 +824,15 @@ function render12List() {
     return `
       <div class="mobile-item-card">
         <div class="d-flex justify-content-between align-items-start mb-2">
-          <span class="fw-bold text-primary">${esc(item.req12_id)}</span>
+          <div>
+            ${canAct ? `<input type="checkbox" class="chk-12 me-2" value="${esc(item.req12_id)}">` : ''}
+            <span class="fw-bold text-primary">${esc(item.req12_id)}</span>
+          </div>
           <span class="badge step-badge ${st.cls}">${st.text}</span>
         </div>
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
         <div class="small text-muted mb-3">
-          <b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ภาค:</b> ${esc(item.term)}<br>
+          <b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ภาค:</b> ${esc(formatTermText(item.term))}<br>
           <b>แผนวันที่:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} | <b>${esc(item.hours)} ชม.</b>
         </div>
         <div class="d-flex gap-2">
@@ -824,6 +846,32 @@ function render12List() {
       </div>
     `;
   }).join('');
+}
+
+function confirmBatchApprove12() {
+  const ids = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
+  if (ids.length === 0) {
+    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการ กพช.1-2 ที่รออนุมัติอย่างน้อย 1 รายการครับ', 'warning');
+  }
+  Swal.fire({
+    title: `อนุมัติ กพช.1-2 จำนวน ${ids.length} รายการ?`,
+    text: 'นักศึกษาที่เลือกทั้งหมดจะได้รับอนุญาตให้ดำเนินกิจกรรมและส่งผลงานได้ทันที',
+    icon: 'question', showCancelButton: true,
+    confirmButtonText: 'ยืนยันอนุมัติทั้งหมด', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#10b981'
+  }).then(async res => {
+    if (res.isConfirmed) {
+      showLoading(`กำลังอนุมัติ กพช.1-2 (${ids.length} รายการ)...`);
+      try {
+        const r = await callApi('batchApprove12', { token: authToken, req12_ids: ids });
+        hideLoading();
+        safeAlert('สำเร็จ 🎉', `อนุมัติ กพช.1-2 เรียบร้อยแล้ว ${r.count} รายการ`, 'success');
+        await loadDashboard();
+      } catch (err) {
+        hideLoading();
+        safeAlert('ผิดพลาด', err.message, 'error');
+      }
+    }
+  });
 }
 
 function open12DetailModal(req12Id) {
@@ -845,7 +893,7 @@ function open12DetailModal(req12Id) {
     </div>
     <div class="row g-2 mb-3 bg-light p-3 rounded-3 small">
       <div class="col-12 col-md-6"><b>นักศึกษา:</b> ${esc(item.student_name)} (${esc(item.student_id)})</div>
-      <div class="col-12 col-md-6"><b>ระดับชั้น:</b> ${esc(item.level)} | <b>ภาคเรียน:</b> ${esc(item.term)}</div>
+      <div class="col-12 col-md-6"><b>ระดับชั้น:</b> ${esc(item.level)} | <b>ภาคเรียน:</b> ${esc(formatTermText(item.term))}</div>
       <div class="col-12 col-md-6"><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</div>
       <div class="col-12 col-md-6"><b>กลุ่ม/ศูนย์การเรียน:</b> ${esc(item.group_name || '-')}</div>
       <div class="col-12 col-md-6"><b>ช่วงเวลาตามแผน:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} (${esc(item.hours)} ชม.)</div>
@@ -918,7 +966,7 @@ async function executeApproval12(req12Id, decision, reason) {
   }
 }
 
-// ==================== พิมพ์ กพช. 1 (หน้า 1) และ กพช. 2 (หน้า 2) ตามแบบฟอร์มต้นฉบับ ====================
+// ==================== พิมพ์ กพช. 1 (หน้า 1) และ กพช. 2 (หน้า 2) ====================
 function printForm12(req12Id) {
   const item = dash12Items.find(x => x.req12_id === req12Id);
   if (!item) return;
@@ -927,12 +975,8 @@ function printForm12(req12Id) {
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '-';
 
-  const termParts = (item.term || '/').split('/');
-  const termNo = termParts[0] || '....';
-  const termYear = termParts[1] || '........';
-
-  const reqDateSlash = formatSlashThaiDate(item.created_at);
-  const appDateSlash = item.approved_at_12 ? formatSlashThaiDate(item.approved_at_12) : '........./................../................';
+  const termObj = parseTermParts(item.term);
+  const blankDateLine = '........./................../................';
   const regNameDisplay = registrarName ? esc(registrarName) : '...........................................';
 
   let scores = [];
@@ -952,83 +996,82 @@ function printForm12(req12Id) {
     `;
   }).join('');
 
-  document.getElementById('printOnlyContainer').innerHTML = `
-    <!-- หน้าที่ 1: แบบ กพช. 1 -->
-    <div class="memo-page" style="padding: 10px 15px; line-height: 1.8;">
-      <div style="text-align:right; font-weight:bold; font-size:16pt; margin-bottom:16px;">กพช. 1</div>
+  const passChecked = item.status_12 !== 'REJECTED_12';
+  const rejectChecked = item.status_12 === 'REJECTED_12';
 
-      <div style="text-align:center; font-weight:bold; font-size:18pt; margin-bottom:10px;">
+  document.getElementById('printOnlyContainer').innerHTML = `
+    <!-- หน้าที่ 1: แบบ กพช. 1 (ใช้จุดไข่ปลาทั้งหมด ไม่ใช้ขีดล่าง) -->
+    <div class="memo-page" style="padding: 10px 12px; line-height: 1.85; font-size: 16pt;">
+      <div style="text-align:right; font-weight:bold; margin-bottom:14px;">กพช. 1</div>
+
+      <div style="text-align:center; font-weight:bold; font-size:18pt; margin-bottom:8px;">
         แบบลงทะเบียนกิจกรรมพัฒนาคุณภาพชีวิต (รายบุคคล)
       </div>
-      <div style="text-align:center; font-size:16pt; margin-bottom:6px;">
-        <b>สถานศึกษา</b> &nbsp;<span style="border-bottom:1px dotted #000; padding:0 24px;">${SCHOOL_NAME}</span>
+      <div style="text-align:center; margin-bottom:4px;">
+        <b>สถานศึกษา</b> ${dotVal(SCHOOL_NAME, 6)}
       </div>
-      <div style="text-align:center; font-size:16pt; margin-bottom:26px;">
-        <b>ภาคเรียนที่</b> &nbsp;<span style="border-bottom:1px dotted #000; padding:0 16px;">${esc(termNo)}</span> / <span style="border-bottom:1px dotted #000; padding:0 20px;">${esc(termYear)}</span>
+      <div style="text-align:center; margin-bottom:26px;">
+        <b>ภาคเรียนที่</b> ${dotVal(termObj.no, 4)}/${dotVal(termObj.year, 5)}
       </div>
 
-      <div style="margin-bottom:14px;">
-        ชื่อ <span style="border-bottom:1px dotted #000; padding:0 22px; display:inline-block; min-width:170px;">${esc(firstName)}</span>
-        สกุล <span style="border-bottom:1px dotted #000; padding:0 22px; display:inline-block; min-width:170px;">${esc(lastName)}</span>
-        รหัสประจำตัวนักศึกษา <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:130px;">${esc(item.student_id)}</span>
+      <div style="display:flex; justify-content:space-between; white-space:nowrap; gap:8px; margin-bottom:14px;">
+        <span>ชื่อ ${dotVal(firstName, 4)}</span>
+        <span>สกุล ${dotVal(lastName, 4)}</span>
+        <span>รหัสประจำตัวนักศึกษา ${dotVal(item.student_id, 4)}</span>
       </div>
-      <div style="margin-bottom:14px;">
-        ระดับ <span style="border-bottom:1px dotted #000; padding:0 20px; display:inline-block; min-width:180px;">${esc(item.level)}</span>
-        กลุ่ม/กศน.ตำบล <span style="border-bottom:1px dotted #000; padding:0 20px; display:inline-block; min-width:260px;">${esc(item.group_name || '-')}</span>
+      <div style="display:flex; justify-content:space-between; white-space:nowrap; gap:12px; margin-bottom:14px;">
+        <span>ระดับ ${dotVal(item.level, 5)}</span>
+        <span>กลุ่ม/กศน.ตำบล ${dotVal(item.group_name || '-', 7)}</span>
       </div>
-      <div style="margin-bottom:46px;">
-        ครูรับผิดชอบ <span style="border-bottom:1px dotted #000; padding:0 20px; display:inline-block; min-width:340px;">${esc(item.teacher_name)}</span>
+      <div style="margin-bottom:44px;">
+        ครูรับผิดชอบ ${dotVal(item.teacher_name, 10)}
       </div>
 
       <div style="text-align:center; margin-bottom:70px;">
         <span style="white-space:nowrap;">ลงชื่อ.....................................................นักศึกษา</span><br>
         ( ${esc(item.student_name)} )<br>
-        ${reqDateSlash}
+        ${blankDateLine}
       </div>
 
       <div style="display:flex; justify-content:space-between; text-align:center; margin-top:40px; page-break-inside:avoid;">
         <div style="width:48%;">
           <span style="white-space:nowrap;">ลงชื่อ..........................................ผู้รับลงทะเบียน</span><br>
           ( ${esc(item.teacher_name)} )<br>
-          ${appDateSlash}
+          ${blankDateLine}
         </div>
         <div style="width:48%;">
           <span style="white-space:nowrap;">ลงชื่อ..........................................นายทะเบียน</span><br>
           ( ${regNameDisplay} )<br>
-          ........./................../................
+          ${blankDateLine}
         </div>
       </div>
-      <div style="margin-top:60px; font-size:12pt; color:#555; text-align:right;">
+      <div style="margin-top:55px; font-size:12pt; color:#555; text-align:right;">
         รหัสอ้างอิงระบบออนไลน์: ${esc(item.req12_id)}
       </div>
     </div>
 
-    <!-- หน้าที่ 2: แบบ กพช. 2 -->
-    <div style="padding: 4px 10px; line-height: 1.4;">
+    <!-- หน้าที่ 2: แบบ กพช. 2 (ติ๊กผ่านอัตโนมัติ + ใช้จุดไข่ปลาทั้งหมด) -->
+    <div style="padding: 4px 8px; line-height: 1.4;">
       <div style="text-align:right; font-weight:bold; font-size:15pt;">กพช. 2</div>
-      <div style="text-align:center; font-weight:bold; font-size:17pt; margin-bottom:8px;">
+      <div style="text-align:center; font-weight:bold; font-size:17pt; margin-bottom:6px;">
         แบบประเมินตนเองกิจกรรมพัฒนาคุณภาพชีวิต
       </div>
 
       <div style="font-weight:bold; font-size:15pt; margin-bottom:4px;">ส่วนที่ 1 สำหรับผู้เรียน</div>
-      <div style="font-size:14.5pt; margin-bottom:10px; line-height:1.55;">
-        <div>
-          ชื่อสถานศึกษา <span style="border-bottom:1px dotted #000; padding:0 16px; display:inline-block; min-width:460px;">${SCHOOL_NAME}</span>
+      <div style="font-size:14.5pt; margin-bottom:8px; line-height:1.55;">
+        <div>ชื่อสถานศึกษา ${dotVal(SCHOOL_NAME, 12)}</div>
+        <div style="display:flex; justify-content:space-between; white-space:nowrap; gap:10px;">
+          <span>ชื่อ-สกุล ${dotVal(item.student_name, 6)}</span>
+          <span>รหัสประจำตัวนักศึกษา ${dotVal(item.student_id, 5)}</span>
         </div>
-        <div>
-          ชื่อ-สกุล <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:250px;">${esc(item.student_name)}</span>
-          รหัสประจำตัวนักศึกษา <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:150px;">${esc(item.student_id)}</span>
+        <div style="display:flex; justify-content:space-between; white-space:nowrap; gap:10px;">
+          <span>ระดับการศึกษา ${dotVal(item.level, 5)}</span>
+          <span>ศูนย์การเรียน ${dotVal(item.group_name || '-', 6)}</span>
         </div>
-        <div>
-          ระดับการศึกษา <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:200px;">${esc(item.level)}</span>
-          ศูนย์การเรียน <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:210px;">${esc(item.group_name || '-')}</span>
-        </div>
-        <div>
-          ครูผู้รับผิดชอบ <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:460px;">${esc(item.teacher_name)}</span>
-        </div>
+        <div>ครูผู้รับผิดชอบ ${dotVal(item.teacher_name, 14)}</div>
       </div>
 
-      <table class="batch-table" style="font-size:13.5pt !important; margin-top:6px;">
+      <table class="batch-table" style="font-size:13.5pt !important; margin-top:4px;">
         <thead>
           <tr>
             <th rowspan="2" style="width:5%; vertical-align:middle;">ที่</th>
@@ -1047,32 +1090,35 @@ function printForm12(req12Id) {
         </tbody>
       </table>
 
-      <div style="text-align:center; margin-top:14px; margin-bottom:14px; font-size:15pt;">
+      <div style="text-align:center; margin-top:12px; margin-bottom:12px; font-size:15pt;">
         <span style="white-space:nowrap;">ลงชื่อ...............................................ผู้เรียน</span><br>
         ( ${esc(item.student_name)} )
       </div>
 
-      <div style="font-size:15pt; margin-bottom:18px; page-break-inside:avoid;">
+      <div style="font-size:15pt; margin-bottom:16px; page-break-inside:avoid;">
         <b>ส่วนที่ 2 สำหรับสถานศึกษา</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle;">${item.status_12 === 'APPROVED_12' ? '✓' : '&nbsp;'}</span> ผ่าน
+        <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle; font-weight:bold;">${passChecked ? '✓' : '&nbsp;'}</span> ผ่าน
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle;">${item.status_12 === 'REJECTED_12' ? '✓' : '&nbsp;'}</span> เพิ่มเติมในเรื่อง ${item.status_12 === 'REJECTED_12' ? esc(item.reject_reason_12) : '................................................'}
+        <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle; font-weight:bold;">${rejectChecked ? '✓' : '&nbsp;'}</span> เพิ่มเติมในเรื่อง ${rejectChecked ? esc(item.reject_reason_12) : '................................................'}
       </div>
 
       <div style="text-align:center; font-size:15pt; page-break-inside:avoid;">
         <span style="white-space:nowrap;">ลงชื่อ...............................................ครูผู้รับผิดชอบ</span><br>
-        ( ${esc(item.teacher_name)} )<br>
-        <span style="font-size:12pt;">${item.approved_at_12 ? 'อนุมัติในระบบ: ' + esc(item.approved_at_12) : ''}</span>
+        ( ${esc(item.teacher_name)} )
       </div>
     </div>
   `;
   setTimeout(() => window.print(), 400);
 }
 
-// --- ตารางส่งผลงาน กพช. (6 ขั้นตอน) ---
+// ==================== ตารางส่งผลงาน กพช. (6 ขั้นตอน) + อนุมัติหลายรายการ ====================
+function toggleAllChecks(master) {
+  document.querySelectorAll('.reg-check').forEach(cb => cb.checked = master.checked);
+}
+
 function renderDashboardList() {
   const kw = document.getElementById('dashSearchInput').value.toLowerCase().trim();
-  const canCheck = ['TEACHER', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
+  const canCheck = ['TEACHER', 'COMM_1', 'COMM_2', 'COMM_3', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
 
   const filtered = dashItems.filter(item => {
     if (filterMode === 'PENDING' && !isMyPendingItem(item)) return false;
@@ -1085,6 +1131,8 @@ function renderDashboardList() {
 
   const tbody = document.getElementById('dashTableBody');
   const mobileBox = document.getElementById('dashMobileCards');
+  const masterCb = document.getElementById('checkAllBox');
+  if (masterCb) masterCb.checked = false;
 
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">ไม่มีรายการในหมวดหมู่นี้</td></tr>`;
@@ -1154,6 +1202,38 @@ function renderDashboardList() {
       </div>
     `;
   }).join('');
+}
+
+function confirmBatchApproveSub() {
+  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  const validIds = checkedIds.filter(id => {
+    const it = dashItems.find(x => x.req_id === id);
+    return it && isMyPendingItem(it);
+  });
+
+  if (validIds.length === 0) {
+    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่อยู่ในขั้นตอน "รอดำเนินการ" ของคุณอย่างน้อย 1 รายการครับ', 'warning');
+  }
+
+  Swal.fire({
+    title: `อนุมัติและส่งต่อ ${validIds.length} รายการ?`,
+    text: 'รายการที่เลือกทั้งหมดจะถูกอนุมัติและส่งต่อไปยังขั้นตอนถัดไปทันที',
+    icon: 'question', showCancelButton: true,
+    confirmButtonText: 'ยืนยันอนุมัติทั้งหมด', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#10b981'
+  }).then(async res => {
+    if (res.isConfirmed) {
+      showLoading(`กำลังอนุมัติผลงาน (${validIds.length} รายการ)...`);
+      try {
+        const r = await callApi('batchApproveSubmissions', { token: authToken, req_ids: validIds });
+        hideLoading();
+        safeAlert('สำเร็จ 🎉', `อนุมัติและส่งต่อเรียบร้อยแล้ว ${r.count} รายการ`, 'success');
+        await loadDashboard();
+      } catch (err) {
+        hideLoading();
+        safeAlert('ผิดพลาด', err.message, 'error');
+      }
+    }
+  });
 }
 
 function openDetailModal(reqId) {
@@ -1534,10 +1614,6 @@ async function printBatchMemo() {
 }
 
 // ==================== นายทะเบียน ====================
-function toggleAllChecks(master) {
-  document.querySelectorAll('.reg-check').forEach(cb => cb.checked = master.checked);
-}
-
 function exportRegistrarCSV() {
   const approved = dashItems.filter(x => x.current_step === 'APPROVED_FOR_REGISTRAR');
   if (approved.length === 0) return safeAlert('แจ้งเตือน', 'ไม่มีรายการที่รอลงทะเบียนในขณะนี้', 'info');
