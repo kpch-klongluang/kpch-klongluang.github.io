@@ -26,6 +26,8 @@ let dashItems = [];
 let dash12Items = [];
 let adminUsers = [];
 let adminLogs = [];
+let adminTrashSubs = [];
+let adminTrash12 = [];
 let publicTeachersList = [];
 let registrarName = '';
 let filterMode = 'PENDING';
@@ -735,6 +737,21 @@ async function searchMyStatus() {
 }
 
 // ==================== ล็อคอิน / หลังบ้าน ====================
+function resetDashboardTabViews() {
+  document.getElementById('dashSubmissionsView').classList.remove('d-none');
+  document.getElementById('dash12View').classList.add('d-none');
+  document.getElementById('adminUsersView').classList.add('d-none');
+  document.getElementById('adminAnnView').classList.add('d-none');
+  document.getElementById('adminLogsView').classList.add('d-none');
+  document.getElementById('adminTrashView')?.classList.add('d-none');
+  document.querySelectorAll('#adminNavTabs button, #teacherNavTabs button').forEach((b, idx) => b.classList.toggle('active', idx === 0));
+  document.querySelectorAll('#presentSubBtns button').forEach((b, idx) => {
+    b.classList.toggle('btn-primary', idx === 0);
+    b.classList.toggle('active', idx === 0);
+    b.classList.toggle('btn-outline-secondary', idx !== 0);
+  });
+}
+
 async function handleLogin() {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value;
@@ -751,6 +768,7 @@ async function handleLogin() {
     document.getElementById('loginPass').value = '';
     teacherTabMode = 'sub';
     presentSubMode = 'WAIT';
+    resetDashboardTabViews();
     await loadDashboard();
   } catch (err) {
     hideLoading();
@@ -762,25 +780,26 @@ function handleLogout() {
   if (authToken) callApi('logout', { token: authToken }).catch(() => {});
   authToken = null;
   currentUser = null;
+  dashItems = [];
+  dash12Items = [];
+  adminUsers = [];
+  adminLogs = [];
+  adminTrashSubs = [];
+  adminTrash12 = [];
   teacherTabMode = 'sub';
   presentSubMode = 'WAIT';
   sessionStorage.removeItem('kpch_token');
   document.getElementById('dashboardSection').classList.add('d-none');
   document.getElementById('publicSection').classList.remove('d-none');
 
-  document.getElementById('dashSubmissionsView').classList.remove('d-none');
-  document.getElementById('dash12View').classList.add('d-none');
-  document.getElementById('adminUsersView').classList.add('d-none');
-  document.getElementById('adminAnnView').classList.add('d-none');
-  document.getElementById('adminLogsView').classList.add('d-none');
+  resetDashboardTabViews();
   document.getElementById('adminDeleteSubBar')?.classList.add('d-none');
   document.getElementById('adminDelete12Bar')?.classList.add('d-none');
-  document.querySelectorAll('#adminNavTabs button, #teacherNavTabs button').forEach((b, idx) => b.classList.toggle('active', idx === 0));
-  document.querySelectorAll('#presentSubBtns button').forEach((b, idx) => {
-    b.classList.toggle('btn-primary', idx === 0);
-    b.classList.toggle('active', idx === 0);
-    b.classList.toggle('btn-outline-secondary', idx !== 0);
-  });
+  const badgeTrash = document.getElementById('badgeTrashCount');
+  if (badgeTrash) {
+    badgeTrash.innerText = '0';
+    badgeTrash.classList.add('d-none');
+  }
   const tf = document.getElementById('dashTermFilter');
   const t12f = document.getElementById('dash12TermFilter');
   const tchf = document.getElementById('dashTeacherFilter');
@@ -864,6 +883,8 @@ async function loadDashboard(silentOnExpire = false) {
     registrarName = res.registrar_name || '';
     adminUsers = res.users || [];
     adminLogs = res.logs || [];
+    adminTrashSubs = res.trash_submissions || [];
+    adminTrash12 = res.trash_approvals12 || [];
 
     document.getElementById('publicSection').classList.add('d-none');
     document.getElementById('dashboardSection').classList.remove('d-none');
@@ -899,22 +920,35 @@ async function loadDashboard(silentOnExpire = false) {
       if (bSentBtn) bSentBtn.innerText = `✅ ส่งแล้ว / ประวัติ (${sentPresent})`;
     }
 
-    if (!isAdmin && !isTeacher) {
-      teacherTabMode = 'sub';
-      document.getElementById('dashSubmissionsView').classList.remove('d-none');
-      document.getElementById('dash12View').classList.add('d-none');
-      document.getElementById('adminUsersView').classList.add('d-none');
-      document.getElementById('adminAnnView').classList.add('d-none');
-      document.getElementById('adminLogsView').classList.add('d-none');
-    } else if (isAdmin) {
+    const badgeTrash = document.getElementById('badgeTrashCount');
+    if (isAdmin) {
       renderAdminUsers();
       renderAdminLogs();
+      renderAdminTrash();
+      const totalTrash = adminTrashSubs.length + adminTrash12.length;
+      if (badgeTrash) {
+        badgeTrash.innerText = totalTrash;
+        badgeTrash.classList.toggle('d-none', totalTrash === 0);
+      }
       if (res.announcement) {
         document.getElementById('ann_visible').checked = !!res.announcement.visible;
         document.getElementById('ann_badge').value = res.announcement.badge || '';
         document.getElementById('ann_content').value = res.announcement.content || '';
         renderAdminAnnPdfBox(res.announcement);
       }
+    } else {
+      adminTrashSubs = [];
+      adminTrash12 = [];
+      if (badgeTrash) {
+        badgeTrash.innerText = '0';
+        badgeTrash.classList.add('d-none');
+      }
+      document.getElementById('adminTrashView')?.classList.add('d-none');
+    }
+
+    if (!isAdmin && !isTeacher) {
+      teacherTabMode = 'sub';
+      resetDashboardTabViews();
     }
 
     populateTermDropdown(document.getElementById('dashTermFilter'), dashItems, getItemTerm);
@@ -996,7 +1030,7 @@ function isMyPendingItem(item) {
   return true;
 }
 
-// ==================== ตาราง กพช.1-2 + อนุมัติหลายรายการ + ลบ (เฉพาะ Admin) ====================
+// ==================== ตาราง กพช.1-2 + อนุมัติหลายรายการ + ย้ายลงถังขยะ (เฉพาะ Admin) ====================
 function toggleAll12Checks(master) {
   document.querySelectorAll('.chk-12').forEach(cb => cb.checked = master.checked);
 }
@@ -1054,7 +1088,7 @@ function render12List() {
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${esc(item.req12_id)}')">
             <i class="bi bi-printer"></i> กพช.1-2
           </button>
-          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" title="ลบรายการนี้" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" title="ย้ายลงถังขยะ" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>
     `;
@@ -1085,7 +1119,7 @@ function render12List() {
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
             <i class="bi bi-printer"></i> กพช.1-2
           </button>
-          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" title="ย้ายลงถังขยะ" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
       </div>
     `;
@@ -1121,7 +1155,7 @@ function confirmBatchApprove12() {
 function confirmBatchDelete12() {
   const ids = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
   if (ids.length === 0) {
-    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการ กพช.1-2 ที่ต้องการลบอย่างน้อย 1 รายการครับ', 'warning');
+    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการ กพช.1-2 ที่ต้องการย้ายลงถังขยะอย่างน้อย 1 รายการครับ', 'warning');
   }
   confirmDelete12(ids);
 }
@@ -1131,18 +1165,18 @@ function confirmDelete12(req12Ids) {
     return safeAlert('ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ลบข้อมูลได้', 'error');
   }
   Swal.fire({
-    title: `ยืนยันลบข้อมูล กพช.1-2 (${req12Ids.length} รายการ)?`,
-    html: `<div class="small text-danger">รายการ <b>${esc(req12Ids.join(', '))}</b> จะถูกลบถาวรออกจาก Google Sheets ไม่สามารถกู้คืนได้</div>`,
+    title: `ย้ายข้อมูล กพช.1-2 (${req12Ids.length} รายการ) ลงถังขยะ?`,
+    html: `<div class="small text-muted">รายการ <b>${esc(req12Ids.join(', '))}</b> จะถูกย้ายไปยังแท็บ <b>"🗑️ ถังขยะ"</b> (สามารถกดกู้คืนกลับมาสถานะเดิมได้ตลอดเวลา)</div>`,
     icon: 'warning', showCancelButton: true,
-    confirmButtonText: 'ยืนยันลบถาวร', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
+    confirmButtonText: '🗑️ ย้ายลงถังขยะ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
   }).then(async res => {
     if (res.isConfirmed) {
-      showLoading('กำลังลบข้อมูล กพช.1-2...');
+      showLoading('กำลังย้ายข้อมูล กพช.1-2 ลงถังขยะ...');
       try {
         const r = await callApi('deleteApprovals12', { token: authToken, req12_ids: req12Ids });
         hideLoading();
         closeModalById('detailModal');
-        safeAlert('ลบเรียบร้อย', `ลบข้อมูล กพช.1-2 จำนวน ${r.count} รายการแล้ว`, 'success');
+        safeAlert('ย้ายลงถังขยะเรียบร้อย 🗑️', `ย้ายข้อมูล กพช.1-2 จำนวน ${r.count} รายการลงถังขยะแล้ว (สามารถกู้คืนได้ในแท็บ 🗑️ ถังขยะ)`, 'success');
         await loadDashboard();
       } catch (err) {
         hideLoading();
@@ -1200,7 +1234,7 @@ function open12DetailModal(req12Id) {
       </button>
       ${isAdmin ? `
         <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])">
-          <i class="bi bi-trash me-1"></i>ลบ กพช.1-2 นี้
+          <i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ
         </button>
       ` : ''}
     </div>
@@ -1616,7 +1650,7 @@ function buildKPCH5Html(item, isLastInPrint) {
   `;
 }
 
-// ==================== ตารางส่งผลงาน กพช. + ครูนำเสนอส่งทะเบียน + ลบ (เฉพาะ Admin) ====================
+// ==================== ตารางส่งผลงาน กพช. + ครูนำเสนอส่งทะเบียน + ย้ายลงถังขยะ (เฉพาะ Admin) ====================
 function toggleAllChecks(master) {
   document.querySelectorAll('.reg-check').forEach(cb => cb.checked = master.checked);
 }
@@ -1697,7 +1731,7 @@ function renderDashboardList() {
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printProjectPDF('${esc(item.req_id)}')">
             <i class="bi bi-printer"></i> โครงการ
           </button>
-          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" title="ลบรายการนี้" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" title="ย้ายลงถังขยะ" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>
     `;
@@ -1730,7 +1764,7 @@ function renderDashboardList() {
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printProjectPDF('${esc(item.req_id)}')">
             <i class="bi bi-printer"></i> โครงการ
           </button>
-          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" title="ย้ายลงถังขยะ" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
       </div>
     `;
@@ -1772,7 +1806,7 @@ function confirmBatchApproveSub() {
 function confirmBatchDeleteSub() {
   const ids = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
   if (ids.length === 0) {
-    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการผลงานที่ต้องการลบอย่างน้อย 1 รายการครับ', 'warning');
+    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการผลงานที่ต้องการย้ายลงถังขยะอย่างน้อย 1 รายการครับ', 'warning');
   }
   confirmDeleteSubmissions(ids);
 }
@@ -1782,18 +1816,18 @@ function confirmDeleteSubmissions(reqIds) {
     return safeAlert('ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ลบข้อมูลได้', 'error');
   }
   Swal.fire({
-    title: `ยืนยันลบข้อมูลผลงาน (${reqIds.length} รายการ)?`,
-    html: `<div class="small text-danger">รายการ <b>${esc(reqIds.join(', '))}</b> และรูปภาพที่แนบจะถูกลบถาวร ไม่สามารถกู้คืนได้</div>`,
+    title: `ย้ายผลงาน (${reqIds.length} รายการ) ลงถังขยะ?`,
+    html: `<div class="small text-muted">รายการ <b>${esc(reqIds.join(', '))}</b> จะถูกย้ายไปยังแท็บ <b>"🗑️ ถังขยะ"</b> (รูปภาพใน Google Drive ยังอยู่ครบ และสามารถกู้คืนกลับมาสถานะเดิมได้ตลอดเวลา)</div>`,
     icon: 'warning', showCancelButton: true,
-    confirmButtonText: 'ยืนยันลบถาวร', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
+    confirmButtonText: '🗑️ ย้ายลงถังขยะ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
   }).then(async res => {
     if (res.isConfirmed) {
-      showLoading('กำลังลบข้อมูลผลงาน...');
+      showLoading('กำลังย้ายข้อมูลผลงานลงถังขยะ...');
       try {
         const r = await callApi('deleteSubmissions', { token: authToken, req_ids: reqIds });
         hideLoading();
         closeModalById('detailModal');
-        safeAlert('ลบเรียบร้อย', `ลบข้อมูลผลงานจำนวน ${r.count} รายการแล้ว`, 'success');
+        safeAlert('ย้ายลงถังขยะเรียบร้อย 🗑️', `ย้ายข้อมูลผลงานจำนวน ${r.count} รายการลงถังขยะแล้ว (กู้คืนได้ในแท็บ 🗑️ ถังขยะ)`, 'success');
         await loadDashboard();
       } catch (err) {
         hideLoading();
@@ -2135,7 +2169,7 @@ function openDetailModal(reqId) {
       </button>
       ${isAdmin ? `
         <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])">
-          <i class="bi bi-trash me-1"></i>ลบข้อมูลนี้
+          <i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ
         </button>
       ` : ''}
     </div>
@@ -2404,7 +2438,7 @@ async function printBatchMemo() {
         <b>คำสั่ง / การอนุมัติผู้อำนวยการสถานศึกษา</b><br>
         <div style="margin:6px 0 12px 20px;">
           [ &nbsp; ] อนุมัติ และมอบหมายงานทะเบียนดำเนินการบันทึกชั่วโมง กพช. ต่อไป<br>
-          [ &nbsp; ] ไม่อนุมติ / อื่นๆ ....................................................................................
+          [ &nbsp; ] ไม่อนุมัติ / อื่นๆ ....................................................................................
         </div>
         <div style="width:60%; margin-left:auto; text-align:center;">
           ลงชื่อ......................................................<br>
@@ -2522,7 +2556,7 @@ function confirmRegistrarComplete() {
   });
 }
 
-// ==================== แอดมิน ====================
+// ==================== แอดมิน & ถังขยะ (Soft Delete / กู้คืน / ลบถาวร) ====================
 function switchAdminTab(tab, btn) {
   document.querySelectorAll('#adminNavTabs button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -2531,6 +2565,148 @@ function switchAdminTab(tab, btn) {
   document.getElementById('adminUsersView').classList.toggle('d-none', tab !== 'users');
   document.getElementById('adminAnnView').classList.toggle('d-none', tab !== 'ann');
   document.getElementById('adminLogsView').classList.toggle('d-none', tab !== 'logs');
+  document.getElementById('adminTrashView')?.classList.toggle('d-none', tab !== 'trash');
+}
+
+function renderAdminTrash() {
+  const subsBody = document.getElementById('trashSubsBody');
+  const req12Body = document.getElementById('trash12Body');
+
+  if (subsBody) {
+    if (adminTrashSubs.length === 0) {
+      subsBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการผลงาน กพช. ในถังขยะ</td></tr>';
+    } else {
+      subsBody.innerHTML = adminTrashSubs.map(item => {
+        const st = STEP_LABELS[item.current_step] || { text: item.current_step || '-', cls: 'bg-secondary' };
+        return `
+          <tr>
+            <td>
+              <div class="fw-bold text-primary">${esc(item.req_id)}</div>
+              ${item.ref_12_id ? `<div class="small text-success">กพช.1-2: ${esc(item.ref_12_id)}</div>` : ''}
+            </td>
+            <td>
+              <div class="fw-semibold">${esc(item.student_name)}</div>
+              <div class="small text-muted">${esc(item.student_id)} (${esc(item.level || '-')})</div>
+            </td>
+            <td>
+              <div class="fw-semibold">${esc(item.activity_name)}</div>
+              <div class="small text-muted">ครู: ${esc(item.teacher_name || '-')} | <b>${esc(item.hours || 0)} ชม.</b></div>
+            </td>
+            <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
+            <td class="small">
+              <div>${esc(item.deleted_at || '-')}</div>
+              <div class="text-muted">โดย: ${esc(item.deleted_by || '-')}</div>
+            </td>
+            <td class="text-end text-nowrap">
+              <button type="button" class="btn btn-success btn-sm rounded-pill px-3 me-1" onclick="confirmRestoreTrash('SUB', '${esc(item.req_id)}')">
+                ♻️ กู้คืน
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmPurgeTrash('SUB', '${esc(item.req_id)}')">
+                🔥 ลบถาวร
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  if (req12Body) {
+    if (adminTrash12.length === 0) {
+      req12Body.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีคำขอ กพช.1-2 ในถังขยะ</td></tr>';
+    } else {
+      req12Body.innerHTML = adminTrash12.map(item => {
+        const st = STEP12_LABELS[item.status_12] || { text: item.status_12 || '-', cls: 'bg-secondary' };
+        return `
+          <tr>
+            <td>
+              <div class="fw-bold text-primary">${esc(item.req12_id)}</div>
+              <div class="small text-muted">${esc(item.created_at || '')}</div>
+            </td>
+            <td>
+              <div class="fw-semibold">${esc(item.student_name)}</div>
+              <div class="small text-muted">${esc(item.student_id)} (${esc(item.level || '-')})</div>
+            </td>
+            <td>
+              <div class="fw-semibold">${esc(item.activity_name)}</div>
+              <div class="small text-muted">ภาคเรียน: ${esc(formatTermText(item.term))} | ครู: ${esc(item.teacher_name || '-')}</div>
+            </td>
+            <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
+            <td class="small">
+              <div>${esc(item.deleted_at || '-')}</div>
+              <div class="text-muted">โดย: ${esc(item.deleted_by || '-')}</div>
+            </td>
+            <td class="text-end text-nowrap">
+              <button type="button" class="btn btn-success btn-sm rounded-pill px-3 me-1" onclick="confirmRestoreTrash('12', '${esc(item.req12_id)}')">
+                ♻️ กู้คืน
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmPurgeTrash('12', '${esc(item.req12_id)}')">
+                🔥 ลบถาวร
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function confirmRestoreTrash(trashType, itemId) {
+  if (!currentUser || currentUser.role !== 'ADMIN') {
+    return safeAlert('ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่กู้คืนข้อมูลได้', 'error');
+  }
+  const typeLabel = trashType === 'SUB' ? 'ผลงาน กพช.' : 'คำขอ กพช.1-2';
+  Swal.fire({
+    title: `♻️ กู้คืน${typeLabel}?`,
+    html: `<div class="small">ต้องการกู้คืนรายการ <b>${esc(itemId)}</b> กลับไปยังสถานะเดิมก่อนลบใช่หรือไม่</div>`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: '♻️ ยืนยันกู้คืน',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#10b981'
+  }).then(async res => {
+    if (res.isConfirmed) {
+      showLoading('กำลังกู้คืนข้อมูล...');
+      try {
+        await callApi('restoreTrash', { token: authToken, trash_type: trashType, item_id: itemId });
+        hideLoading();
+        safeAlert('กู้คืนสำเร็จ ♻️', `กู้คืนรายการ ${esc(itemId)} กลับสู่สถานะเดิมเรียบร้อยแล้ว`, 'success');
+        await loadDashboard();
+      } catch (err) {
+        hideLoading();
+        safeAlert('ผิดพลาด', err.message, 'error');
+      }
+    }
+  });
+}
+
+function confirmPurgeTrash(trashType, itemId) {
+  if (!currentUser || currentUser.role !== 'ADMIN') {
+    return safeAlert('ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ลบถาวรได้', 'error');
+  }
+  const isSub = trashType === 'SUB';
+  Swal.fire({
+    title: `🔥 ยืนยันลบถาวร ${esc(itemId)}?`,
+    html: `<div class="small text-danger">ข้อมูลนี้${isSub ? 'และรูปภาพที่แนบใน Google Drive ' : ' '}จะถูกลบออกจากระบบอย่างถาวร <b>ไม่สามารถกู้คืนได้อีก</b></div>`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: '🔥 ยืนยันลบถาวร',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#dc2626'
+  }).then(async res => {
+    if (res.isConfirmed) {
+      showLoading('กำลังลบข้อมูลถาวร...');
+      try {
+        await callApi('purgeTrash', { token: authToken, trash_type: trashType, item_id: itemId });
+        hideLoading();
+        safeAlert('ลบถาวรเรียบร้อย 🔥', `ลบรายการ ${esc(itemId)} ออกจากถังขยะถาวรแล้ว`, 'success');
+        await loadDashboard();
+      } catch (err) {
+        hideLoading();
+        safeAlert('ผิดพลาด', err.message, 'error');
+      }
+    }
+  });
 }
 
 function renderAdminUsers() {
