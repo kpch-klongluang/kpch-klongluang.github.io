@@ -240,6 +240,14 @@ function toInputDate(val) {
   if (!val) return '';
   return String(val).split(' ')[0];
 }
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(String(e.target.result || '').split(',')[1] || '');
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 function safeAlert(title, htmlText, icon) {
   Swal.fire({ title, html: htmlText, icon: icon || 'info', confirmButtonColor: '#6366f1' });
 }
@@ -283,13 +291,28 @@ function switchPublicTab(tab) {
 
 function renderAnnouncement(ann) {
   const box = document.getElementById('announcementBox');
+  const pdfArea = document.getElementById('annPdfArea');
   if (!ann || !ann.visible) {
     box.classList.add('d-none');
+    if (pdfArea) { pdfArea.classList.add('d-none'); pdfArea.innerHTML = ''; }
     return;
   }
   box.classList.remove('d-none');
   document.getElementById('annBadgeText').innerText = ann.badge || '';
   document.getElementById('annContentText').innerText = ann.content || '';
+  if (pdfArea) {
+    if (ann.pdf_url) {
+      pdfArea.classList.remove('d-none');
+      pdfArea.innerHTML = `
+        <a href="${esc(ann.pdf_url)}" target="_blank" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold shadow-sm">
+          <i class="bi bi-file-earmark-pdf-fill me-1"></i>เปิดอ่าน / ดาวน์โหลดเอกสารแนบ (${esc(ann.pdf_name || 'PDF')})
+        </a>
+      `;
+    } else {
+      pdfArea.classList.add('d-none');
+      pdfArea.innerHTML = '';
+    }
+  }
 }
 
 async function loadPublicData() {
@@ -750,6 +773,8 @@ function handleLogout() {
   document.getElementById('adminUsersView').classList.add('d-none');
   document.getElementById('adminAnnView').classList.add('d-none');
   document.getElementById('adminLogsView').classList.add('d-none');
+  document.getElementById('adminDeleteSubBar')?.classList.add('d-none');
+  document.getElementById('adminDelete12Bar')?.classList.add('d-none');
   document.querySelectorAll('#adminNavTabs button, #teacherNavTabs button').forEach((b, idx) => b.classList.toggle('active', idx === 0));
   document.querySelectorAll('#presentSubBtns button').forEach((b, idx) => {
     b.classList.toggle('btn-primary', idx === 0);
@@ -775,7 +800,7 @@ function updateSubmissionsBarsVisibility() {
 
   const canBatchApproveSub = ['COMM_1', 'COMM_2', 'COMM_3', 'DIRECTOR'].includes(currentUser.role) || (isTeacher && teacherTabMode === 'sub');
   const canBatchMemo = ['DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
-  const canCheckSub = canBatchApproveSub || canBatchMemo || isTeacherPresentTab || isTeacher;
+  const canCheckSub = canBatchApproveSub || canBatchMemo || isTeacherPresentTab || isTeacher || isAdmin;
 
   document.getElementById('subFilterRow').classList.remove('d-none');
   document.getElementById('filterStatusBtnsWrap').classList.toggle('d-none', isTeacherPresentTab);
@@ -797,8 +822,35 @@ function updateSubmissionsBarsVisibility() {
   document.getElementById('batchApproveSubBar').classList.toggle('d-none', !canBatchApproveSub);
   document.getElementById('batchMemoBar').classList.toggle('d-none', !canBatchMemo);
   document.getElementById('registrarTools').classList.toggle('d-none', !isReg);
+  document.getElementById('adminDeleteSubBar')?.classList.toggle('d-none', !isAdmin);
   document.getElementById('thCheckbox').classList.toggle('d-none', !canCheckSub);
   document.getElementById('mobileCheckAllSubWrap').classList.toggle('d-none', !canCheckSub);
+}
+
+function renderAdminAnnPdfBox(ann) {
+  const box = document.getElementById('annCurrentPdfBox');
+  const fileInput = document.getElementById('ann_pdf_file');
+  if (fileInput) fileInput.value = '';
+  if (!box) return;
+  if (ann && ann.pdf_url) {
+    box.classList.remove('d-none');
+    box.innerHTML = `
+      <div class="alert alert-light border d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 mb-0 rounded-3 small">
+        <div>
+          <i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i>
+          <b>ไฟล์แนบปัจจุบัน:</b>
+          <a href="${esc(ann.pdf_url)}" target="_blank" class="fw-semibold">${esc(ann.pdf_name || 'เอกสารประกาศ.pdf')}</a>
+        </div>
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="ann_remove_pdf">
+          <label class="form-check-label text-danger fw-semibold" for="ann_remove_pdf">ลบไฟล์ PDF นี้ออก</label>
+        </div>
+      </div>
+    `;
+  } else {
+    box.classList.add('d-none');
+    box.innerHTML = '';
+  }
 }
 
 async function loadDashboard(silentOnExpire = false) {
@@ -825,6 +877,7 @@ async function loadDashboard(silentOnExpire = false) {
 
     document.getElementById('adminNavTabs').classList.toggle('d-none', !isAdmin);
     document.getElementById('teacherNavTabs').classList.toggle('d-none', !isTeacher);
+    document.getElementById('adminDelete12Bar')?.classList.toggle('d-none', !isAdmin);
 
     if (isTeacher) {
       const waitSub = dashItems.filter(x => x.current_step === 'WAIT_TEACHER').length;
@@ -860,6 +913,7 @@ async function loadDashboard(silentOnExpire = false) {
         document.getElementById('ann_visible').checked = !!res.announcement.visible;
         document.getElementById('ann_badge').value = res.announcement.badge || '';
         document.getElementById('ann_content').value = res.announcement.content || '';
+        renderAdminAnnPdfBox(res.announcement);
       }
     }
 
@@ -942,7 +996,7 @@ function isMyPendingItem(item) {
   return true;
 }
 
-// ==================== ตาราง กพช.1-2 + อนุมัติหลายรายการ ====================
+// ==================== ตาราง กพช.1-2 + อนุมัติหลายรายการ + ลบ (เฉพาะ Admin) ====================
 function toggleAll12Checks(master) {
   document.querySelectorAll('.chk-12').forEach(cb => cb.checked = master.checked);
 }
@@ -950,6 +1004,7 @@ function toggleAll12Checks(master) {
 function render12List() {
   const kw = document.getElementById('dash12SearchInput').value.toLowerCase().trim();
   const termVal = document.getElementById('dash12TermFilter')?.value || 'ALL';
+  const isAdmin = currentUser.role === 'ADMIN';
   const filtered = dash12Items.filter(item => {
     if (filter12Mode === 'PENDING' && item.status_12 !== 'WAIT_TEACHER_12') return false;
     if (!matchesTermFilter(formatTermText(item.term), termVal)) return false;
@@ -974,9 +1029,10 @@ function render12List() {
   tbody.innerHTML = filtered.map(item => {
     const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
     const canAct = item.status_12 === 'WAIT_TEACHER_12';
+    const showChk = canAct || isAdmin;
     return `
       <tr>
-        <td>${canAct ? `<input type="checkbox" class="chk-12" value="${esc(item.req12_id)}">` : ''}</td>
+        <td>${showChk ? `<input type="checkbox" class="chk-12" value="${esc(item.req12_id)}">` : ''}</td>
         <td>
           <div class="fw-bold text-primary">${esc(item.req12_id)}</div>
           <div class="small text-muted">${esc(item.created_at)}</div>
@@ -998,6 +1054,7 @@ function render12List() {
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${esc(item.req12_id)}')">
             <i class="bi bi-printer"></i> กพช.1-2
           </button>
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" title="ลบรายการนี้" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>
     `;
@@ -1006,11 +1063,12 @@ function render12List() {
   mobileBox.innerHTML = filtered.map(item => {
     const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
     const canAct = item.status_12 === 'WAIT_TEACHER_12';
+    const showChk = canAct || isAdmin;
     return `
       <div class="mobile-item-card">
         <div class="d-flex justify-content-between align-items-start mb-2">
           <div>
-            ${canAct ? `<input type="checkbox" class="chk-12 me-2" value="${esc(item.req12_id)}">` : ''}
+            ${showChk ? `<input type="checkbox" class="chk-12 me-2" value="${esc(item.req12_id)}">` : ''}
             <span class="fw-bold text-primary">${esc(item.req12_id)}</span>
           </div>
           <span class="badge step-badge ${st.cls}">${st.text}</span>
@@ -1027,6 +1085,7 @@ function render12List() {
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
             <i class="bi bi-printer"></i> กพช.1-2
           </button>
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
       </div>
     `;
@@ -1050,6 +1109,40 @@ function confirmBatchApprove12() {
         const r = await callApi('batchApprove12', { token: authToken, req12_ids: ids });
         hideLoading();
         safeAlert('สำเร็จ 🎉', `อนุมัติ กพช.1-2 เรียบร้อยแล้ว ${r.count} รายการ`, 'success');
+        await loadDashboard();
+      } catch (err) {
+        hideLoading();
+        safeAlert('ผิดพลาด', err.message, 'error');
+      }
+    }
+  });
+}
+
+function confirmBatchDelete12() {
+  const ids = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
+  if (ids.length === 0) {
+    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการ กพช.1-2 ที่ต้องการลบอย่างน้อย 1 รายการครับ', 'warning');
+  }
+  confirmDelete12(ids);
+}
+
+function confirmDelete12(req12Ids) {
+  if (!currentUser || currentUser.role !== 'ADMIN') {
+    return safeAlert('ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ลบข้อมูลได้', 'error');
+  }
+  Swal.fire({
+    title: `ยืนยันลบข้อมูล กพช.1-2 (${req12Ids.length} รายการ)?`,
+    html: `<div class="small text-danger">รายการ <b>${esc(req12Ids.join(', '))}</b> จะถูกลบถาวรออกจาก Google Sheets ไม่สามารถกู้คืนได้</div>`,
+    icon: 'warning', showCancelButton: true,
+    confirmButtonText: 'ยืนยันลบถาวร', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
+  }).then(async res => {
+    if (res.isConfirmed) {
+      showLoading('กำลังลบข้อมูล กพช.1-2...');
+      try {
+        const r = await callApi('deleteApprovals12', { token: authToken, req12_ids: req12Ids });
+        hideLoading();
+        closeModalById('detailModal');
+        safeAlert('ลบเรียบร้อย', `ลบข้อมูล กพช.1-2 จำนวน ${r.count} รายการแล้ว`, 'success');
         await loadDashboard();
       } catch (err) {
         hideLoading();
@@ -1099,10 +1192,18 @@ function open12DetailModal(req12Id) {
   `;
 
   const canAct = item.status_12 === 'WAIT_TEACHER_12' && ['TEACHER', 'ADMIN'].includes(currentUser.role);
+  const isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
-    <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
-      <i class="bi bi-printer me-1"></i>พิมพ์ กพช.1 และ กพช.2 (PDF)
-    </button>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
+        <i class="bi bi-printer me-1"></i>พิมพ์ กพช.1 และ กพช.2 (PDF)
+      </button>
+      ${isAdmin ? `
+        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])">
+          <i class="bi bi-trash me-1"></i>ลบ กพช.1-2 นี้
+        </button>
+      ` : ''}
+    </div>
     <div class="d-flex flex-wrap gap-2">
       ${canAct ? `
         <button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'REJECT')">
@@ -1515,7 +1616,7 @@ function buildKPCH5Html(item, isLastInPrint) {
   `;
 }
 
-// ==================== ตารางส่งผลงาน กพช. + ครูนำเสนอส่งทะเบียน ====================
+// ==================== ตารางส่งผลงาน กพช. + ครูนำเสนอส่งทะเบียน + ลบ (เฉพาะ Admin) ====================
 function toggleAllChecks(master) {
   document.querySelectorAll('.reg-check').forEach(cb => cb.checked = master.checked);
 }
@@ -1550,6 +1651,7 @@ function getFilteredDashItems() {
 
 function renderDashboardList() {
   const isTeacher = currentUser.role === 'TEACHER';
+  const isAdmin = currentUser.role === 'ADMIN';
   const isPresentTab = isTeacher && teacherTabMode === 'present';
   const canCheck = ['TEACHER', 'COMM_1', 'COMM_2', 'COMM_3', 'DIRECTOR', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
 
@@ -1595,6 +1697,7 @@ function renderDashboardList() {
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printProjectPDF('${esc(item.req_id)}')">
             <i class="bi bi-printer"></i> โครงการ
           </button>
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" title="ลบรายการนี้" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>
     `;
@@ -1627,6 +1730,7 @@ function renderDashboardList() {
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printProjectPDF('${esc(item.req_id)}')">
             <i class="bi bi-printer"></i> โครงการ
           </button>
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
       </div>
     `;
@@ -1656,6 +1760,40 @@ function confirmBatchApproveSub() {
         const r = await callApi('batchApproveSubmissions', { token: authToken, req_ids: validIds });
         hideLoading();
         safeAlert('สำเร็จ 🎉', `อนุมัติและส่งต่อเรียบร้อยแล้ว ${r.count} รายการ`, 'success');
+        await loadDashboard();
+      } catch (err) {
+        hideLoading();
+        safeAlert('ผิดพลาด', err.message, 'error');
+      }
+    }
+  });
+}
+
+function confirmBatchDeleteSub() {
+  const ids = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  if (ids.length === 0) {
+    return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการผลงานที่ต้องการลบอย่างน้อย 1 รายการครับ', 'warning');
+  }
+  confirmDeleteSubmissions(ids);
+}
+
+function confirmDeleteSubmissions(reqIds) {
+  if (!currentUser || currentUser.role !== 'ADMIN') {
+    return safeAlert('ไม่มีสิทธิ์', 'เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่ลบข้อมูลได้', 'error');
+  }
+  Swal.fire({
+    title: `ยืนยันลบข้อมูลผลงาน (${reqIds.length} รายการ)?`,
+    html: `<div class="small text-danger">รายการ <b>${esc(reqIds.join(', '))}</b> และรูปภาพที่แนบจะถูกลบถาวร ไม่สามารถกู้คืนได้</div>`,
+    icon: 'warning', showCancelButton: true,
+    confirmButtonText: 'ยืนยันลบถาวร', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
+  }).then(async res => {
+    if (res.isConfirmed) {
+      showLoading('กำลังลบข้อมูลผลงาน...');
+      try {
+        const r = await callApi('deleteSubmissions', { token: authToken, req_ids: reqIds });
+        hideLoading();
+        closeModalById('detailModal');
+        safeAlert('ลบเรียบร้อย', `ลบข้อมูลผลงานจำนวน ${r.count} รายการแล้ว`, 'success');
         await loadDashboard();
       } catch (err) {
         hideLoading();
@@ -1989,10 +2127,18 @@ function openDetailModal(reqId) {
   `;
 
   const canAct = isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
+  const isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
-    <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printProjectPDF('${esc(item.req_id)}')">
-      <i class="bi bi-printer me-1"></i>พิมพ์บันทึกข้อความ + โครงการ + กพช.5 (PDF)
-    </button>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printProjectPDF('${esc(item.req_id)}')">
+        <i class="bi bi-printer me-1"></i>พิมพ์บันทึกข้อความ + โครงการ + กพช.5 (PDF)
+      </button>
+      ${isAdmin ? `
+        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])">
+          <i class="bi bi-trash me-1"></i>ลบข้อมูลนี้
+        </button>
+      ` : ''}
+    </div>
     <div class="d-flex flex-wrap gap-2">
       ${canAct ? `
         <button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision('${esc(item.req_id)}', 'REJECT')">
@@ -2482,15 +2628,35 @@ async function handleSaveAnnouncement() {
   const visible = document.getElementById('ann_visible').checked;
   const badge = document.getElementById('ann_badge').value.trim();
   const content = document.getElementById('ann_content').value.trim();
+  const removePdfEl = document.getElementById('ann_remove_pdf');
+  const removePdf = removePdfEl ? removePdfEl.checked : false;
+  const fileInput = document.getElementById('ann_pdf_file');
+  const file = fileInput && fileInput.files ? fileInput.files[0] : null;
 
-  showLoading('กำลังบันทึกข่าวประกาศ...');
+  let pdfFilePayload = null;
+  if (file) {
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      return safeAlert('ไฟล์ไม่ถูกต้อง', 'กรุณาเลือกเฉพาะไฟล์นามสกุล .pdf เท่านั้นครับ', 'warning');
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      return safeAlert('ไฟล์ใหญ่เกินไป', 'กรุณาเลือกไฟล์ PDF ขนาดไม่เกิน 8 MB ครับ', 'warning');
+    }
+  }
+
+  showLoading(file ? 'กำลังอัปโหลดไฟล์ PDF และบันทึกประกาศ...' : 'กำลังบันทึกข่าวประกาศ...');
   try {
+    if (file) {
+      const b64 = await readFileAsBase64(file);
+      pdfFilePayload = { name: file.name, base64Data: b64 };
+    }
     const res = await callApi('saveAnnouncement', {
       token: authToken,
-      announcement: { visible, badge, content }
+      announcement: { visible, badge, content, remove_pdf: removePdf, pdf_file: pdfFilePayload }
     });
     hideLoading();
     renderAnnouncement(res.announcement);
+    renderAdminAnnPdfBox(res.announcement);
     safeAlert('สำเร็จ', 'อัปเดตข่าวประกาศเรียบร้อยแล้ว', 'success');
   } catch (err) {
     hideLoading();
