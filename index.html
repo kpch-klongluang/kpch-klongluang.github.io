@@ -358,6 +358,11 @@
         <li class="nav-item text-nowrap">
           <button type="button" class="nav-link cute-pill" onclick="switchAdminTab('logs', this)">📜 ประวัติระบบ</button>
         </li>
+        <li class="nav-item text-nowrap">
+          <button type="button" class="nav-link cute-pill" onclick="switchAdminTab('trash', this)">
+            🗑️ ถังขยะ <span class="badge bg-danger rounded-pill ms-1 d-none" id="badgeTrashCount">0</span>
+          </button>
+        </li>
       </ul>
 
       <!-- มุมมอง 1: รายการบันทึกผลงาน กพช. -->
@@ -452,15 +457,15 @@
           </div>
         </div>
 
-        <!-- แถบเครื่องมือแอดมิน: ลบผลงานที่ติ๊กเลือก (เฉพาะ ADMIN) -->
+        <!-- แถบเครื่องมือแอดมิน: ย้ายผลงานที่ติ๊กเลือกลงถังขยะ (เฉพาะ ADMIN) -->
         <div id="adminDeleteSubBar" class="alert alert-danger border-0 rounded-4 d-none mb-3">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
             <div class="small">
               <strong><i class="bi bi-trash3 me-1"></i>สิทธิ์ผู้ดูแลระบบ (Admin):</strong>
-              ติ๊กเลือกรายการที่กรอกผิดหรือข้อมูลทดสอบเพื่อลบถาวรออกจากระบบ
+              ติ๊กเลือกรายการที่กรอกผิดหรือข้อมูลทดสอบเพื่อย้ายลงถังขยะ (กู้คืนภายหลังได้)
             </div>
             <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchDeleteSub()">
-              <i class="bi bi-trash me-1"></i>ลบผลงานที่ติ๊กเลือกทั้งหมด
+              <i class="bi bi-trash me-1"></i>ย้ายที่ติ๊กเลือกลงถังขยะ
             </button>
           </div>
         </div>
@@ -520,15 +525,15 @@
           </div>
         </div>
 
-        <!-- แถบเครื่องมือแอดมิน: ลบ กพช.1-2 ที่ติ๊กเลือก (เฉพาะ ADMIN) -->
+        <!-- แถบเครื่องมือแอดมิน: ย้าย กพช.1-2 ที่ติ๊กเลือกลงถังขยะ (เฉพาะ ADMIN) -->
         <div id="adminDelete12Bar" class="alert alert-danger border-0 rounded-4 d-none mb-3">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
             <div class="small">
               <strong><i class="bi bi-trash3 me-1"></i>สิทธิ์ผู้ดูแลระบบ (Admin):</strong>
-              ติ๊กเลือกรายการ กพช.1-2 ที่กรอกผิดหรือข้อมูลทดสอบเพื่อลบถาวรออกจากระบบ
+              ติ๊กเลือกรายการ กพช.1-2 ที่กรอกผิดหรือข้อมูลทดสอบเพื่อย้ายลงถังขยะ (กู้คืนภายหลังได้)
             </div>
             <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchDelete12()">
-              <i class="bi bi-trash me-1"></i>ลบ กพช.1-2 ที่ติ๊กเลือกทั้งหมด
+              <i class="bi bi-trash me-1"></i>ย้ายที่ติ๊กเลือกลงถังขยะ
             </button>
           </div>
         </div>
@@ -612,6 +617,38 @@
               </tr>
             </thead>
             <tbody id="adminLogsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- มุมมองแอดมิน: ถังขยะ (กู้คืน / ลบถาวร) -->
+      <div id="adminTrashView" class="cute-card p-3 p-md-4 d-none">
+        <div class="alert alert-warning border-0 rounded-4 small mb-3">
+          <i class="bi bi-shield-check me-1"></i>
+          <strong>ถังขยะสำรองข้อมูล (เฉพาะผู้ดูแลระบบ):</strong> รายการที่ถูกลบจะถูกเก็บไว้ที่นี่ชั่วคราว สามารถกด <b>"กู้คืน"</b> กลับไปยังสถานะเดิมได้ หรือกด <b>"ลบถาวร"</b> เพื่อล้างข้อมูลออกจากระบบ
+        </div>
+
+        <h6 class="fw-bold text-primary mb-2">📸 ผลงาน กพช. ที่อยู่ในถังขยะ</h6>
+        <div class="table-responsive mb-4">
+          <table class="table table-bordered table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>รหัสคำขอ</th><th>นักศึกษา</th><th>กิจกรรม / ชม.</th><th>สถานะเดิม</th><th>ลบเมื่อ / โดย</th><th class="text-end">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="trashSubsBody"></tbody>
+          </table>
+        </div>
+
+        <h6 class="fw-bold text-primary mb-2">📋 คำขอ กพช.1-2 ที่อยู่ในถังขยะ</h6>
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>รหัส กพช.1-2</th><th>นักศึกษา</th><th>ภาคเรียน / โครงการ</th><th>สถานะเดิม</th><th>ลบเมื่อ / โดย</th><th class="text-end">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="trash12Body"></tbody>
           </table>
         </div>
       </div>
