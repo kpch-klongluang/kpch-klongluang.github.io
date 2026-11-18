@@ -1,4 +1,3 @@
-
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 const SCHOOL_NAME = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
 const DIRECTOR_NAME = 'นางฑัศดาพร ลองชัย';
@@ -2164,4 +2163,3 @@ if (document.readyState === 'loading') {
 } else {
   initApp();
 }
-```
