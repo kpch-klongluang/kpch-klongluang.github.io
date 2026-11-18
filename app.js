@@ -1,7 +1,20 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbwuuQeFT7Ikjcr4GeTrwdY_7I4hJ-Ksgs4dWWYV1us8lOe02233vtOgv0TTyPwgM9Vu/exec';
 const SCHOOL_NAME = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
 const DIRECTOR_NAME = 'นางฑัศดาพร ลองชัย';
-const GARUDA_URL = 'https://upload.wikimedia.org/wikipedia/commons/3/3c/Garuda_Emblem_of_Thailand_%28Monochrome_2%29.svg';
+const GARUDA_URL = 'garuda.png';
+
+const EVAL_QUESTIONS_12 = [
+  'ท่านคิดว่า กิจกรรม กพช. มีประโยชน์เพียงใด',
+  'ท่านได้รับความรู้เกี่ยวกับโครงสร้างและประโยชน์ของ กพช. ระดับใด',
+  'ท่านมีความรู้ในเรื่องแนวทางการพัฒนาตนเอง ครอบครัว ชุมชน สังคมในระดับใด',
+  'ท่านได้รับความรู้เกี่ยวกับกระบวนการกลุ่มในระดับใด',
+  'ท่านได้รับความรู้ในเรื่องกระบวนการคิดเป็น ทำเป็น แก้ปัญหาเป็น และการนำไปใช้ในการดำเนินชีวิตใน ระดับใด',
+  'ท่านได้รับความรู้ในเรื่องการประสานเครือข่ายในระดับ ใด',
+  'ท่านได้รับความรู้ในเรื่องการเป็นผู้นำผู้ตามในระดับใด',
+  'ท่านมีความรู้ในเรื่องการวางแผน และประโยชน์ของการ วางแผนในระดับใด',
+  'ท่านมีความรู้ในเรื่องมนุษยสัมพันธ์ในระดับใด',
+  'ท่านได้รับความรู้ในเรื่องการเขียนโครงการในระดับใด'
+];
 
 let compressedImages = [];
 let authToken = null;
@@ -10,6 +23,8 @@ let dashItems = [];
 let dash12Items = [];
 let adminUsers = [];
 let adminLogs = [];
+let publicTeachersList = [];
+let registrarName = '';
 let filterMode = 'PENDING';
 let filter12Mode = 'PENDING';
 let currentEligibleList12 = [];
@@ -106,6 +121,20 @@ function formatShortThaiDate(dateInput) {
   }
   return datePart;
 }
+function formatSlashThaiDate(dateInput) {
+  if (!dateInput) return '........./................../................';
+  const datePart = String(dateInput).split(' ')[0];
+  const parts = datePart.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return `${d} / ${m} / ${y < 2400 ? y + 543 : y}`;
+    }
+  }
+  return '........./................../................';
+}
 function toInputDate(val) {
   if (!val) return '';
   return String(val).split(' ')[0];
@@ -171,11 +200,11 @@ async function loadPublicData() {
     errEl.classList.add('d-none');
     renderAnnouncement(data.announcement);
 
-    const list = data.teachers || [];
-    const html = list.length === 0
+    publicTeachersList = data.teachers || [];
+    const html = publicTeachersList.length === 0
       ? '<option value="">-- ยังไม่มีรายชื่อครูในระบบ --</option>'
       : '<option value="">-- กรุณาเลือกครูประจำกลุ่ม --</option>' +
-        list.map(t => `<option value="${esc(t.user_id)}">${esc(t.full_name)} (${esc(t.group_name)})</option>`).join('');
+        publicTeachersList.map(t => `<option value="${esc(t.user_id)}">${esc(t.full_name)} (${esc(t.group_name)})</option>`).join('');
 
     sel1.innerHTML = html;
     sel2.innerHTML = html;
@@ -188,12 +217,21 @@ async function loadPublicData() {
   }
 }
 
+function onSelectPre12Teacher() {
+  const tid = document.getElementById('p12_teacher_id').value;
+  const t = publicTeachersList.find(x => x.user_id === tid);
+  if (t && t.group_name) {
+    document.getElementById('p12_group_name').value = t.group_name;
+  }
+}
+
 // --- 1. ยื่นขออนุมัติทำ กพช. (กพช.1-2) ---
 async function handlePre12Submit() {
   const sid = document.getElementById('p12_student_id').value.trim();
   const sname = document.getElementById('p12_student_name').value.trim();
   const lvl = document.getElementById('p12_level').value;
   const tid = document.getElementById('p12_teacher_id').value;
+  const grp = document.getElementById('p12_group_name').value.trim();
   const term = document.getElementById('p12_term').value.trim();
   const hrs = document.getElementById('p12_hours').value;
   const actName = document.getElementById('p12_activity_name').value.trim();
@@ -203,23 +241,35 @@ async function handlePre12Submit() {
   const detail = document.getElementById('p12_plan_detail').value.trim();
   const evalOk = document.getElementById('p12_self_eval_ok').checked;
 
-  if (!sid || !sname || !lvl || !tid || !hrs || !actName || !startDate || !endDate || !detail) {
+  if (!sid || !sname || !lvl || !tid || !grp || !hrs || !actName || !startDate || !endDate || !detail) {
     return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบทุกช่อง', 'warning');
   }
   if (endDate < startDate) {
     return safeAlert('วันที่ไม่ถูกต้อง', 'วันที่คาดว่าจะสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม', 'warning');
   }
+
+  // เก็บผลประเมิน กพช.2 ทั้ง 10 ข้อ
+  const evalScores = [];
+  for (let i = 1; i <= 10; i++) {
+    const checked = document.querySelector(`input[name="eval_q${i}"]:checked`);
+    if (!checked) {
+      return safeAlert('แบบประเมินยังไม่ครบ', `กรุณาเลือกคำตอบในตารางแบบประเมินตนเอง (กพช. 2) ข้อที่ ${i} ด้วยครับ`, 'warning');
+    }
+    evalScores.push(checked.value);
+  }
+
   if (!evalOk) {
-    return safeAlert('กรุณายืนยัน', 'กรุณาติ๊กถูกช่องรับรองการประเมินตนเอง กพช.1-2 ด้านล่างก่อนยื่นคำขอ', 'warning');
+    return safeAlert('กรุณายืนยัน', 'กรุณาติ๊กถูกช่องรับรองข้อมูลด้านล่างก่อนยื่นคำขอ', 'warning');
   }
 
   showLoading('กำลังส่งคำขออนุมัติ กพช.1-2...');
   try {
     const res = await callApi('submitPreApproval12', {
       payload: {
-        student_id: sid, student_name: sname, level: lvl, teacher_id: tid,
+        student_id: sid, student_name: sname, level: lvl, teacher_id: tid, group_name: grp,
         term, hours: hrs, activity_name: actName, plan_start_date: startDate,
-        plan_end_date: endDate, location: loc, plan_detail: detail, self_eval_ok: evalOk
+        plan_end_date: endDate, location: loc, plan_detail: detail,
+        eval_scores: evalScores, self_eval_ok: evalOk
       }
     });
     hideLoading();
@@ -228,9 +278,12 @@ async function handlePre12Submit() {
       `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req12_id)}</b><br>กรุณารอครูประจำกลุ่มกดอนุมัติก่อนจึงจะส่งบันทึกผลงานได้ (เช็กผลได้ที่แท็บ "เช็กสถานะ")`,
       'success'
     );
-    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_hours','p12_activity_name','p12_start_date','p12_end_date','p12_location','p12_plan_detail'].forEach(id => {
+    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_hours','p12_activity_name','p12_start_date','p12_end_date','p12_location','p12_plan_detail'].forEach(id => {
       document.getElementById(id).value = '';
     });
+    for (let i = 1; i <= 10; i++) {
+      document.querySelectorAll(`input[name="eval_q${i}"]`).forEach(el => el.checked = false);
+    }
     document.getElementById('p12_self_eval_ok').checked = false;
   } catch (err) {
     hideLoading();
@@ -303,7 +356,6 @@ async function checkEligibilityUI() {
       return;
     }
 
-    // ผ่านการอนุมัติ กพช.1-2 แล้ว!
     currentEligibleList12 = avail;
     banner.innerHTML = `
       <div class="alert alert-success mb-0 rounded-3 small">
@@ -595,6 +647,7 @@ async function loadDashboard(silentOnExpire = false) {
     currentUser = res.user;
     dashItems = res.items || [];
     dash12Items = res.items12 || [];
+    registrarName = res.registrar_name || '';
     adminUsers = res.users || [];
     adminLogs = res.logs || [];
 
@@ -777,6 +830,12 @@ function open12DetailModal(req12Id) {
   const item = dash12Items.find(x => x.req12_id === req12Id);
   if (!item) return;
 
+  let scores = [];
+  try { scores = JSON.parse(item.eval_scores || '[]'); } catch (e) {}
+  const scorePreview = EVAL_QUESTIONS_12.map((q, i) => `
+    <tr><td class="text-center">${i + 1}</td><td>${q}</td><td class="text-center fw-bold text-primary">${esc(scores[i] || '-')}</td></tr>
+  `).join('');
+
   document.getElementById('mdReqId').innerText = item.req12_id;
   const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
   document.getElementById('detailModalBody').innerHTML = `
@@ -788,23 +847,29 @@ function open12DetailModal(req12Id) {
       <div class="col-12 col-md-6"><b>นักศึกษา:</b> ${esc(item.student_name)} (${esc(item.student_id)})</div>
       <div class="col-12 col-md-6"><b>ระดับชั้น:</b> ${esc(item.level)} | <b>ภาคเรียน:</b> ${esc(item.term)}</div>
       <div class="col-12 col-md-6"><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</div>
-      <div class="col-12 col-md-6"><b>ชั่วโมงที่ขอทำ:</b> ${esc(item.hours)} ชั่วโมง</div>
-      <div class="col-12 col-md-6"><b>ช่วงเวลาตามแผน:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)}</div>
+      <div class="col-12 col-md-6"><b>กลุ่ม/ศูนย์การเรียน:</b> ${esc(item.group_name || '-')}</div>
+      <div class="col-12 col-md-6"><b>ช่วงเวลาตามแผน:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} (${esc(item.hours)} ชม.)</div>
       <div class="col-12 col-md-6"><b>สถานที่:</b> ${esc(item.location || '-')}</div>
     </div>
     <h6 class="fw-bold">ชื่อกิจกรรม / โครงการที่จะทำ:</h6>
     <p>${esc(item.activity_name)}</p>
     <h6 class="fw-bold">วัตถุประสงค์ / แผนการดำเนินกิจกรรม:</h6>
     <p style="white-space: pre-line;" class="border p-3 rounded-3 bg-white">${esc(item.plan_detail)}</p>
-    <div class="alert alert-info py-2 small mb-2"><b>การประเมินตนเอง กพช.1-2:</b> ✅ ${esc(item.self_eval_ok)}</div>
-    ${item.approved_at_12 ? `<div class="small text-success">อนุมัติให้ทำกิจกรรมเมื่อ: ${esc(item.approved_at_12)}</div>` : ''}
+    <h6 class="fw-bold mt-3">ผลประเมินตนเอง (กพช. 2) ทั้ง 10 ข้อ:</h6>
+    <div class="table-responsive mb-2">
+      <table class="table table-bordered table-sm small mb-0">
+        <thead class="table-light"><tr><th style="width:40px;">ที่</th><th>รายการ</th><th style="width:85px;" class="text-center">ระดับ</th></tr></thead>
+        <tbody>${scorePreview}</tbody>
+      </table>
+    </div>
+    ${item.approved_at_12 ? `<div class="small text-success fw-bold">✅ อนุมัติให้ทำกิจกรรมเมื่อ: ${esc(item.approved_at_12)}</div>` : ''}
     ${item.reject_reason_12 ? `<div class="alert alert-danger mt-2 mb-0 rounded-3"><b>เหตุผลที่ไม่ผ่าน:</b> ${esc(item.reject_reason_12)}</div>` : ''}
   `;
 
   const canAct = item.status_12 === 'WAIT_TEACHER_12' && ['TEACHER', 'ADMIN'].includes(currentUser.role);
   document.getElementById('detailModalFooter').innerHTML = `
     <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
-      <i class="bi bi-printer me-1"></i>พิมพ์แบบ กพช.1-2
+      <i class="bi bi-printer me-1"></i>พิมพ์ กพช.1 และ กพช.2 (PDF)
     </button>
     <div class="d-flex flex-wrap gap-2">
       ${canAct ? `
@@ -853,72 +918,155 @@ async function executeApproval12(req12Id, decision, reason) {
   }
 }
 
+// ==================== พิมพ์ กพช. 1 (หน้า 1) และ กพช. 2 (หน้า 2) ตามแบบฟอร์มต้นฉบับ ====================
 function printForm12(req12Id) {
   const item = dash12Items.find(x => x.req12_id === req12Id);
   if (!item) return;
-  const startThai = formatThaiDate(item.plan_start_date);
-  const endThai = formatThaiDate(item.plan_end_date);
-  const todayThai = formatThaiDate();
+
+  const nameParts = (item.student_name || '').trim().split(/\s+/);
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '-';
+
+  const termParts = (item.term || '/').split('/');
+  const termNo = termParts[0] || '....';
+  const termYear = termParts[1] || '........';
+
+  const reqDateSlash = formatSlashThaiDate(item.created_at);
+  const appDateSlash = item.approved_at_12 ? formatSlashThaiDate(item.approved_at_12) : '........./................../................';
+  const regNameDisplay = registrarName ? esc(registrarName) : '...........................................';
+
+  let scores = [];
+  try { scores = JSON.parse(item.eval_scores || '[]'); } catch (e) {}
+
+  const evalRowsHtml = EVAL_QUESTIONS_12.map((q, i) => {
+    const val = scores[i] || '';
+    return `
+      <tr>
+        <td style="text-align:center;">${i + 1}</td>
+        <td>${q}</td>
+        <td style="text-align:center; font-weight:bold;">${val === 'มาก' ? '✓' : ''}</td>
+        <td style="text-align:center; font-weight:bold;">${val === 'ปานกลาง' ? '✓' : ''}</td>
+        <td style="text-align:center; font-weight:bold;">${val === 'น้อย' ? '✓' : ''}</td>
+        <td></td>
+      </tr>
+    `;
+  }).join('');
 
   document.getElementById('printOnlyContainer').innerHTML = `
-    <div>
-      <div class="memo-header">
-        <img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'">
-        <div class="memo-title" style="font-size:22pt !important;">แบบคำขออนุมัติและประเมินตนเอง กพช. (กพช.1-2)</div>
-      </div>
-      <div style="text-align:center; font-size:15pt; margin-bottom:10px;">
-        <b>${SCHOOL_NAME}</b> | ภาคเรียนที่ ${esc(item.term)} | รหัสอ้างอิง: ${esc(item.req12_id)}
-      </div>
-      <div class="memo-divider"></div>
+    <!-- หน้าที่ 1: แบบ กพช. 1 -->
+    <div class="memo-page" style="padding: 10px 15px; line-height: 1.8;">
+      <div style="text-align:right; font-weight:bold; font-size:16pt; margin-bottom:16px;">กพช. 1</div>
 
-      <table style="width:100%; border-collapse:collapse; margin-bottom:12px; font-size:15pt;" border="1" cellpadding="5">
-        <tr>
-          <td style="width:50%;"><b>ชื่อ-สกุล นักศึกษา:</b> ${esc(item.student_name)}</td>
-          <td style="width:50%;"><b>รหัสนักศึกษา:</b> ${esc(item.student_id)}</td>
-        </tr>
-        <tr>
-          <td><b>ระดับชั้น:</b> ${esc(item.level)}</td>
-          <td><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</td>
-        </tr>
-        <tr>
-          <td><b>วันที่คาดว่าจะจัด:</b> ${startThai} ถึง ${endThai}</td>
-          <td><b>จำนวนชั่วโมงที่ขอทำ:</b> ${esc(item.hours)} ชั่วโมง</td>
-        </tr>
-        <tr>
-          <td colspan="2"><b>สถานที่ดำเนินการ:</b> ${esc(item.location || '-')}</td>
-        </tr>
+      <div style="text-align:center; font-weight:bold; font-size:18pt; margin-bottom:10px;">
+        แบบลงทะเบียนกิจกรรมพัฒนาคุณภาพชีวิต (รายบุคคล)
+      </div>
+      <div style="text-align:center; font-size:16pt; margin-bottom:6px;">
+        <b>สถานศึกษา</b> &nbsp;<span style="border-bottom:1px dotted #000; padding:0 24px;">${SCHOOL_NAME}</span>
+      </div>
+      <div style="text-align:center; font-size:16pt; margin-bottom:26px;">
+        <b>ภาคเรียนที่</b> &nbsp;<span style="border-bottom:1px dotted #000; padding:0 16px;">${esc(termNo)}</span> / <span style="border-bottom:1px dotted #000; padding:0 20px;">${esc(termYear)}</span>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        ชื่อ <span style="border-bottom:1px dotted #000; padding:0 22px; display:inline-block; min-width:170px;">${esc(firstName)}</span>
+        สกุล <span style="border-bottom:1px dotted #000; padding:0 22px; display:inline-block; min-width:170px;">${esc(lastName)}</span>
+        รหัสประจำตัวนักศึกษา <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:130px;">${esc(item.student_id)}</span>
+      </div>
+      <div style="margin-bottom:14px;">
+        ระดับ <span style="border-bottom:1px dotted #000; padding:0 20px; display:inline-block; min-width:180px;">${esc(item.level)}</span>
+        กลุ่ม/กศน.ตำบล <span style="border-bottom:1px dotted #000; padding:0 20px; display:inline-block; min-width:260px;">${esc(item.group_name || '-')}</span>
+      </div>
+      <div style="margin-bottom:46px;">
+        ครูรับผิดชอบ <span style="border-bottom:1px dotted #000; padding:0 20px; display:inline-block; min-width:340px;">${esc(item.teacher_name)}</span>
+      </div>
+
+      <div style="text-align:center; margin-bottom:70px;">
+        <span style="white-space:nowrap;">ลงชื่อ.....................................................นักศึกษา</span><br>
+        ( ${esc(item.student_name)} )<br>
+        ${reqDateSlash}
+      </div>
+
+      <div style="display:flex; justify-content:space-between; text-align:center; margin-top:40px; page-break-inside:avoid;">
+        <div style="width:48%;">
+          <span style="white-space:nowrap;">ลงชื่อ..........................................ผู้รับลงทะเบียน</span><br>
+          ( ${esc(item.teacher_name)} )<br>
+          ${appDateSlash}
+        </div>
+        <div style="width:48%;">
+          <span style="white-space:nowrap;">ลงชื่อ..........................................นายทะเบียน</span><br>
+          ( ${regNameDisplay} )<br>
+          ........./................../................
+        </div>
+      </div>
+      <div style="margin-top:60px; font-size:12pt; color:#555; text-align:right;">
+        รหัสอ้างอิงระบบออนไลน์: ${esc(item.req12_id)}
+      </div>
+    </div>
+
+    <!-- หน้าที่ 2: แบบ กพช. 2 -->
+    <div style="padding: 4px 10px; line-height: 1.4;">
+      <div style="text-align:right; font-weight:bold; font-size:15pt;">กพช. 2</div>
+      <div style="text-align:center; font-weight:bold; font-size:17pt; margin-bottom:8px;">
+        แบบประเมินตนเองกิจกรรมพัฒนาคุณภาพชีวิต
+      </div>
+
+      <div style="font-weight:bold; font-size:15pt; margin-bottom:4px;">ส่วนที่ 1 สำหรับผู้เรียน</div>
+      <div style="font-size:14.5pt; margin-bottom:10px; line-height:1.55;">
+        <div>
+          ชื่อสถานศึกษา <span style="border-bottom:1px dotted #000; padding:0 16px; display:inline-block; min-width:460px;">${SCHOOL_NAME}</span>
+        </div>
+        <div>
+          ชื่อ-สกุล <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:250px;">${esc(item.student_name)}</span>
+          รหัสประจำตัวนักศึกษา <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:150px;">${esc(item.student_id)}</span>
+        </div>
+        <div>
+          ระดับการศึกษา <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:200px;">${esc(item.level)}</span>
+          ศูนย์การเรียน <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:210px;">${esc(item.group_name || '-')}</span>
+        </div>
+        <div>
+          ครูผู้รับผิดชอบ <span style="border-bottom:1px dotted #000; padding:0 14px; display:inline-block; min-width:460px;">${esc(item.teacher_name)}</span>
+        </div>
+      </div>
+
+      <table class="batch-table" style="font-size:13.5pt !important; margin-top:6px;">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:5%; vertical-align:middle;">ที่</th>
+            <th rowspan="2" style="width:57%; vertical-align:middle;">รายการ</th>
+            <th colspan="3" style="width:26%;">ระดับความรู้ความเข้าใจ</th>
+            <th rowspan="2" style="width:12%; vertical-align:middle;">หมายเหตุ</th>
+          </tr>
+          <tr>
+            <th style="width:8%;">มาก</th>
+            <th style="width:10%;">ปานกลาง</th>
+            <th style="width:8%;">น้อย</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${evalRowsHtml}
+        </tbody>
       </table>
 
-      <div style="margin-bottom:6px;"><b>1. ชื่อกิจกรรม / โครงการที่จะขออนุมัติทำ กพช.:</b> ${esc(item.activity_name)}</div>
-      <div style="margin-bottom:4px;"><b>2. วัตถุประสงค์ / แผนการดำเนินกิจกรรมโดยสังเขป:</b></div>
-      <div style="border:1px solid #000; padding:10px; min-height:90px; white-space:pre-line; margin-bottom:12px;">${esc(item.plan_detail)}</div>
-
-      <div style="border:1px solid #000; padding:10px; margin-bottom:20px;">
-        <b>3. การรับรองและประเมินตนเองเบื้องต้นของผู้เรียน (กพช.1-2):</b><br>
-        [ ✓ ] ${esc(item.self_eval_ok)}<br>
-        <div style="width:55%; margin-left:auto; text-align:center; margin-top:16px;">
-          ลงชื่อ......................................................ผู้ขออนุมัติ<br>
-          (${esc(item.student_name)})<br>
-          วันที่ยื่นคำขอ: ${formatThaiDate(item.created_at)}
-        </div>
+      <div style="text-align:center; margin-top:14px; margin-bottom:14px; font-size:15pt;">
+        <span style="white-space:nowrap;">ลงชื่อ...............................................ผู้เรียน</span><br>
+        ( ${esc(item.student_name)} )
       </div>
 
-      <div style="border:1px solid #000; padding:12px; page-break-inside:avoid;">
-        <b>4. ความเห็นของครูประจำกลุ่ม / ผู้รับผิดชอบกิจกรรม:</b><br>
-        <div style="margin:8px 0 14px 20px;">
-          [ ${item.status_12 === 'APPROVED_12' ? '✓' : ' '} ] อนุมัติให้ดำเนินกิจกรรมตามแผนได้ &nbsp;&nbsp;&nbsp;
-          [ ${item.status_12 === 'REJECTED_12' ? '✓' : ' '} ] ไม่อนุมัติ / ปรับปรุงแก้ไข
-        </div>
-        <div style="width:55%; margin-left:auto; text-align:center;">
-          ลงชื่อ......................................................<br>
-          (${esc(item.teacher_name)})<br>
-          ครูประจำกลุ่ม<br>
-          <span style="font-size:13pt;">(${item.approved_at_12 ? 'อนุมัติในระบบ: ' + esc(item.approved_at_12) : 'วันที่ ' + todayThai})</span>
-        </div>
+      <div style="font-size:15pt; margin-bottom:18px; page-break-inside:avoid;">
+        <b>ส่วนที่ 2 สำหรับสถานศึกษา</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle;">${item.status_12 === 'APPROVED_12' ? '✓' : '&nbsp;'}</span> ผ่าน
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px; vertical-align:middle;">${item.status_12 === 'REJECTED_12' ? '✓' : '&nbsp;'}</span> เพิ่มเติมในเรื่อง ${item.status_12 === 'REJECTED_12' ? esc(item.reject_reason_12) : '................................................'}
+      </div>
+
+      <div style="text-align:center; font-size:15pt; page-break-inside:avoid;">
+        <span style="white-space:nowrap;">ลงชื่อ...............................................ครูผู้รับผิดชอบ</span><br>
+        ( ${esc(item.teacher_name)} )<br>
+        <span style="font-size:12pt;">${item.approved_at_12 ? 'อนุมัติในระบบ: ' + esc(item.approved_at_12) : ''}</span>
       </div>
     </div>
   `;
-  setTimeout(() => window.print(), 500);
+  setTimeout(() => window.print(), 400);
 }
 
 // --- ตารางส่งผลงาน กพช. (6 ขั้นตอน) ---
