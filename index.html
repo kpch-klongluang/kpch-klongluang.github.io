@@ -75,28 +75,28 @@
         </li>
       </ul>
 
-      <!-- แท็บ 1: ขออนุมัติทำ กพช. (กพช.1-2) -->
+      <!-- แท็บ 1: ขออนุมัติทำ กพช. (กพช.1 และ กพช.2) -->
       <div id="publicPre12View" class="cute-card p-3 p-md-4 mx-auto" style="max-width: 820px;">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
-          <span class="badge rounded-pill bg-warning bg-opacity-25 text-dark px-3 py-2">📋 ขั้นตอนที่ 1: ขออนุญาตก่อนลงมือทำ</span>
+          <span class="badge rounded-pill bg-warning bg-opacity-25 text-dark px-3 py-2">📋 ขั้นตอนที่ 1: ลงทะเบียนและประเมินตนเอง (กพช.1-2)</span>
           <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="switchPublicTab('status')">
             <i class="bi bi-search me-1"></i>เคยขอไว้แล้ว? เช็กสถานะที่นี่
           </button>
         </div>
-        <h4 class="fw-bold text-primary mb-1 mt-2">แบบคำขออนุมัติทำกิจกรรม กพช. (กพช.1-2)</h4>
-        <p class="text-muted small mb-4">นักศึกษาต้องยื่นขออนุมัติและรอให้ครูประจำกลุ่มอนุมัติก่อน จึงจะสามารถส่งบันทึกผลงานในขั้นตอนที่ 2 ได้</p>
+        <h4 class="fw-bold text-primary mb-1 mt-2">แบบลงทะเบียนและประเมินตนเอง กพช. (กพช.1-2)</h4>
+        <p class="text-muted small mb-4">นักศึกษาต้องยื่นขออนุมัติและรอให้ครูอนุมัติก่อน จึงจะสามารถส่งบันทึกผลงานพร้อมภาพถ่ายในขั้นตอนที่ 2 ได้</p>
 
         <div class="row g-3">
           <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold small">รหัสนักศึกษา <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold small">รหัสประจำตัวนักศึกษา <span class="text-danger">*</span></label>
             <input type="text" class="form-control" id="p12_student_id" placeholder="เช่น 6912345678">
           </div>
           <div class="col-12 col-md-5">
-            <label class="form-label fw-semibold small">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="p12_student_name" placeholder="นาย/นางสาว ...">
+            <label class="form-label fw-semibold small">ชื่อ - นามสกุล (เว้นวรรคระหว่างชื่อ-สกุล) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="p12_student_name" placeholder="เช่น นายสมชาย ใจดี">
           </div>
           <div class="col-12 col-md-3">
-            <label class="form-label fw-semibold small">ระดับชั้น <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold small">ระดับการศึกษา <span class="text-danger">*</span></label>
             <select class="form-select" id="p12_level">
               <option value="">-- เลือก --</option>
               <option value="ประถมศึกษา">ประถมศึกษา</option>
@@ -106,18 +106,27 @@
           </div>
 
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold small">เลือกครูประจำกลุ่มของท่าน <span class="text-danger">*</span></label>
-            <select class="form-select" id="p12_teacher_id">
+            <label class="form-label fw-semibold small">ครูผู้รับผิดชอบ / ครูประจำกลุ่ม <span class="text-danger">*</span></label>
+            <select class="form-select" id="p12_teacher_id" onchange="onSelectPre12Teacher()">
               <option value="">กำลังโหลดรายชื่อครู...</option>
             </select>
           </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold small">กลุ่ม / ศูนย์การเรียน (ศกร.ตำบล) <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="p12_group_name" placeholder="เช่น ศรช.คลองหลวง">
+          </div>
+
           <div class="col-6 col-md-3">
-            <label class="form-label fw-semibold small">ภาคเรียน/ปีการศึกษา</label>
+            <label class="form-label fw-semibold small">ภาคเรียนที่</label>
             <input type="text" class="form-control" id="p12_term" value="2/2569">
           </div>
           <div class="col-6 col-md-3">
             <label class="form-label fw-semibold small">ชั่วโมงที่ขอทำ <span class="text-danger">*</span></label>
             <input type="number" class="form-control" id="p12_hours" min="1" max="200" placeholder="เช่น 20">
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold small">สถานที่ดำเนินการ</label>
+            <input type="text" class="form-control" id="p12_location" placeholder="เช่น ศกร.ตำบล / วัด...">
           </div>
 
           <div class="col-12">
@@ -125,17 +134,13 @@
             <input type="text" class="form-control" id="p12_activity_name" placeholder="เช่น โครงการจิตอาสาพัฒนาชุมชนและสิ่งแวดล้อม">
           </div>
 
-          <div class="col-6 col-md-4">
+          <div class="col-6">
             <label class="form-label fw-semibold small">วันที่คาดว่าจะเริ่ม <span class="text-danger">*</span></label>
             <input type="date" class="form-control" id="p12_start_date">
           </div>
-          <div class="col-6 col-md-4">
+          <div class="col-6">
             <label class="form-label fw-semibold small">วันที่คาดว่าจะสิ้นสุด <span class="text-danger">*</span></label>
             <input type="date" class="form-control" id="p12_end_date">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label fw-semibold small">สถานที่ดำเนินการ</label>
-            <input type="text" class="form-control" id="p12_location" placeholder="เช่น ศกร.ตำบล / วัด...">
           </div>
 
           <div class="col-12">
@@ -143,12 +148,108 @@
             <textarea class="form-control" id="p12_plan_detail" rows="3" placeholder="ระบุวัตถุประสงค์และสิ่งที่จะดำเนินการ..."></textarea>
           </div>
 
+          <!-- ตาราง กพช. 2: แบบประเมินตนเอง 10 ข้อ -->
+          <div class="col-12 mt-4">
+            <div class="p-3 rounded-4 border bg-white">
+              <h6 class="fw-bold text-primary mb-1">📊 ส่วนประเมินตนเอง (แบบ กพช. 2) <span class="text-danger">*</span></h6>
+              <p class="small text-muted mb-3">กรุณาประเมินระดับความรู้ความเข้าใจของท่านให้ครบทั้ง 10 ข้อ</p>
+              <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle mb-0" style="font-size: 0.9rem;">
+                  <thead class="table-light text-center">
+                    <tr>
+                      <th rowspan="2" style="width:45px; vertical-align:middle;">ที่</th>
+                      <th rowspan="2" style="vertical-align:middle;">รายการ</th>
+                      <th colspan="3">ระดับความรู้ความเข้าใจ</th>
+                    </tr>
+                    <tr>
+                      <th style="width:65px;">มาก</th>
+                      <th style="width:75px;">ปานกลาง</th>
+                      <th style="width:65px;">น้อย</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-center">1</td>
+                      <td>ท่านคิดว่า กิจกรรม กพช. มีประโยชน์เพียงใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q1" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q1" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q1" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">2</td>
+                      <td>ท่านได้รับความรู้เกี่ยวกับโครงสร้างและประโยชน์ของ กพช. ระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q2" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q2" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q2" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">3</td>
+                      <td>ท่านมีความรู้ในเรื่องแนวทางการพัฒนาตนเอง ครอบครัว ชุมชน สังคมในระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q3" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q3" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q3" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">4</td>
+                      <td>ท่านได้รับความรู้เกี่ยวกับกระบวนการกลุ่มในระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q4" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q4" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q4" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">5</td>
+                      <td>ท่านได้รับความรู้ในเรื่องกระบวนการคิดเป็น ทำเป็น แก้ปัญหาเป็น และการนำไปใช้ในการดำเนินชีวิตในระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q5" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q5" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q5" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">6</td>
+                      <td>ท่านได้รับความรู้ในเรื่องการประสานเครือข่ายในระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q6" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q6" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q6" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">7</td>
+                      <td>ท่านได้รับความรู้ในเรื่องการเป็นผู้นำผู้ตามในระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q7" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q7" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q7" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">8</td>
+                      <td>ท่านมีความรู้ในเรื่องการวางแผน และประโยชน์ของการวางแผนในระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q8" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q8" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q8" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">9</td>
+                      <td>ท่านมีความรู้ในเรื่องมนุษยสัมพันธ์ในระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q9" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q9" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q9" value="น้อย"></td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">10</td>
+                      <td>ท่านได้รับความรู้ในเรื่องการเขียนโครงการในระดับใด</td>
+                      <td class="text-center"><input type="radio" name="eval_q10" value="มาก"></td>
+                      <td class="text-center"><input type="radio" name="eval_q10" value="ปานกลาง"></td>
+                      <td class="text-center"><input type="radio" name="eval_q10" value="น้อย"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <div class="col-12">
             <div class="p-3 rounded-4 border bg-light">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" id="p12_self_eval_ok">
                 <label class="form-check-label small fw-semibold" for="p12_self_eval_ok">
-                  ข้าพเจ้าได้ศึกษาหลักเกณฑ์และประเมินตนเองเบื้องต้น (กพช.1-2) แล้ว ขอรับรองว่าจะดำเนินการตามแผนที่ได้รับอนุมัติและจะส่งภาพถ่ายหลักฐานหลังทำกิจกรรมเสร็จสิ้น <span class="text-danger">*</span>
+                  ข้าพเจ้าขอลงทะเบียนเข้าร่วมกิจกรรมพัฒนาคุณภาพชีวิต (กพช.1-2) และรับรองว่าข้อมูลการประเมินตนเองเป็นความจริง <span class="text-danger">*</span>
                 </label>
               </div>
             </div>
