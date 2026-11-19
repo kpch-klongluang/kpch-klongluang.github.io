@@ -96,6 +96,9 @@ function esc(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+function validateStudentId10(sid) {
+  return /^6\d{9}$/.test(String(sid || '').trim());
+}
 function getDriveThumb(url) {
   if (!url) return '';
   const m = url.match(/[-\w]{25,}/);
@@ -107,30 +110,20 @@ function formatThaiDate(dateInput) {
     const d = new Date();
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
   }
-  const datePart = String(dateInput).split(' ')[0];
-  const parts = datePart.split('-');
+  const parts = String(dateInput).split(' ')[0].split('-');
   if (parts.length === 3) {
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10) - 1;
-    const d = parseInt(parts[2], 10);
-    if (!isNaN(y) && !isNaN(m) && !isNaN(d) && months[m]) {
-      return `${d} ${months[m]} ${y < 2400 ? y + 543 : y}`;
-    }
+    const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d) && months[m]) return `${d} ${months[m]} ${y < 2400 ? y + 543 : y}`;
   }
   return String(dateInput);
 }
 function formatThaiDateWithLabel(dateInput) {
   const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   if (!dateInput) return '......เดือน............พ.ศ.........';
-  const datePart = String(dateInput).split(' ')[0];
-  const parts = datePart.split('-');
+  const parts = String(dateInput).split(' ')[0].split('-');
   if (parts.length === 3) {
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10) - 1;
-    const d = parseInt(parts[2], 10);
-    if (!isNaN(y) && !isNaN(m) && !isNaN(d) && months[m]) {
-      return `${d} เดือน ${months[m]} พ.ศ. ${y < 2400 ? y + 543 : y}`;
-    }
+    const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d) && months[m]) return `${d} เดือน ${months[m]} พ.ศ. ${y < 2400 ? y + 543 : y}`;
   }
   return String(dateInput);
 }
@@ -140,12 +133,8 @@ function formatShortThaiDate(dateInput) {
   const datePart = String(dateInput).split(' ')[0];
   const parts = datePart.split('-');
   if (parts.length === 3) {
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10) - 1;
-    const d = parseInt(parts[2], 10);
-    if (!isNaN(y) && !isNaN(m) && !isNaN(d) && shortMonths[m]) {
-      return `${d} ${shortMonths[m]} ${y < 2400 ? y + 543 : y}`;
-    }
+    const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d) && shortMonths[m]) return `${d} ${shortMonths[m]} ${y < 2400 ? y + 543 : y}`;
   }
   return datePart;
 }
@@ -153,8 +142,7 @@ function parseTermParts(termVal) {
   const raw = String(termVal || '').replace(/^'/, '').trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
     const p = raw.split(' ')[0].split('-');
-    const y = parseInt(p[0], 10);
-    const m = parseInt(p[1], 10);
+    const y = parseInt(p[0], 10), m = parseInt(p[1], 10);
     return { no: String(m), year: String(y < 2400 ? y + 543 : y) };
   }
   if (raw.includes('/')) {
@@ -174,17 +162,12 @@ function getItemTerm(item) {
     if (ref12 && ref12.term) return formatTermText(ref12.term);
   }
   const rawDate = String(item.activity_date || item.created_at || '').split(' ')[0];
-  let m = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  let yearNum, month;
-  if (m) { yearNum = parseInt(m[1], 10); month = parseInt(m[2], 10); }
-  else {
-    m = rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (m) { month = parseInt(m[2], 10); yearNum = parseInt(m[3], 10); }
-  }
-  if (yearNum && month) {
-    const thaiYear = yearNum < 2400 ? yearNum + 543 : yearNum;
-    if (month >= 5 && month <= 10) return `1/${thaiYear}`;
-    if (month >= 11) return `2/${thaiYear}`;
+  const m = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    const y = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+    const thaiYear = y < 2400 ? y + 543 : y;
+    if (mo >= 5 && mo <= 10) return `1/${thaiYear}`;
+    if (mo >= 11) return `2/${thaiYear}`;
     return `2/${thaiYear - 1}`;
   }
   return '';
@@ -192,17 +175,13 @@ function getItemTerm(item) {
 function matchesTermFilter(itemTerm, filterVal) {
   if (!filterVal || filterVal === 'ALL') return true;
   if (filterVal.startsWith('TERM:')) return itemTerm === filterVal.slice(5);
-  if (filterVal.startsWith('YEAR:')) {
-    const targetYear = filterVal.slice(5);
-    return String(itemTerm || '').split('/')[1] === targetYear;
-  }
+  if (filterVal.startsWith('YEAR:')) return String(itemTerm || '').split('/')[1] === filterVal.slice(5);
   return true;
 }
 function populateTermDropdown(selectEl, items, termGetter) {
   if (!selectEl) return;
   const prev = selectEl.value || 'ALL';
-  const termSet = new Set();
-  const yearSet = new Set();
+  const termSet = new Set(), yearSet = new Set();
   items.forEach(it => {
     const t = termGetter(it);
     if (t && t.includes('/')) {
@@ -212,18 +191,13 @@ function populateTermDropdown(selectEl, items, termGetter) {
     }
   });
   const terms = Array.from(termSet).sort((a, b) => {
-    const [ta, ya] = a.split('/').map(Number);
-    const [tb, yb] = b.split('/').map(Number);
+    const [ta, ya] = a.split('/').map(Number), [tb, yb] = b.split('/').map(Number);
     return yb !== ya ? yb - ya : tb - ta;
   });
   const years = Array.from(yearSet).sort((a, b) => Number(b) - Number(a));
   let html = '<option value="ALL">📅 ทุกภาคเรียน</option>';
-  if (terms.length > 0) {
-    html += '<optgroup label="เลือกตามภาคเรียน">' + terms.map(t => `<option value="TERM:${esc(t)}">ภาคเรียนที่ ${esc(t)}</option>`).join('') + '</optgroup>';
-  }
-  if (years.length > 0) {
-    html += '<optgroup label="รวมทั้งปีการศึกษา">' + years.map(y => `<option value="YEAR:${esc(y)}">รวมปีการศึกษา ${esc(y)}</option>`).join('') + '</optgroup>';
-  }
+  if (terms.length > 0) html += '<optgroup label="เลือกตามภาคเรียน">' + terms.map(t => `<option value="TERM:${esc(t)}">ภาคเรียนที่ ${esc(t)}</option>`).join('') + '</optgroup>';
+  if (years.length > 0) html += '<optgroup label="รวมทั้งปีการศึกษา">' + years.map(y => `<option value="YEAR:${esc(y)}">รวมปีการศึกษา ${esc(y)}</option>`).join('') + '</optgroup>';
   selectEl.innerHTML = html;
   selectEl.value = Array.from(selectEl.options).some(o => o.value === prev) ? prev : 'ALL';
 }
@@ -257,7 +231,6 @@ function openModalById(id) {
 function closeModalById(id) {
   bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).hide();
 }
-
 function renderNavbar() {
   const area = document.getElementById('navUserArea');
   if (currentUser) {
@@ -266,42 +239,25 @@ function renderNavbar() {
         <i class="bi bi-person-circle me-1"></i>${esc(currentUser.full_name)}
         <span class="badge bg-warning text-dark rounded-pill ms-1">${ROLE_LABELS[currentUser.role] || currentUser.role}</span>
       </span>
-      <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-3" onclick="handleLogout()">
-        <i class="bi bi-box-arrow-right me-1"></i>ออก
-      </button>
-    `;
+      <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-3" onclick="handleLogout()"><i class="bi bi-box-arrow-right me-1"></i>ออก</button>`;
   } else {
-    area.innerHTML = `
-      <button type="button" class="btn btn-light btn-sm rounded-pill px-3 fw-bold text-primary shadow-sm" onclick="openModalById('loginModal')">
-        <i class="bi bi-box-arrow-in-right me-1"></i>เข้าสู่ระบบเจ้าหน้าที่
-      </button>
-    `;
+    area.innerHTML = `<button type="button" class="btn btn-light btn-sm rounded-pill px-3 fw-bold text-primary shadow-sm" onclick="openModalById('loginModal')"><i class="bi bi-box-arrow-in-right me-1"></i>เข้าสู่ระบบเจ้าหน้าที่</button>`;
   }
 }
 
 // ==================== ประเภท กพช. ====================
 function populateCategorySelects() {
   const activeCats = kpchCategories.filter(c => c.status !== 'INACTIVE');
-  const studentOpts = '<option value="">-- เลือกประเภท กพช. --</option>' +
-    activeCats.map(c => `<option value="${esc(c.cat_name)}">${esc(c.cat_name)}</option>`).join('');
-  const filterOpts = '<option value="ALL">🏷️ ทุกประเภท กพช.</option>' +
-    kpchCategories.map(c => `<option value="${esc(c.cat_name)}">${esc(c.cat_name)}</option>`).join('');
+  const studentOpts = '<option value="">-- เลือกประเภท กพช. --</option>' + activeCats.map(c => `<option value="${esc(c.cat_name)}">${esc(c.cat_name)}</option>`).join('');
+  const filterOpts = '<option value="ALL">🏷️ ทุกประเภท กพช.</option>' + kpchCategories.map(c => `<option value="${esc(c.cat_name)}">${esc(c.cat_name)}</option>`).join('');
 
   ['p12_category', 'f_category', 'se_category'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) {
-      const prev = el.value;
-      el.innerHTML = studentOpts;
-      if (prev) el.value = prev;
-    }
+    if (el) { const prev = el.value; el.innerHTML = studentOpts; if (prev) el.value = prev; }
   });
   ['dashCategoryFilter', 'dash12CategoryFilter'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) {
-      const prev = el.value;
-      el.innerHTML = filterOpts;
-      if (Array.from(el.options).some(o => o.value === prev)) el.value = prev;
-    }
+    if (el) { const prev = el.value; el.innerHTML = filterOpts; if (Array.from(el.options).some(o => o.value === prev)) el.value = prev; }
   });
 }
 
@@ -329,17 +285,14 @@ function renderAdminCategories() {
   }
   tbody.innerHTML = kpchCategories.map(c => `
     <tr>
-      <td>${esc(c.cat_id)}</td>
-      <td class="fw-semibold">${esc(c.cat_name)}</td>
-      <td>${esc(c.default_project || '-')}</td>
+      <td>${esc(c.cat_id)}</td><td class="fw-semibold">${esc(c.cat_name)}</td><td>${esc(c.default_project || '-')}</td>
       <td class="text-center">${esc(c.default_hours || 25)}</td>
       <td><span class="badge ${c.status === 'INACTIVE' ? 'bg-secondary' : 'bg-success'}">${esc(c.status)}</span></td>
       <td class="text-end text-nowrap">
         <button type="button" class="btn btn-warning btn-sm rounded-pill" onclick="openCategoryModal('${esc(c.cat_id)}')"><i class="bi bi-pencil"></i> แก้ไข</button>
         <button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDeleteCategory('${esc(c.cat_id)}')"><i class="bi bi-trash"></i></button>
       </td>
-    </tr>
-  `).join('');
+    </tr>`).join('');
 }
 
 function openCategoryModal(catId) {
@@ -372,34 +325,19 @@ async function handleSaveCategory() {
     });
     hideLoading();
     kpchCategories = res.categories || [];
-    populateCategorySelects();
-    renderAdminCategories();
-    closeModalById('categoryModal');
+    populateCategorySelects(); renderAdminCategories(); closeModalById('categoryModal');
     safeAlert('สำเร็จ', 'บันทึกประเภท กพช. ลง Google Sheet เรียบร้อยแล้ว', 'success');
-  } catch (err) {
-    hideLoading();
-    safeAlert('ผิดพลาด', err.message, 'error');
-  }
+  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
 function confirmDeleteCategory(catId) {
-  Swal.fire({
-    title: 'ยืนยันลบประเภท กพช. นี้?',
-    icon: 'warning', showCancelButton: true,
-    confirmButtonText: 'ลบเลย', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
-  }).then(async res => {
+  Swal.fire({ title: 'ยืนยันลบประเภท กพช. นี้?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ลบเลย', confirmButtonColor: '#dc2626' }).then(async res => {
     if (res.isConfirmed) {
-      showLoading('กำลังลบประเภท กพช....');
+      showLoading('กำลังลบ...');
       try {
         const r = await callApi('deleteCategoryAdmin', { token: authToken, cat_id: catId });
-        hideLoading();
-        kpchCategories = r.categories || [];
-        populateCategorySelects();
-        renderAdminCategories();
-      } catch (err) {
-        hideLoading();
-        safeAlert('ผิดพลาด', err.message, 'error');
-      }
+        hideLoading(); kpchCategories = r.categories || []; populateCategorySelects(); renderAdminCategories();
+      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
@@ -407,48 +345,21 @@ function confirmDeleteCategory(catId) {
 // ==================== เติมข้อความมาตรฐาน กพช.3 & กพช.4 ====================
 function fillDefaultKpch3Template() {
   const act = document.getElementById('p12_activity_name').value.trim() || 'กิจกรรมพัฒนาคุณภาพชีวิต';
-  if (!document.getElementById('p3_rationale').value) {
-    document.getElementById('p3_rationale').value =
-      'กิจกรรมพัฒนาคุณภาพชีวิต (กพช.) เป็นกิจกรรมที่เป็นองค์ประกอบสำคัญส่วนหนึ่งในโครงสร้างที่กำหนดไว้ในหลักเกณฑ์ และวิธีการจัดการศึกษานอกระบบระดับการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 บันทึกความดี มุ่งเน้นให้เกิดการพัฒนาตนเอง กิจกรรมพัฒนาคุณภาพชีวิต บันทึกความดี จะส่งผลต่อการพัฒนาตนเอง ครอบครัว ชุมชน สังคมและประเทศชาติ เพื่อให้ดำรงอยู่ในสังคมอย่างมีความสุข';
-  }
-  if (!document.getElementById('p3_objectives').value) {
-    document.getElementById('p3_objectives').value =
-      '3.1 เพื่อเป็นการเปลี่ยนแปลงในการพัฒนาตนเอง ให้มีระเบียบ วินัย และการเสียสละ\n3.2 เพื่อส่งเสริมให้เป็นผู้มีน้ำใจ เสียสละ ในการพัฒนาตนเอง ครอบครัว ชุมชน สังคมและประเทศชาติ';
-  }
-  if (!document.getElementById('p3_target').value) {
-    document.getElementById('p3_target').value =
-      'นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย';
-  }
-  if (!document.getElementById('p3_steps').value) {
-    document.getElementById('p3_steps').value =
-      '5.1 วางแผนการจัดกิจกรรม\n5.2 ปรึกษาอาจารย์ที่ปรึกษา\n5.3 เข้าร่วมโครงการ\n5.4 เสนอโครงการการจัดกิจกรรมฯ ต่อสถานศึกษาเพื่อให้คณะกรรมการพิจารณาอนุมัติโครงการ\n5.5 ดำเนินจัดกิจกรรมตามแผนที่กำหนด สรุปผลและรายงานผลการดำเนินงาน\n5.6 สรุปผลและรายงานผลการดำเนินงาน และขออนุมัติชั่วโมง กพช.';
-  }
-  if (!document.getElementById('p3_expected').value) {
-    document.getElementById('p3_expected').value =
-      `นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก จาก${act} เพื่อเป็นการพัฒนาตนเองในการดำเนินชีวิต สามารถนำความรู้และประสบการณ์ที่ได้รับมาประยุกต์ใช้ในชีวิตประจำวัน`;
-  }
+  if (!document.getElementById('p3_rationale').value) document.getElementById('p3_rationale').value = 'กิจกรรมพัฒนาคุณภาพชีวิต (กพช.) เป็นกิจกรรมที่เป็นองค์ประกอบสำคัญส่วนหนึ่งในโครงสร้างที่กำหนดไว้ในหลักเกณฑ์ และวิธีการจัดการศึกษานอกระบบระดับการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 มุ่งเน้นให้เกิดการพัฒนาตนเอง ครอบครัว ชุมชน สังคมและประเทศชาติ เพื่อให้ดำรงอยู่ในสังคมอย่างมีความสุข';
+  if (!document.getElementById('p3_objectives').value) document.getElementById('p3_objectives').value = '3.1 เพื่อเป็นการเปลี่ยนแปลงในการพัฒนาตนเอง ให้มีระเบียบ วินัย และการเสียสละ\n3.2 เพื่อส่งเสริมให้เป็นผู้มีน้ำใจ เสียสละ ในการพัฒนาตนเอง ครอบครัว ชุมชน สังคมและประเทศชาติ';
+  if (!document.getElementById('p3_target').value) document.getElementById('p3_target').value = 'นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย';
+  if (!document.getElementById('p3_steps').value) document.getElementById('p3_steps').value = '5.1 วางแผนการจัดกิจกรรม\n5.2 ปรึกษาอาจารย์ที่ปรึกษา\n5.3 เข้าร่วมโครงการ\n5.4 เสนอโครงการการจัดกิจกรรมฯ ต่อสถานศึกษาเพื่อให้คณะกรรมการพิจารณาอนุมัติโครงการ\n5.5 ดำเนินจัดกิจกรรมตามแผนที่กำหนด สรุปผลและรายงานผลการดำเนินงาน\n5.6 สรุปผลและรายงานผลการดำเนินงาน และขออนุมัติชั่วโมง กพช.';
+  if (!document.getElementById('p3_expected').value) document.getElementById('p3_expected').value = `นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก จาก${act} สามารถนำความรู้และประสบการณ์ที่ได้รับมาประยุกต์ใช้ในชีวิตประจำวัน`;
 }
 
 function fillDefaultKpch4Template() {
-  if (!document.getElementById('f_k4_plan').value) {
-    document.getElementById('f_k4_plan').value =
-      '1. ปรึกษาครูผู้สอนเข้าร่วมกิจกรรม/โครงการ\n2. เตรียมตัวเข้าร่วมกิจกรรมพัฒนาคุณภาพชีวิตของนักศึกษา\n3. พัฒนาการเรียนรู้มุ่งเน้นการพัฒนาชุมชนและสังคม';
-  }
-  if (!document.getElementById('f_activity_detail').value) {
-    document.getElementById('f_activity_detail').value =
-      '1. วางแผนการเข้าร่วมกิจกรรม\n2. ปรึกษาครูที่ปรึกษา\n3. เข้าร่วมกิจกรรมการลงทะเบียน\n4. เสนอโครงการการจัดกิจกรรมต่อสถานศึกษาเพื่อให้คณะกรรมการพิจารณาอนุมัติ\n5. ดำเนินจัดกิจกรรมตามแผนที่กำหนด\n6. สรุปและรายงานผลการดำเนินงาน ขออนุมัติชั่วโมง กพช.';
-  }
-  if (!document.getElementById('f_k4_learning').value) {
-    document.getElementById('f_k4_learning').value =
-      '1. การวางแผนการเข้าร่วมกิจกรรม\n2. ได้เรียนรู้คุณค่าของการทำความดี การมีน้ำใจ การเสียสละ และการช่วยเหลือผู้อื่นโดยไม่หวังสิ่งตอบแทน\n3. เพื่อได้รับประสบการณ์ในการทำกิจกรรมจิตอาสาและการช่วยเหลือสังคม';
-  }
-  if (!document.getElementById('f_k4_apply').value) {
-    document.getElementById('f_k4_apply').value =
-      '1. ได้ทำประโยชน์ให้กับส่วนรวม\n2. นักศึกษาที่ทำกิจกรรมเป็นการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก เพื่อเป็นการพัฒนาตนเองในการดำเนินชีวิต เป็นผู้มีจิตสำนึกที่ดี รู้จักเสียสละ มีน้ำใจเอื้อเฟื้อเผื่อแผ่';
-  }
+  if (!document.getElementById('f_k4_plan').value) document.getElementById('f_k4_plan').value = '1. ปรึกษาครูผู้สอนเข้าร่วมกิจกรรม/โครงการ\n2. เตรียมตัวเข้าร่วมกิจกรรมพัฒนาคุณภาพชีวิตของนักศึกษา\n3. พัฒนาการเรียนรู้มุ่งเน้นการพัฒนาชุมชนและสังคม';
+  if (!document.getElementById('f_activity_detail').value) document.getElementById('f_activity_detail').value = '1. วางแผนการเข้าร่วมกิจกรรม\n2. ปรึกษาครูที่ปรึกษา\n3. เข้าร่วมกิจกรรมการลงทะเบียน\n4. เสนอโครงการการจัดกิจกรรมต่อสถานศึกษาเพื่อให้คณะกรรมการพิจารณาอนุมัติ\n5. ดำเนินจัดกิจกรรมตามแผนที่กำหนด\n6. สรุปและรายงานผลการดำเนินงาน ขออนุมัติชั่วโมง กพช.';
+  if (!document.getElementById('f_k4_learning').value) document.getElementById('f_k4_learning').value = '1. การวางแผนการเข้าร่วมกิจกรรม\n2. ได้เรียนรู้คุณค่าของการทำความดี การมีน้ำใจ การเสียสละ และการช่วยเหลือผู้อื่นโดยไม่หวังสิ่งตอบแทน\n3. เพื่อได้รับประสบการณ์ในการทำกิจกรรมพัฒนาคุณภาพชีวิต';
+  if (!document.getElementById('f_k4_apply').value) document.getElementById('f_k4_apply').value = '1. ได้ทำประโยชน์ให้กับส่วนรวม\n2. นักศึกษาที่ทำกิจกรรมเป็นการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึกเพื่อการดำเนินชีวิต';
 }
 
-// ==================== ส่วนหน้าแรก (นักศึกษา) ====================
+// ==================== หน้าแรก (นักศึกษา) ====================
 function switchPublicTab(tab) {
   document.getElementById('tabBtnPre12').classList.toggle('active', tab === 'pre12');
   document.getElementById('tabBtnSubmit').classList.toggle('active', tab === 'submit');
@@ -474,8 +385,7 @@ function renderAnnouncement(ann) {
       pdfArea.classList.remove('d-none');
       pdfArea.innerHTML = `<a href="${esc(ann.pdf_url)}" target="_blank" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold shadow-sm"><i class="bi bi-file-earmark-pdf-fill me-1"></i>เปิดอ่าน / ดาวน์โหลดเอกสารแนบ (${esc(ann.pdf_name || 'PDF')})</a>`;
     } else {
-      pdfArea.classList.add('d-none');
-      pdfArea.innerHTML = '';
+      pdfArea.classList.add('d-none'); pdfArea.innerHTML = '';
     }
   }
 }
@@ -489,27 +399,18 @@ async function loadPublicData() {
     const data = await callApi('getPublicData');
     if (errEl) errEl.classList.add('d-none');
     renderAnnouncement(data.announcement);
-
     kpchCategories = data.categories || [];
     populateCategorySelects();
-
     publicTeachersList = data.teachers || [];
     const html = publicTeachersList.length === 0
       ? '<option value="">-- ยังไม่มีรายชื่อครูในระบบ --</option>'
-      : '<option value="">-- กรุณาเลือกครูประจำกลุ่ม --</option>' +
-        publicTeachersList.map(t => `<option value="${esc(t.user_id)}">${esc(t.full_name)} (${esc(t.group_name)})</option>`).join('');
-
-    sel1.innerHTML = html;
-    sel2.innerHTML = html;
+      : '<option value="">-- กรุณาเลือกครูประจำกลุ่ม --</option>' + publicTeachersList.map(t => `<option value="${esc(t.user_id)}">${esc(t.full_name)} (${esc(t.group_name)})</option>`).join('');
+    sel1.innerHTML = html; sel2.innerHTML = html;
     if (selEdit) selEdit.innerHTML = html;
   } catch (err) {
     const errOpt = '<option value="">-- โหลดรายชื่อครูไม่สำเร็จ --</option>';
-    sel1.innerHTML = errOpt;
-    sel2.innerHTML = errOpt;
-    if (errEl) {
-      errEl.innerText = err.message;
-      errEl.classList.remove('d-none');
-    }
+    sel1.innerHTML = errOpt; sel2.innerHTML = errOpt;
+    if (errEl) { errEl.innerText = err.message; errEl.classList.remove('d-none'); }
   }
 }
 
@@ -534,12 +435,13 @@ async function handlePre12Submit() {
   const loc = document.getElementById('p12_location').value.trim();
   const evalOk = document.getElementById('p12_self_eval_ok').checked;
 
-  if (!sid || !sname || !lvl || !tid || !grp || !cat || !actName || !startDate || !endDate) {
+  if (!validateStudentId10(sid)) {
+    return safeAlert('รหัสนักศึกษาไม่ถูกต้อง', 'กรุณากรอกรหัสนักศึกษาที่ขึ้นต้นด้วยเลข 6 และมี 10 หลักเท่านั้น (เช่น 6912345678)', 'warning');
+  }
+  if (!sname || !lvl || !tid || !grp || !cat || !actName || !startDate || !endDate) {
     return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * และเลือกประเภท กพช. ให้ครบทุกช่อง', 'warning');
   }
-  if (endDate < startDate) {
-    return safeAlert('วันที่ไม่ถูกต้อง', 'วันที่คาดว่าจะสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม', 'warning');
-  }
+  if (endDate < startDate) return safeAlert('วันที่ไม่ถูกต้อง', 'วันที่คาดว่าจะสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม', 'warning');
 
   const evalScores = [];
   for (let i = 1; i <= 10; i++) {
@@ -553,16 +455,11 @@ async function handlePre12Submit() {
   try {
     const elig = await callApi('checkEligibility', { student_id: sid });
     const targetTerm = formatTermText(term);
-    const dup = (elig.approvals12 || []).find(x =>
-      formatTermText(x.term) === targetTerm && ['WAIT_TEACHER_12', 'APPROVED_12'].includes(x.status_12)
-    );
+    const dup = (elig.approvals12 || []).find(x => formatTermText(x.term) === targetTerm && ['WAIT_TEACHER_12', 'APPROVED_12'].includes(x.status_12));
     if (dup) {
       hideLoading();
-      return safeAlert(
-        dup.status_12 === 'APPROVED_12' ? 'มีสิทธิ์ กพช.1-3 ในภาคเรียนนี้แล้ว ✅' : 'ยื่นคำขอในภาคเรียนนี้ไว้แล้ว ⏳',
-        `รหัสนักศึกษา <b>${esc(sid)}</b> มีคำขอในภาคเรียน <b>${esc(targetTerm)}</b> แล้ว (รหัส: <b>${esc(dup.req12_id)}</b>)<br>หากข้อมูลผิดสามารถกดแก้ไขได้ที่แท็บ <b>"🔍 เช็กสถานะ / แก้ไข"</b>`,
-        'info'
-      );
+      return safeAlert(dup.status_12 === 'APPROVED_12' ? 'มีสิทธิ์ กพช.1-3 ในภาคเรียนนี้แล้ว ✅' : 'ยื่นคำขอในภาคเรียนนี้ไว้แล้ว ⏳',
+        `รหัสนักศึกษา <b>${esc(sid)}</b> มีคำขอในภาคเรียน <b>${esc(targetTerm)}</b> แล้ว (รหัส: <b>${esc(dup.req12_id)}</b>)<br>หากข้อมูลผิดสามารถแก้ไขได้ที่แท็บ <b>"🔍 เช็กสถานะ"</b>`, 'info');
     }
 
     const res = await callApi('submitPreApproval12', {
@@ -583,15 +480,10 @@ async function handlePre12Submit() {
     });
     hideLoading();
     safeAlert('ยื่นขอ กพช.1-3 สำเร็จ! 📋', `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req12_id)}</b><br>กรุณารอครูประจำกลุ่มอนุมัติก่อนส่งรายงานผล กพช.4`, 'success');
-    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_category','p12_role_note','p12_activity_name','p12_start_date','p12_end_date','p3_rationale','p3_objectives','p3_target','p3_steps','p3_expected'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_category','p12_role_note','p12_activity_name','p12_start_date','p12_end_date','p3_rationale','p3_objectives','p3_target','p3_steps','p3_expected'].forEach(id => { document.getElementById(id).value = ''; });
     for (let i = 1; i <= 10; i++) document.querySelectorAll(`input[name="eval_q${i}"]`).forEach(el => el.checked = false);
     document.getElementById('p12_self_eval_ok').checked = false;
-  } catch (err) {
-    hideLoading();
-    safeAlert('เกิดข้อผิดพลาด', err.message, 'error');
-  }
+  } catch (err) { hideLoading(); safeAlert('เกิดข้อผิดพลาด', err.message, 'error'); }
 }
 
 function resetSubmitLock(btnText) {
@@ -606,51 +498,35 @@ function resetSubmitLock(btnText) {
 async function checkEligibilityUI() {
   const sid = document.getElementById('f_student_id').value.trim();
   const banner = document.getElementById('eligibilityBanner');
-  if (!sid) return safeAlert('แจ้งเตือน', 'กรุณากรอกรหัสนักศึกษาก่อนกดตรวจสอบสิทธิ์', 'warning');
+  if (!validateStudentId10(sid)) return safeAlert('รหัสนักศึกษาไม่ถูกต้อง', 'รหัสนักศึกษาต้องขึ้นต้นด้วยเลข 6 และมี 10 หลักเท่านั้น (เช่น 6912345678)', 'warning');
 
   showLoading('กำลังตรวจสอบสิทธิ์ กพช.1-3...');
   try {
     const res = await callApi('checkEligibility', { student_id: sid });
     hideLoading();
     banner.classList.remove('d-none');
-
     if (!res.hasAny12) {
       resetSubmitLock('ไม่สามารถส่งได้ (ยังไม่ได้ขออนุมัติ กพช.1-3)');
-      banner.innerHTML = `
-        <div class="alert alert-danger mb-0 rounded-3 small">
-          <div class="fw-bold mb-1">❌ ยังไม่พบคำขออนุมัติทำ กพช. (กพช.1-3) ของรหัส ${esc(sid)}</div>
-          <button type="button" class="btn btn-danger btn-sm rounded-pill mt-1 fw-bold" onclick="goToPre12WithId('${esc(sid)}')">📋 ไปหน้าขออนุมัติ กพช.1-3 ทันที</button>
-        </div>`;
+      banner.innerHTML = `<div class="alert alert-danger mb-0 rounded-3 small"><div class="fw-bold mb-1">❌ ยังไม่พบคำขออนุมัติทำ กพช. ของรหัส ${esc(sid)}</div><button type="button" class="btn btn-danger btn-sm rounded-pill mt-1 fw-bold" onclick="goToPre12WithId('${esc(sid)}')">📋 ไปหน้าขออนุมัติ กพช.1-3 ทันที</button></div>`;
       return;
     }
-
     const approvedList = (res.approvals12 || []).filter(x => x.status_12 === 'APPROVED_12');
     if (approvedList.length === 0) {
       const latest = res.approvals12[0];
       const st = STEP12_LABELS[latest.status_12] || { text: latest.status_12 };
       resetSubmitLock('รอครูอนุมัติ กพช.1-3 ก่อนจึงจะส่งผลงานได้');
-      banner.innerHTML = `
-        <div class="alert alert-warning mb-0 rounded-3 small">
-          <div class="fw-bold mb-1">⏳ ยังไม่สามารถส่งผลงานได้ (สถานะล่าสุด: ${st.text})</div>
-          <div>รหัสคำขอ: <b>${esc(latest.req12_id)}</b> | โครงการ: ${esc(latest.activity_name)}</div>
-          ${latest.status_12 === 'REJECTED_12' ? `<div class="text-danger mt-1"><b>เหตุผลที่ตีกลับ:</b> ${esc(latest.reject_reason_12)} — ไปแก้ไขได้ที่แท็บ <b>"🔍 เช็กสถานะ / แก้ไข"</b></div>` : ''}
-        </div>`;
+      banner.innerHTML = `<div class="alert alert-warning mb-0 rounded-3 small"><div class="fw-bold mb-1">⏳ ยังไม่สามารถส่งผลงานได้ (สถานะ: ${st.text})</div><div>รหัส: <b>${esc(latest.req12_id)}</b> | ${esc(latest.activity_name)}</div>${latest.status_12 === 'REJECTED_12' ? `<div class="text-danger mt-1"><b>เหตุผลที่ตีกลับ:</b> ${esc(latest.reject_reason_12)} — ไปแก้ไขได้ที่แท็บ <b>"🔍 เช็กสถานะ"</b></div>` : ''}</div>`;
       return;
     }
-
     currentEligibleList12 = approvedList;
     banner.innerHTML = `<div class="alert alert-success mb-0 rounded-3 small"><b>✅ ผ่านการตรวจสอบสิทธิ์ กพช.1-3 แล้ว!</b></div>`;
     document.getElementById('ref12SelectWrap').classList.remove('d-none');
     document.getElementById('f_ref_12_id').innerHTML = approvedList.map(x => `<option value="${esc(x.req12_id)}">${esc(x.req12_id)} (ภาคเรียน ${esc(formatTermText(x.term))}) - ${esc(x.activity_name)}</option>`).join('');
     onSelectApproved12();
-
     const btn = document.getElementById('btnSubmitKPCH');
     btn.disabled = false;
     btn.innerHTML = `<i class="bi bi-send-heart me-2"></i>ส่งรายงานผล กพช.4`;
-  } catch (err) {
-    hideLoading();
-    safeAlert('ผิดพลาด', err.message, 'error');
-  }
+  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
 function goToPre12WithId(sid) {
@@ -678,12 +554,10 @@ function onSelectApproved12() {
 async function handleImageSelection(input) {
   const files = Array.from(input.files || []);
   const box = document.getElementById('imagePreviewBox');
-  box.innerHTML = '';
-  compressedImages = [];
+  box.innerHTML = ''; compressedImages = [];
   if (files.length < 2 || files.length > 3) {
     safeAlert('แจ้งเตือน', 'กรุณาเลือกรูปภาพจำนวน 2 ถึง 3 ภาพเท่านั้น', 'warning');
-    input.value = '';
-    return;
+    input.value = ''; return;
   }
   showLoading('กำลังย่อขนาดรูปภาพ...');
   try {
@@ -692,21 +566,18 @@ async function handleImageSelection(input) {
       compressedImages.push({ name: file.name, mimeType: 'image/jpeg', base64Data: b64.split(',')[1] });
       box.innerHTML += `<img src="${b64}" class="thumb-preview">`;
     }
-  } catch (err) {
-    safeAlert('ผิดพลาด', 'ไม่สามารถอ่านไฟล์รูปภาพได้', 'error');
-  } finally { hideLoading(); }
+  } catch (err) { safeAlert('ผิดพลาด', 'ไม่สามารถอ่านไฟล์รูปภาพได้', 'error'); }
+  finally { hideLoading(); }
 }
 
 async function handleEditImageSelection(input) {
   const files = Array.from(input.files || []);
   const box = document.getElementById('se_imagePreviewBox');
-  box.innerHTML = '';
-  editCompressedImages = [];
+  box.innerHTML = ''; editCompressedImages = [];
   if (files.length === 0) return;
   if (files.length < 2 || files.length > 3) {
     safeAlert('แจ้งเตือน', 'หากต้องการเปลี่ยนรูป กรุณาเลือก 2 ถึง 3 ภาพ', 'warning');
-    input.value = '';
-    return;
+    input.value = ''; return;
   }
   showLoading('กำลังย่อขนาดรูปภาพใหม่...');
   try {
@@ -734,11 +605,9 @@ function compressImageFile(file, maxSize, quality) {
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         resolve(canvas.toDataURL('image/jpeg', quality));
       };
-      img.onerror = reject;
-      img.src = e.target.result;
+      img.onerror = reject; img.src = e.target.result;
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.onerror = reject; reader.readAsDataURL(file);
   });
 }
 
@@ -757,8 +626,9 @@ async function handleStudentSubmit() {
   const loc = document.getElementById('f_location').value.trim();
   const detail = document.getElementById('f_activity_detail').value.trim();
 
+  if (!validateStudentId10(sid)) return safeAlert('รหัสนักศึกษาไม่ถูกต้อง', 'รหัสนักศึกษาต้องขึ้นต้นด้วยเลข 6 และมี 10 หลักเท่านั้น', 'warning');
   if (!ref12Id) return safeAlert('ยังไม่ได้รับอนุมัติ กพช.1-3', 'กรุณาตรวจสอบสิทธิ์ กพช.1-3 ก่อนส่งผลงาน', 'warning');
-  if (!sid || !sname || !lvl || !cat || !tid || !grp || !hrs || !actName || !startDate || !endDate || !detail) {
+  if (!sname || !lvl || !cat || !tid || !grp || !hrs || !actName || !startDate || !endDate || !detail) {
     return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * และเลือกประเภท กพช. ให้ครบ', 'warning');
   }
   if (endDate < startDate) return safeAlert('วันที่ไม่ถูกต้อง', 'วันสิ้นสุดโครงการต้องไม่น้อยกว่าวันที่เริ่มโครงการ', 'warning');
@@ -770,8 +640,7 @@ async function handleStudentSubmit() {
       payload: {
         ref_12_id: ref12Id, student_id: sid, student_name: sname, level: lvl,
         category: cat, teacher_id: tid, group_name: grp, hours: hrs,
-        activity_name: actName, activity_date: startDate, activity_end_date: endDate,
-        location: loc,
+        activity_name: actName, activity_date: startDate, activity_end_date: endDate, location: loc,
         k4_plan: document.getElementById('f_k4_plan').value.trim(),
         activity_detail: detail,
         k4_learning: document.getElementById('f_k4_learning').value.trim(),
@@ -782,39 +651,29 @@ async function handleStudentSubmit() {
     });
     hideLoading();
     safeAlert('ส่งรายงานผล กพช.4 สำเร็จ! 🎉', `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req_id)}</b><br>เรื่องถูกส่งไปยังครูประจำกลุ่มเรียบร้อยแล้ว`, 'success');
-    ['f_student_id','f_student_name','f_level','f_category','f_teacher_id','f_group_name','f_hours','f_activity_name','f_activity_date','f_activity_end_date','f_location','f_k4_plan','f_activity_detail','f_k4_learning','f_k4_apply','f_images'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    ['f_student_id','f_student_name','f_level','f_category','f_teacher_id','f_group_name','f_hours','f_activity_name','f_activity_date','f_activity_end_date','f_location','f_k4_plan','f_activity_detail','f_k4_learning','f_k4_apply','f_images'].forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('imagePreviewBox').innerHTML = '';
     document.getElementById('eligibilityBanner').classList.add('d-none');
-    compressedImages = [];
-    resetSubmitLock();
-  } catch (err) {
-    hideLoading();
-    safeAlert('เกิดข้อผิดพลาด', err.message, 'error');
-  }
+    compressedImages = []; resetSubmitLock();
+  } catch (err) { hideLoading(); safeAlert('เกิดข้อผิดพลาด', err.message, 'error'); }
 }
 
-// ==================== เช็กสถานะ & ปุ่มแก้ไขของนักศึกษา ====================
+// ==================== เช็กสถานะ + แก้ไข + นักศึกษาสั่งพิมพ์ของตัวเอง ====================
 async function searchMyStatus() {
   const sid = document.getElementById('searchStudentId').value.trim();
-  if (!sid) return safeAlert('แจ้งเตือน', 'กรุณากรอกรหัสนักศึกษา', 'warning');
+  if (!validateStudentId10(sid)) return safeAlert('รหัสนักศึกษาไม่ถูกต้อง', 'กรุณากรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วยเลข 6)', 'warning');
+
   showLoading('กำลังค้นหาข้อมูล...');
   try {
     const res = await callApi('checkStatus', { student_id: sid });
     hideLoading();
     const list12 = res.approvals12 || [];
     const listSubs = res.submissions || [];
-    lastStatus12List = list12;
-    lastStatusSubList = listSubs;
+    lastStatus12List = list12; lastStatusSubList = listSubs;
     const area = document.getElementById('statusResultArea');
 
     if (list12.length === 0 && listSubs.length === 0) {
-      area.innerHTML = `
-        <div class="alert alert-warning rounded-4 text-center">
-          <div class="fw-bold mb-1">❌ ยังไม่พบประวัติการขออนุมัติทำ กพช. ของรหัสนักศึกษา ${esc(sid)}</div>
-          <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold mt-2" onclick="goToPre12WithId('${esc(sid)}')">📋 ไปยื่นขอ กพช.1-3 ตอนนี้</button>
-        </div>`;
+      area.innerHTML = `<div class="alert alert-warning rounded-4 text-center"><div class="fw-bold mb-1">❌ ยังไม่พบประวัติของรหัส ${esc(sid)}</div><button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold mt-2" onclick="goToPre12WithId('${esc(sid)}')">📋 ไปยื่นขอ กพช.1-3 ตอนนี้</button></div>`;
       return;
     }
 
@@ -832,21 +691,16 @@ async function searchMyStatus() {
                 <span class="badge bg-light text-primary border me-1">${esc(r.req12_id)}</span>
                 ${r.category ? `<span class="badge bg-info bg-opacity-10 text-dark border me-1">${esc(r.category)}</span>` : ''}
                 <strong>${esc(r.activity_name)}</strong>
-                <div class="small text-muted mt-1">
-                  ผู้ขอ: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | ภาคเรียน: ${esc(formatTermText(r.term))}<br>
-                  แผนวันที่: ${formatShortThaiDate(r.plan_start_date)} ถึง ${formatShortThaiDate(r.plan_end_date)}
-                </div>
+                <div class="small text-muted mt-1">ผู้ขอ: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | ภาคเรียน: ${esc(formatTermText(r.term))}<br>แผนวันที่: ${formatShortThaiDate(r.plan_start_date)} ถึง ${formatShortThaiDate(r.plan_end_date)}</div>
               </div>
               <span class="badge step-badge ${st.cls}">${st.text}</span>
             </div>
             ${r.status_12 === 'APPROVED_12' ? `<div class="small text-success fw-semibold mt-2">✅ อนุมัติเมื่อ: ${esc(r.approved_at_12)}</div>` : ''}
             ${r.reject_reason_12 ? `<div class="alert alert-danger mt-2 mb-1 py-2 small rounded-3"><b>เหตุผลที่ครูตีกลับ:</b> ${esc(r.reject_reason_12)}</div>` : ''}
-            ${canEdit ? `
-              <div class="mt-2">
-                <button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('12', '${esc(r.req12_id)}')">
-                  <i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล
-                </button>
-              </div>` : ''}
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              ${canEdit ? `<button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('12', '${esc(r.req12_id)}')"><i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล</button>` : ''}
+              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf13('${esc(r.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช.1-3 ของฉัน</button>
+            </div>
           </div>`;
       }).join('');
     }
@@ -867,12 +721,7 @@ async function searchMyStatus() {
           { label: 'ครูส่งทะเบียน', done: !!r.teacher_presented_at || r.current_step === 'APPROVED_FOR_REGISTRAR' || r.current_step === 'COMPLETED' },
           { label: 'นายทะเบียน', done: r.current_step === 'COMPLETED' }
         ];
-        const progHtml = steps.map(s => `
-          <div class="prog-step ${s.done ? 'done' : (r.current_step === 'REJECTED' ? 'rejected' : '')}">
-            <div>${s.done ? '✅' : (r.current_step === 'REJECTED' ? '❌' : '⏳')}</div>
-            <div>${s.label}</div>
-          </div>`).join('');
-
+        const progHtml = steps.map(s => `<div class="prog-step ${s.done ? 'done' : (r.current_step === 'REJECTED' ? 'rejected' : '')}"><div>${s.done ? '✅' : (r.current_step === 'REJECTED' ? '❌' : '⏳')}</div><div>${s.label}</div></div>`).join('');
         return `
           <div class="mobile-item-card">
             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -880,41 +729,72 @@ async function searchMyStatus() {
                 <span class="badge bg-light text-primary border me-1">${esc(r.req_id)}</span>
                 ${r.category ? `<span class="badge bg-info bg-opacity-10 text-dark border me-1">${esc(r.category)}</span>` : ''}
                 <strong>${esc(r.activity_name)}</strong>
-                <div class="small text-muted mt-1">
-                  ผู้ส่ง: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>
-                  ช่วงวันที่: ${formatShortThaiDate(r.activity_date)} ถึง ${formatShortThaiDate(r.activity_end_date)}
-                </div>
+                <div class="small text-muted mt-1">ผู้ส่ง: ${esc(r.student_name)} | ครู: ${esc(r.teacher_name)} | จำนวน: <b>${esc(r.hours)} ชม.</b><br>ช่วงวันที่: ${formatShortThaiDate(r.activity_date)} ถึง ${formatShortThaiDate(r.activity_end_date)}</div>
               </div>
               <span class="badge step-badge ${st.cls}">${st.text}</span>
             </div>
             <div class="cute-progress-bar">${progHtml}</div>
             ${r.reject_reason ? `<div class="alert alert-danger mt-2 mb-1 py-2 small rounded-3"><b>เหตุผลที่ครูตีกลับ:</b> ${esc(r.reject_reason)}</div>` : ''}
-            ${canEdit ? `
-              <div class="mt-2">
-                <button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('sub', '${esc(r.req_id)}')">
-                  <i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล
-                </button>
-              </div>` : ''}
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              ${canEdit ? `<button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('sub', '${esc(r.req_id)}')"><i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล</button>` : ''}
+              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf4('${esc(r.req_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์รายงานผล กพช.4 ของฉัน</button>
+            </div>
           </div>`;
       }).join('');
     }
     area.innerHTML = html;
-  } catch (err) {
-    hideLoading();
-    safeAlert('ผิดพลาด', err.message, 'error');
-  }
+  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+}
+
+function printMySelf13(req12Id) {
+  const item = lastStatus12List.find(x => x.req12_id === req12Id);
+  if (!item) return;
+  const k12 = buildKPCH12Html(item);
+  const k3 = buildKPCH3BodyHtml([item], {
+    projName: item.activity_name || '',
+    hours: item.hours || '25',
+    rationale: item.p3_rationale || '',
+    objectives: item.p3_objectives || '',
+    target: item.p3_target || '',
+    steps: item.p3_steps || '',
+    loc: item.location || '',
+    sDate: formatThaiDateWithLabel(item.plan_start_date),
+    eDate: formatThaiDateWithLabel(item.plan_end_date),
+    budget: item.p3_budget || '-',
+    material: item.p3_material || 'หนังสือ / อุปกรณ์การทำกิจกรรม',
+    labor: item.p3_labor || 'นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง',
+    expected: item.p3_expected || '',
+    advisor: item.teacher_name || '',
+    tOpinion: 'เป็นกิจกรรมที่มีประโยชน์ต่อนักศึกษา ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก เพื่อเป็นการพัฒนาตนเอง ในการดำเนินชีวิต',
+    comm1: COMM_1_NAME, comm2: COMM_2_NAME, comm3: COMM_3_NAME, director: DIRECTOR_NAME
+  });
+  document.getElementById('printOnlyContainer').innerHTML = `<div class="memo-page">${k12}</div>${k3}`;
+  setTimeout(() => window.print(), 350);
+}
+
+function printMySelf4(reqId) {
+  const item = lastStatusSubList.find(x => x.req_id === reqId);
+  if (!item) return;
+  const sDate = formatThaiDateWithLabel(item.activity_date);
+  const eDate = formatThaiDateWithLabel(item.activity_end_date);
+  const imgs = [item.img_1, item.img_2, item.img_3].filter(Boolean).map(u => getDriveThumb(u));
+  const k4 = buildKPCH4Html([item], {
+    projName: item.activity_name || '',
+    sDate, eDate,
+    loc: item.location || '',
+    tName: item.teacher_name || ''
+  });
+  const photoPage = imgs.length > 0 ? `<div class="page-break-before"><div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:10px;">ภาพถ่ายประกอบการดำเนินกิจกรรม (${esc(item.student_name)})</div><div class="photo-grid">${imgs.map(u => `<img src="${esc(u)}">`).join('')}</div></div>` : '';
+  document.getElementById('printOnlyContainer').innerHTML = k4 + photoPage;
+  setTimeout(() => window.print(), 500);
 }
 
 function openStudentEditModal(itemType, id) {
-  const item = itemType === '12'
-    ? lastStatus12List.find(x => x.req12_id === id)
-    : lastStatusSubList.find(x => x.req_id === id);
+  const item = itemType === '12' ? lastStatus12List.find(x => x.req12_id === id) : lastStatusSubList.find(x => x.req_id === id);
   if (!item) return;
-
   editCompressedImages = [];
   document.getElementById('se_images').value = '';
   document.getElementById('se_imagePreviewBox').innerHTML = '';
-
   document.getElementById('se_type').value = itemType;
   document.getElementById('se_id').value = id;
   document.getElementById('se_req_id').innerText = id;
@@ -925,21 +805,15 @@ function openStudentEditModal(itemType, id) {
   document.getElementById('se_category').value = item.category || '';
   document.getElementById('se_activity_name').value = item.activity_name || '';
   document.getElementById('se_location').value = item.location || '';
-
   const rejEl = document.getElementById('se_reject_alert');
   const rejMsg = itemType === '12' ? item.reject_reason_12 : item.reject_reason;
-  if (rejMsg) {
-    rejEl.innerHTML = `<b>เหตุผลที่ถูกตีกลับ:</b> ${esc(rejMsg)}`;
-    rejEl.classList.remove('d-none');
-  } else {
-    rejEl.classList.add('d-none');
-  }
+  if (rejMsg) { rejEl.innerHTML = `<b>เหตุผลที่ถูกตีกลับ:</b> ${esc(rejMsg)}`; rejEl.classList.remove('d-none'); }
+  else rejEl.classList.add('d-none');
 
   const is12 = itemType === '12';
   document.getElementById('se_hours_wrap').classList.toggle('d-none', is12);
   document.getElementById('se_p3_wrap').classList.toggle('d-none', !is12);
   document.getElementById('se_k4_wrap').classList.toggle('d-none', is12);
-
   if (is12) {
     document.getElementById('se_start_date').value = toInputDate(item.plan_start_date);
     document.getElementById('se_end_date').value = toInputDate(item.plan_end_date);
@@ -963,9 +837,7 @@ async function saveStudentEdit() {
   const itemType = document.getElementById('se_type').value;
   const sid = document.getElementById('searchStudentId').value.trim();
   const payload = {
-    item_type: itemType,
-    id: document.getElementById('se_id').value,
-    student_id: sid,
+    item_type: itemType, id: document.getElementById('se_id').value, student_id: sid,
     student_name: document.getElementById('se_student_name').value.trim(),
     level: document.getElementById('se_level').value,
     teacher_id: document.getElementById('se_teacher_id').value,
@@ -989,18 +861,13 @@ async function saveStudentEdit() {
     payload.k4_apply = document.getElementById('se_k4_apply').value.trim();
     if (editCompressedImages.length >= 2) payload.images = editCompressedImages;
   }
-
   showLoading('กำลังบันทึกการแก้ไขข้อมูล...');
   try {
     await callApi('studentUpdateRecord', { payload });
-    hideLoading();
-    closeModalById('studentEditModal');
+    hideLoading(); closeModalById('studentEditModal');
     safeAlert('แก้ไขเรียบร้อย ✅', 'ข้อมูลถูกปรับปรุงและส่งกลับให้ครูตรวจสอบใหม่อีกครั้งแล้ว', 'success');
     await searchMyStatus();
-  } catch (err) {
-    hideLoading();
-    safeAlert('ผิดพลาด', err.message, 'error');
-  }
+  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
 // ==================== ล็อคอิน / หลังบ้าน ====================
@@ -1022,32 +889,21 @@ async function handleLogin() {
   showLoading('กำลังเข้าสู่ระบบ...');
   try {
     const res = await callApi('login', { username: u, password: p });
-    hideLoading();
-    authToken = res.token;
-    currentUser = res.user;
+    hideLoading(); authToken = res.token; currentUser = res.user;
     sessionStorage.setItem('kpch_token', authToken);
-    closeModalById('loginModal');
-    document.getElementById('loginPass').value = '';
-    teacherTabMode = 'sub';
-    presentSubMode = 'WAIT';
-    resetDashboardTabViews();
+    closeModalById('loginModal'); document.getElementById('loginPass').value = '';
+    teacherTabMode = 'sub'; presentSubMode = 'WAIT'; resetDashboardTabViews();
     await loadDashboard();
-  } catch (err) {
-    hideLoading();
-    safeAlert('เข้าสู่ระบบไม่สำเร็จ', err.message, 'error');
-  }
+  } catch (err) { hideLoading(); safeAlert('เข้าสู่ระบบไม่สำเร็จ', err.message, 'error'); }
 }
 
 function handleLogout() {
   if (authToken) callApi('logout', { token: authToken }).catch(() => {});
-  authToken = null; currentUser = null;
-  dashItems = []; dash12Items = [];
+  authToken = null; currentUser = null; dashItems = []; dash12Items = [];
   sessionStorage.removeItem('kpch_token');
   document.getElementById('dashboardSection').classList.add('d-none');
   document.getElementById('publicSection').classList.remove('d-none');
-  resetDashboardTabViews();
-  renderNavbar();
-  loadPublicData();
+  resetDashboardTabViews(); renderNavbar(); loadPublicData();
 }
 
 function updateSubmissionsBarsVisibility() {
@@ -1080,22 +936,8 @@ function renderAdminAnnPdfBox(ann) {
   if (!box) return;
   if (ann && ann.pdf_url) {
     box.classList.remove('d-none');
-    box.innerHTML = `
-      <div class="alert alert-light border d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 mb-0 rounded-3 small">
-        <div>
-          <i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i>
-          <b>ไฟล์แนบปัจจุบัน:</b>
-          <a href="${esc(ann.pdf_url)}" target="_blank" class="fw-semibold">${esc(ann.pdf_name || 'เอกสารประกาศ.pdf')}</a>
-        </div>
-        <div class="form-check mb-0">
-          <input class="form-check-input" type="checkbox" id="ann_remove_pdf">
-          <label class="form-check-label text-danger fw-semibold" for="ann_remove_pdf">ลบไฟล์ PDF นี้ออก</label>
-        </div>
-      </div>`;
-  } else {
-    box.classList.add('d-none');
-    box.innerHTML = '';
-  }
+    box.innerHTML = `<div class="alert alert-light border d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 mb-0 rounded-3 small"><div><i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i><b>ไฟล์แนบปัจจุบัน:</b> <a href="${esc(ann.pdf_url)}" target="_blank">${esc(ann.pdf_name || 'PDF')}</a></div><div class="form-check mb-0"><input class="form-check-input" type="checkbox" id="ann_remove_pdf"><label class="form-check-label text-danger fw-semibold" for="ann_remove_pdf">ลบไฟล์ PDF นี้ออก</label></div></div>`;
+  } else { box.classList.add('d-none'); box.innerHTML = ''; }
 }
 
 async function loadDashboard(silentOnExpire = false) {
@@ -1106,10 +948,7 @@ async function loadDashboard(silentOnExpire = false) {
     currentUser = res.user;
     dashItems = res.items || [];
     dash12Items = res.items12 || [];
-    if (res.categories) {
-      kpchCategories = res.categories;
-      populateCategorySelects();
-    }
+    if (res.categories) { kpchCategories = res.categories; populateCategorySelects(); }
     registrarName = res.registrar_name || '';
     adminUsers = res.users || [];
     adminLogs = res.logs || [];
@@ -1119,13 +958,11 @@ async function loadDashboard(silentOnExpire = false) {
     document.getElementById('publicSection').classList.add('d-none');
     document.getElementById('dashboardSection').classList.remove('d-none');
     renderNavbar();
-
     document.getElementById('dashTitle').innerText = `หลังบ้าน: ${ROLE_LABELS[currentUser.role] || currentUser.role}`;
     document.getElementById('dashSubtitle').innerText = `สวัสดีคุณ ${currentUser.full_name} (${currentUser.group_name || '-'})`;
 
     const isAdmin = currentUser.role === 'ADMIN';
     const isTeacher = currentUser.role === 'TEACHER';
-
     document.getElementById('adminNavTabs').classList.toggle('d-none', !isAdmin);
     document.getElementById('teacherNavTabs').classList.toggle('d-none', !isTeacher);
     document.getElementById('adminDelete12Bar')?.classList.toggle('d-none', !isAdmin);
@@ -1135,31 +972,19 @@ async function loadDashboard(silentOnExpire = false) {
       const waitPresent = dashItems.filter(x => x.current_step === 'WAIT_TEACHER_PRESENT').length;
       const sentPresent = dashItems.filter(x => ['APPROVED_FOR_REGISTRAR', 'COMPLETED'].includes(x.current_step)).length;
       const wait12 = dash12Items.filter(x => x.status_12 === 'WAIT_TEACHER_12').length;
-
-      const bSub = document.getElementById('badgeWaitSub');
-      const bPres = document.getElementById('badgeWaitPresent');
-      const b12 = document.getElementById('badgeWait12');
+      const bSub = document.getElementById('badgeWaitSub'), bPres = document.getElementById('badgeWaitPresent'), b12 = document.getElementById('badgeWait12');
       bSub.innerText = waitSub; bSub.classList.toggle('d-none', waitSub === 0);
       bPres.innerText = waitPresent; bPres.classList.toggle('d-none', waitPresent === 0);
       b12.innerText = wait12; b12.classList.toggle('d-none', wait12 === 0);
-
-      const bWaitBtn = document.getElementById('btnPresentWait');
-      const bSentBtn = document.getElementById('btnPresentSent');
-      if (bWaitBtn) bWaitBtn.innerText = `⏳ รอนำส่ง (${waitPresent})`;
-      if (bSentBtn) bSentBtn.innerText = `✅ ส่งแล้ว / ประวัติ (${sentPresent})`;
+      document.getElementById('btnPresentWait').innerText = `⏳ รอนำส่ง (${waitPresent})`;
+      document.getElementById('btnPresentSent').innerText = `✅ ส่งแล้ว / ประวัติ (${sentPresent})`;
     }
 
     const badgeTrash = document.getElementById('badgeTrashCount');
     if (isAdmin) {
-      renderAdminCategories();
-      renderAdminUsers();
-      renderAdminLogs();
-      renderAdminTrash();
+      renderAdminCategories(); renderAdminUsers(); renderAdminLogs(); renderAdminTrash();
       const totalTrash = adminTrashSubs.length + adminTrash12.length;
-      if (badgeTrash) {
-        badgeTrash.innerText = totalTrash;
-        badgeTrash.classList.toggle('d-none', totalTrash === 0);
-      }
+      if (badgeTrash) { badgeTrash.innerText = totalTrash; badgeTrash.classList.toggle('d-none', totalTrash === 0); }
       if (res.announcement) {
         document.getElementById('ann_visible').checked = !!res.announcement.visible;
         document.getElementById('ann_badge').value = res.announcement.badge || '';
@@ -1172,27 +997,17 @@ async function loadDashboard(silentOnExpire = false) {
       document.getElementById('adminTrashView')?.classList.add('d-none');
     }
 
-    if (!isAdmin && !isTeacher) {
-      teacherTabMode = 'sub';
-      resetDashboardTabViews();
-    }
-
+    if (!isAdmin && !isTeacher) { teacherTabMode = 'sub'; resetDashboardTabViews(); }
     populateTermDropdown(document.getElementById('dashTermFilter'), dashItems, getItemTerm);
     populateTermDropdown(document.getElementById('dash12TermFilter'), dash12Items, x => formatTermText(x.term));
     populateDashTeacherFilter();
-
     updateSubmissionsBarsVisibility();
     renderDashboardList();
     if (isTeacher || isAdmin) render12List();
   } catch (err) {
     hideLoading();
-    if (silentOnExpire) {
-      authToken = null;
-      sessionStorage.removeItem('kpch_token');
-      renderNavbar();
-    } else {
-      safeAlert('ผิดพลาด', err.message, 'error');
-    }
+    if (silentOnExpire) { authToken = null; sessionStorage.removeItem('kpch_token'); renderNavbar(); }
+    else safeAlert('ผิดพลาด', err.message, 'error');
   }
 }
 
@@ -1203,43 +1018,27 @@ function switchTeacherTab(tab, btn) {
   const showSubs = (tab === 'sub' || tab === 'present');
   document.getElementById('dashSubmissionsView').classList.toggle('d-none', !showSubs);
   document.getElementById('dash12View').classList.toggle('d-none', tab !== 'req12');
-  if (showSubs) {
-    updateSubmissionsBarsVisibility();
-    renderDashboardList();
-  }
+  if (showSubs) { updateSubmissionsBarsVisibility(); renderDashboardList(); }
 }
 
 function setPresentSubMode(mode, btn) {
   presentSubMode = mode;
-  document.querySelectorAll('#presentSubBtns button').forEach(b => {
-    b.classList.remove('btn-primary', 'active');
-    b.classList.add('btn-outline-secondary');
-  });
-  btn.classList.remove('btn-outline-secondary');
-  btn.classList.add('btn-primary', 'active');
-  updateSubmissionsBarsVisibility();
-  renderDashboardList();
+  document.querySelectorAll('#presentSubBtns button').forEach(b => { b.classList.remove('btn-primary', 'active'); b.classList.add('btn-outline-secondary'); });
+  btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-primary', 'active');
+  updateSubmissionsBarsVisibility(); renderDashboardList();
 }
 
 function setFilterMode(mode, btn) {
   filterMode = mode;
-  document.querySelectorAll('#filterStatusBtns button').forEach(b => {
-    b.classList.remove('btn-primary', 'active');
-    b.classList.add('btn-outline-secondary');
-  });
-  btn.classList.remove('btn-outline-secondary');
-  btn.classList.add('btn-primary', 'active');
+  document.querySelectorAll('#filterStatusBtns button').forEach(b => { b.classList.remove('btn-primary', 'active'); b.classList.add('btn-outline-secondary'); });
+  btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-primary', 'active');
   renderDashboardList();
 }
 
 function setFilter12Mode(mode, btn) {
   filter12Mode = mode;
-  document.querySelectorAll('#filter12Btns button').forEach(b => {
-    b.classList.remove('btn-primary', 'active');
-    b.classList.add('btn-outline-secondary');
-  });
-  btn.classList.remove('btn-outline-secondary');
-  btn.classList.add('btn-primary', 'active');
+  document.querySelectorAll('#filter12Btns button').forEach(b => { b.classList.remove('btn-primary', 'active'); b.classList.add('btn-outline-secondary'); });
+  btn.classList.remove('btn-outline-secondary'); btn.classList.add('btn-primary', 'active');
   render12List();
 }
 
@@ -1254,7 +1053,23 @@ function isMyPendingItem(item) {
   return true;
 }
 
-// ==================== ตาราง กพช.1-3 & เอกสาร 56 (กพช.3) ====================
+// ==================== บันทึกสถานะ "ปริ้นแล้ว" ====================
+async function markPrintedClient(docType, ids) {
+  if (!authToken || !ids || ids.length === 0) return;
+  try {
+    const res = await callApi('markPrinted', { token: authToken, doc_type: docType, ids });
+    const ts = res.printed_at || 'ปริ้นแล้ว';
+    if (docType === '13') {
+      dash12Items.forEach(x => { if (ids.includes(x.req12_id)) x.printed_13_at = ts; });
+      render12List();
+    } else {
+      dashItems.forEach(x => { if (ids.includes(x.req_id)) x.printed_46_at = ts; });
+      renderDashboardList();
+    }
+  } catch (e) { console.warn('markPrinted error:', e); }
+}
+
+// ==================== ตาราง กพช.1-3 & เอกสาร 56 ====================
 function toggleAll12Checks(master) {
   document.querySelectorAll('.chk-12').forEach(cb => cb.checked = master.checked);
 }
@@ -1263,12 +1078,15 @@ function render12List() {
   const kw = document.getElementById('dash12SearchInput').value.toLowerCase().trim();
   const termVal = document.getElementById('dash12TermFilter')?.value || 'ALL';
   const catVal = document.getElementById('dash12CategoryFilter')?.value || 'ALL';
+  const printVal = document.getElementById('dash12PrintFilter')?.value || 'ALL';
   const isAdmin = currentUser.role === 'ADMIN';
 
   const filtered = dash12Items.filter(item => {
     if (filter12Mode === 'PENDING' && item.status_12 !== 'WAIT_TEACHER_12') return false;
     if (!matchesTermFilter(formatTermText(item.term), termVal)) return false;
     if (catVal !== 'ALL' && String(item.category || '').trim() !== catVal) return false;
+    if (printVal === 'PRINTED' && !item.printed_13_at) return false;
+    if (printVal === 'NOT_PRINTED' && !!item.printed_13_at) return false;
     if (kw) {
       const text = `${item.req12_id} ${item.student_id} ${item.student_name} ${item.activity_name} ${item.category || ''} ${item.teacher_name}`.toLowerCase();
       if (!text.includes(kw)) return false;
@@ -1291,6 +1109,9 @@ function render12List() {
   tbody.innerHTML = filtered.map(item => {
     const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
     const canAct = item.status_12 === 'WAIT_TEACHER_12';
+    const printBadge = item.printed_13_at
+      ? `<div class="mt-1"><span class="badge bg-success bg-opacity-15 text-success border border-success">✅ ปริ้นแล้ว</span></div>`
+      : `<div class="mt-1"><span class="badge bg-light text-muted border">⏳ ยังไม่ปริ้น</span></div>`;
     return `
       <tr>
         <td><input type="checkbox" class="chk-12" value="${esc(item.req12_id)}"></td>
@@ -1298,10 +1119,10 @@ function render12List() {
         <td><div class="fw-semibold">${esc(item.student_name)}</div><div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div></td>
         <td class="small">${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border mb-1">${esc(item.category)}</span><br>` : ''}ภาค: ${esc(formatTermText(item.term))}</td>
         <td><div class="fw-semibold">${esc(item.activity_name)}</div><div class="small text-muted">${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} ${item.role_note ? `| <b>${esc(item.role_note)}</b>` : ''}</div></td>
-        <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
+        <td><span class="badge step-badge ${st.cls}">${st.text}</span>${printBadge}</td>
         <td class="text-end text-nowrap">
           <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="open12DetailModal('${esc(item.req12_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูแผน'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-2</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printSingle13('${esc(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-3</button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>`;
@@ -1310,17 +1131,18 @@ function render12List() {
   mobileBox.innerHTML = filtered.map(item => {
     const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
     const canAct = item.status_12 === 'WAIT_TEACHER_12';
+    const printBadge = item.printed_13_at ? `<span class="badge bg-success bg-opacity-15 text-success border border-success ms-1">✅ ปริ้นแล้ว</span>` : '';
     return `
       <div class="mobile-item-card">
         <div class="d-flex justify-content-between align-items-start mb-2">
-          <div><input type="checkbox" class="chk-12 me-2" value="${esc(item.req12_id)}"><span class="fw-bold text-primary">${esc(item.req12_id)}</span></div>
+          <div><input type="checkbox" class="chk-12 me-2" value="${esc(item.req12_id)}"><span class="fw-bold text-primary">${esc(item.req12_id)}</span>${printBadge}</div>
           <span class="badge step-badge ${st.cls}">${st.text}</span>
         </div>
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
-        <div class="small text-muted mb-2"><b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ประเภท:</b> ${esc(item.category || '-')}<br><b>แผนวันที่:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)}</div>
+        <div class="small text-muted mb-2"><b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ประเภท:</b> ${esc(item.category || '-')}</div>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="open12DetailModal('${esc(item.req12_id)}')"><i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer"></i></button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printSingle13('${esc(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-3</button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
       </div>`;
@@ -1330,18 +1152,11 @@ function render12List() {
 function confirmBatchApprove12() {
   const ids = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
   if (ids.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการ กพช.1-3 อย่างน้อย 1 รายการครับ', 'warning');
-  Swal.fire({
-    title: `อนุมัติ กพช.1-3 จำนวน ${ids.length} รายการ?`,
-    icon: 'question', showCancelButton: true,
-    confirmButtonText: 'ยืนยันอนุมัติทั้งหมด', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#10b981'
-  }).then(async res => {
+  Swal.fire({ title: `อนุมัติ กพช.1-3 จำนวน ${ids.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยันอนุมัติทั้งหมด', confirmButtonColor: '#10b981' }).then(async res => {
     if (res.isConfirmed) {
-      showLoading(`กำลังอนุมัติ กพช.1-3 (${ids.length} รายการ)...`);
-      try {
-        const r = await callApi('batchApprove12', { token: authToken, req12_ids: ids });
-        hideLoading(); safeAlert('สำเร็จ 🎉', `อนุมัติเรียบร้อยแล้ว ${r.count} รายการ`, 'success');
-        await loadDashboard();
-      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+      showLoading('กำลังอนุมัติ...');
+      try { const r = await callApi('batchApprove12', { token: authToken, req12_ids: ids }); hideLoading(); safeAlert('สำเร็จ 🎉', `อนุมัติเรียบร้อยแล้ว ${r.count} รายการ`, 'success'); await loadDashboard(); }
+      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
@@ -1350,20 +1165,14 @@ function confirmBatchReject12() {
   const ids = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
   if (ids.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่ต้องการตีกลับอย่างน้อย 1 รายการ', 'warning');
   Swal.fire({
-    title: `ตีกลับ กพช.1-3 (${ids.length} รายการ)`,
-    input: 'textarea',
-    inputLabel: 'ระบุเหตุผลในการตีกลับให้นักศึกษาทราบ',
-    inputPlaceholder: 'เช่น ชื่อกิจกรรมไม่ชัดเจน, เลือกประเภท กพช. ผิด...',
-    showCancelButton: true, confirmButtonText: 'ยืนยันตีกลับ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#ef4444',
+    title: `ตีกลับ กพช.1-3 (${ids.length} รายการ)`, input: 'textarea', inputLabel: 'ระบุเหตุผลในการตีกลับให้นักศึกษาทราบ',
+    inputPlaceholder: 'เช่น ชื่อกิจกรรมไม่ชัดเจน, เลือกประเภท กพช. ผิด...', showCancelButton: true, confirmButtonText: 'ยืนยันตีกลับ', confirmButtonColor: '#ef4444',
     inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลในการตีกลับด้วยครับ'; }
   }).then(async res => {
     if (res.isConfirmed) {
       showLoading('กำลังบันทึกการตีกลับ...');
-      try {
-        const r = await callApi('batchReject12', { token: authToken, req12_ids: ids, reason: res.value.trim() });
-        hideLoading(); safeAlert('ตีกลับเรียบร้อย', `ส่งคืนให้นักศึกษาแก้ไข ${r.count} รายการแล้ว`, 'success');
-        await loadDashboard();
-      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+      try { const r = await callApi('batchReject12', { token: authToken, req12_ids: ids, reason: res.value.trim() }); hideLoading(); safeAlert('ตีกลับเรียบร้อย', `ส่งคืนให้นักศึกษาแก้ไข ${r.count} รายการแล้ว`, 'success'); await loadDashboard(); }
+      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
@@ -1376,19 +1185,11 @@ function confirmBatchDelete12() {
 
 function confirmDelete12(req12Ids) {
   if (!currentUser || currentUser.role !== 'ADMIN') return safeAlert('ไม่มีสิทธิ์', 'เฉพาะ Admin เท่านั้น', 'error');
-  Swal.fire({
-    title: `ย้ายข้อมูล กพช.1-3 (${req12Ids.length} รายการ) ลงถังขยะ?`,
-    icon: 'warning', showCancelButton: true,
-    confirmButtonText: '🗑️ ย้ายลงถังขยะ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
-  }).then(async res => {
+  Swal.fire({ title: `ย้ายข้อมูล กพช.1-3 (${req12Ids.length} รายการ) ลงถังขยะ?`, icon: 'warning', showCancelButton: true, confirmButtonText: '🗑️ ย้ายลงถังขยะ', confirmButtonColor: '#dc2626' }).then(async res => {
     if (res.isConfirmed) {
       showLoading('กำลังย้ายลงถังขยะ...');
-      try {
-        const r = await callApi('deleteApprovals12', { token: authToken, req12_ids: req12Ids });
-        hideLoading(); closeModalById('detailModal');
-        safeAlert('เรียบร้อย 🗑️', `ย้ายลงถังขยะแล้ว ${r.count} รายการ`, 'success');
-        await loadDashboard();
-      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+      try { const r = await callApi('deleteApprovals12', { token: authToken, req12_ids: req12Ids }); hideLoading(); closeModalById('detailModal'); safeAlert('เรียบร้อย 🗑️', `ย้ายลงถังขยะแล้ว ${r.count} รายการ`, 'success'); await loadDashboard(); }
+      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
@@ -1425,7 +1226,7 @@ function open12DetailModal(req12Id) {
   const isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
     <div class="d-flex flex-wrap gap-2">
-      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช.1 และ กพช.2</button>
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="closeModalById('detailModal'); printSingle13('${esc(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 1-3</button>
       ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -1439,59 +1240,56 @@ function submitDecision12(req12Id, decision) {
   closeModalById('detailModal');
   setTimeout(() => {
     if (decision === 'APPROVE') {
-      Swal.fire({
-        title: 'อนุมัติคำขอ กพช.1-3?',
-        text: `อนุญาตให้นักศึกษาดำเนินกิจกรรมตามคำขอ ${req12Id} ใช่หรือไม่`,
-        icon: 'question', showCancelButton: true,
-        confirmButtonText: 'ยืนยันอนุมัติ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#10b981'
-      }).then(res => { if (res.isConfirmed) executeApproval12(req12Id, 'APPROVE', ''); });
+      Swal.fire({ title: 'อนุมัติคำขอ กพช.1-3?', text: `อนุญาตให้นักศึกษาดำเนินกิจกรรมตามคำขอ ${req12Id} ใช่หรือไม่`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยันอนุมัติ', confirmButtonColor: '#10b981' }).then(res => { if (res.isConfirmed) executeApproval12(req12Id, 'APPROVE', ''); });
     } else {
-      Swal.fire({
-        title: 'ระบุเหตุผลในการตีกลับ กพช.1-3',
-        input: 'textarea',
-        inputPlaceholder: 'เช่น ชื่อกิจกรรมไม่ชัดเจน / เลือกประเภท กพช. ผิด กรุณาปรับแก้ไข...',
-        showCancelButton: true, confirmButtonText: 'ส่งตีกลับ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#ef4444',
-        inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลด้วยครับ'; }
-      }).then(res => { if (res.isConfirmed) executeApproval12(req12Id, 'REJECT', res.value); });
+      Swal.fire({ title: 'ระบุเหตุผลในการตีกลับ กพช.1-3', input: 'textarea', inputPlaceholder: 'เช่น ชื่อกิจกรรมไม่ชัดเจน / เลือกประเภท กพช. ผิด...', showCancelButton: true, confirmButtonText: 'ส่งตีกลับ', confirmButtonColor: '#ef4444', inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลด้วยครับ'; } }).then(res => { if (res.isConfirmed) executeApproval12(req12Id, 'REJECT', res.value); });
     }
   }, 220);
 }
 
 async function executeApproval12(req12Id, decision, reason) {
   showLoading('กำลังบันทึกผล กพช.1-3...');
-  try {
-    await callApi('processApproval12', { token: authToken, req12_id: req12Id, decision, reason });
-    hideLoading(); safeAlert('สำเร็จ', 'บันทึกผลการพิจารณา กพช.1-3 เรียบร้อยแล้ว', 'success');
-    await loadDashboard();
-  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+  try { await callApi('processApproval12', { token: authToken, req12_id: req12Id, decision, reason }); hideLoading(); safeAlert('สำเร็จ', 'บันทึกผลการพิจารณา กพช.1-3 เรียบร้อยแล้ว', 'success'); await loadDashboard(); }
+  catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
-// ==================== จัดชุด & พิมพ์เอกสาร 56 (กพช. 3) ====================
+// ==================== พิมพ์ชุด กพช. 1-3 (บังคับติ๊กเลือกเท่านั้น + ระยะข้อ 9-10 กระชับไม่เว้นหน้าว่าง) ====================
+function printSingle13(req12Id) {
+  const item = dash12Items.find(x => x.req12_id === req12Id);
+  if (!item) return;
+  openDoc56ModalWithItems([item]);
+}
+
 function openDoc56PrintModal() {
   const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
-  _doc56Items = checkedIds.length > 0 ? currentFiltered12.filter(x => checkedIds.includes(x.req12_id)) : currentFiltered12;
-  if (_doc56Items.length === 0) return safeAlert('ไม่พบรายชื่อ', 'กรุณาเลือกประเภท กพช. หรือติ๊กเลือกรายชื่อนักศึกษาอย่างน้อย 1 คนก่อนสั่งพิมพ์', 'warning');
+  if (checkedIds.length === 0) {
+    return safeAlert('กรุณาติ๊กเลือกรายชื่อ', 'กรุณาติ๊กถูกหน้ารายชื่อนักศึกษาที่ต้องการพิมพ์ กพช. 1-3 อย่างน้อย 1 คนก่อนครับ (ระบบจะพิมพ์เฉพาะคนที่ติ๊กเลือกเท่านั้น)', 'warning');
+  }
+  const items = dash12Items.filter(x => checkedIds.includes(x.req12_id));
+  openDoc56ModalWithItems(items);
+}
 
-  const first = _doc56Items[0];
-  document.getElementById('d56_count').innerText = _doc56Items.length;
+function openDoc56ModalWithItems(items) {
+  _doc56Items = items;
+  const first = items[0];
+  document.getElementById('d56_count').innerText = items.length;
+  document.getElementById('d56_include_12').checked = false;
+  document.getElementById('d56_doc_no').value = 'ศธ 07058.02/';
+  document.getElementById('d56_doc_date').value = formatThaiDate();
+  document.getElementById('d56_advisor_pos').value = 'บรรณารักษ์ / ครูประจำกลุ่ม';
   document.getElementById('d56_project_name').value = first.activity_name || '';
   document.getElementById('d56_hours').value = first.hours || 25;
-  document.getElementById('d56_rationale').value = first.p3_rationale ||
-    'กิจกรรมพัฒนาคุณภาพชีวิต (กพช.) เป็นกิจกรรมที่เป็นองค์ประกอบสำคัญส่วนหนึ่งในโครงสร้างที่กำหนดไว้ในหลักเกณฑ์ และวิธีการจัดการศึกษานอกระบบระดับการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 บันทึกความดี มุ่งเน้นให้เกิดการพัฒนาตนเอง กิจกรรมพัฒนาคุณภาพชีวิต บันทึกความดี จะส่งผลต่อการพัฒนาตนเอง ครอบครัว ชุมชน สังคมและประเทศชาติ เพื่อให้ดำรงอยู่ในสังคมอย่างมีความสุข';
-  document.getElementById('d56_objectives').value = first.p3_objectives ||
-    '3.1 เพื่อเป็นการเปลี่ยนแปลงในการพัฒนาตนเอง ให้มีระเบียบ วินัย และการเสียสละ\n3.2 เพื่อส่งเสริมให้เป็นผู้มีน้ำใจ เสียสละ ในการพัฒนาตนเอง ครอบครัว ชุมชน สังคมและประเทศชาติ';
-  document.getElementById('d56_target').value = first.p3_target ||
-    'นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย';
-  document.getElementById('d56_steps').value = first.p3_steps ||
-    '5.1 วางแผนการจัดกิจกรรม\n5.2 ปรึกษาอาจารย์ที่ปรึกษา\n5.3 เข้าร่วมโครงการ\n5.4 เสนอโครงการการจัดกิจกรรมฯ ต่อสถานศึกษาเพื่อให้คณะกรรมการพิจารณาอนุมัติโครงการ\n5.5 ดำเนินจัดกิจกรรมตามแผนที่กำหนด สรุปผลและรายงานผลการดำเนินงาน\n5.6 สรุปผลและรายงานผลการดำเนินงาน และขออนุมัติชั่วโมง กพช.';
+  document.getElementById('d56_rationale').value = first.p3_rationale || 'กิจกรรมพัฒนาคุณภาพชีวิต (กพช.) เป็นกิจกรรมที่เป็นองค์ประกอบสำคัญส่วนหนึ่งในโครงสร้างที่กำหนดไว้ในหลักเกณฑ์ และวิธีการจัดการศึกษานอกระบบระดับการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 มุ่งเน้นให้เกิดการพัฒนาตนเอง ครอบครัว ชุมชน สังคมและประเทศชาติ เพื่อให้ดำรงอยู่ในสังคมอย่างมีความสุข';
+  document.getElementById('d56_objectives').value = first.p3_objectives || '3.1 เพื่อเป็นการเปลี่ยนแปลงในการพัฒนาตนเอง ให้มีระเบียบ วินัย และการเสียสละ\n3.2 เพื่อส่งเสริมให้เป็นผู้มีน้ำใจ เสียสละ ในการพัฒนาตนเอง ครอบครัว ชุมชน สังคมและประเทศชาติ';
+  document.getElementById('d56_target').value = first.p3_target || 'นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย';
+  document.getElementById('d56_steps').value = first.p3_steps || '5.1 วางแผนการจัดกิจกรรม\n5.2 ปรึกษาอาจารย์ที่ปรึกษา\n5.3 เข้าร่วมโครงการ\n5.4 เสนอโครงการการจัดกิจกรรมฯ ต่อสถานศึกษาเพื่อให้คณะกรรมการพิจารณาอนุมัติโครงการ\n5.5 ดำเนินจัดกิจกรรมตามแผนที่กำหนด สรุปผลและรายงานผลการดำเนินงาน\n5.6 สรุปผลและรายงานผลการดำเนินงาน และขออนุมัติชั่วโมง กพช.';
   document.getElementById('d56_location').value = first.location || 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง จังหวัดปทุมธานี';
   document.getElementById('d56_start_date').value = toInputDate(first.plan_start_date);
   document.getElementById('d56_end_date').value = toInputDate(first.plan_end_date);
   document.getElementById('d56_budget').value = first.p3_budget || '-';
   document.getElementById('d56_material').value = first.p3_material || 'หนังสือ';
   document.getElementById('d56_labor').value = first.p3_labor || 'นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง';
-  document.getElementById('d56_expected').value = first.p3_expected ||
-    'นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก เพื่อเป็นการพัฒนาตนเอง ในการดำเนินชีวิต ให้มีความรู้ ความเข้าใจ รู้จักคิดวิเคราะห์อย่างเป็นระบบ สามารถนำความรู้และประสบการณ์ที่ได้รับมาประยุกต์ใช้ในชีวิตประจำวัน';
+  document.getElementById('d56_expected').value = first.p3_expected || 'นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก สามารถนำความรู้และประสบการณ์ที่ได้รับมาประยุกต์ใช้ในชีวิตประจำวัน';
   document.getElementById('d56_advisor').value = first.teacher_name || (currentUser?.full_name || '');
   document.getElementById('d56_comm1').value = COMM_1_NAME;
   document.getElementById('d56_comm2').value = COMM_2_NAME;
@@ -1500,158 +1298,167 @@ function openDoc56PrintModal() {
   openModalById('doc56Modal');
 }
 
-function executePrintDoc56() {
-  const items = _doc56Items;
-  const projName = document.getElementById('d56_project_name').value.trim();
-  const hours = document.getElementById('d56_hours').value || '25';
-  const rationale = document.getElementById('d56_rationale').value;
-  const objectives = document.getElementById('d56_objectives').value;
-  const target = document.getElementById('d56_target').value;
-  const steps = document.getElementById('d56_steps').value;
-  const loc = document.getElementById('d56_location').value;
-  const sDate = formatThaiDateWithLabel(document.getElementById('d56_start_date').value);
-  const eDate = formatThaiDateWithLabel(document.getElementById('d56_end_date').value);
-  const budget = document.getElementById('d56_budget').value;
-  const material = document.getElementById('d56_material').value;
-  const labor = document.getElementById('d56_labor').value;
-  const expected = document.getElementById('d56_expected').value;
-  const advisor = document.getElementById('d56_advisor').value;
-  const tOpinion = document.getElementById('d56_teacher_opinion').value;
-  const comm1 = document.getElementById('d56_comm1').value;
-  const comm2 = document.getElementById('d56_comm2').value;
-  const comm3 = document.getElementById('d56_comm3').value;
-  const director = document.getElementById('d56_director').value;
-
+function buildKPCH3BodyHtml(items, cfg) {
   const isGroup = items.length > 1;
   const leader = items.find(i => (i.role_note || '').includes('ประธาน')) || items[0];
   const rowsHtml = items.map((s, idx) => `
     <tr><td style="text-align:center;">${idx + 1}</td><td>${esc(s.student_name)}</td><td style="text-align:center;">${esc(s.student_id)}</td><td style="text-align:center;">${esc(s.role_note || (idx === 0 && isGroup ? 'ประธาน' : ''))}</td><td style="text-align:center;">${esc(s.level || '')}</td></tr>`).join('');
 
-  document.getElementById('printOnlyContainer').innerHTML = `
-  <div style="line-height:1.4; font-size:15.5pt;">
-    <div class="memo-page">
-      <div class="kpch-box-tag">กพช. 3</div>
-      <div class="doc-title-center">แบบเสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับผู้เรียน)</div>
-      <div style="margin-top:8px;"><b>ส่วนที่ 1 สำหรับผู้เรียน</b></div>
-      <div>เสนอต่อสถานศึกษา (ชื่อสถานศึกษา) &nbsp;&nbsp;&nbsp; <b>${SCHOOL_NAME}</b></div>
-      <div><b>1. ชื่อโครงการ</b> &nbsp;&nbsp; ${esc(projName)}</div>
-      <div><b>2. หลักการและเหตุผล</b><div class="doc-section-indent">${esc(rationale).replace(/\n/g,'<br>')}</div></div>
-      <div><b>3. วัตถุประสงค์</b><div class="doc-section-indent">${esc(objectives).replace(/\n/g,'<br>')}</div></div>
-      <div><b>4. เป้าหมาย</b><div class="doc-section-indent">${esc(target).replace(/\n/g,'<br>')}</div></div>
-      <div><b>5. ขั้นตอน/แผนการปฏิบัติโครงการ</b><div class="doc-section-indent">${esc(steps).replace(/\n/g,'<br>')}</div></div>
-      <div><b>6. สถานที่ดำเนินการ</b><div class="doc-section-indent">${esc(loc)}</div></div>
-      <div><b>7. ระยะเวลาการดำเนินโครงการ</b><div class="doc-section-indent">ระหว่างวันที่ ${sDate} ถึงวันที่ ${eDate}</div></div>
-      <div><b>8. ปัจจัยในการดำเนินโครงการ</b><div class="doc-section-indent">8.1 เงิน ${esc(budget)}<br>8.2 วัสดุ ${esc(material)}<br>8.3 แรงงาน ${esc(labor)}</div></div>
-      <div><b>9. ผลที่คาดว่าจะได้รับ</b><div class="doc-section-indent">${esc(expected).replace(/\n/g,'<br>')}</div></div>
-    </div>
-    <div class="memo-page">
-      <div style="text-align:center; margin-bottom:6px;">-2-</div>
-      <div><b>10. ผู้รับผิดชอบโครงการ</b> ชื่อ ${isGroup ? '........................................' : esc(leader.student_name)} รหัส ${isGroup ? '........................' : esc(leader.student_id)} (กรณีเสนอเป็นรายบุคคล)</div>
-      <div><b>11. ผู้รับผิดชอบโครงการ</b> จำนวน ${isGroup ? items.length : '............'} คน ได้แก่ ${isGroup ? esc(leader.student_name) + ' และคณะ' : '........................................'} (กรณีเสนอเป็นกลุ่ม)</div>
-      <div style="text-align:center; font-weight:bold; margin-top:8px;">รายชื่อผู้เข้าร่วมทำ${esc(projName)}</div>
-      <table class="doc-table"><thead><tr><th style="width:45px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:130px;">รหัสนักศึกษา</th><th style="width:110px;">หมายเหตุ</th><th style="width:110px;">ระดับ</th></tr></thead><tbody>${rowsHtml}</tbody></table>
-      <div style="margin-top:10px;"><b>12. ที่ปรึกษาโครงการ</b><br>&nbsp;&nbsp;&nbsp;&nbsp;1. ${esc(advisor)}</div>
-      <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................ผู้เสนอ/ประธานโครงการ<br>(${esc(leader.student_name)})</div>
-      <div style="font-size:14pt !important; margin-top:8px;"><b>หมายเหตุ</b> ผู้เสนอ/ประธานโครงการ คัดเลือกจากนักศึกษาที่เข้าร่วมโครงการ หากทำโครงการคนเดียว ก็ถือว่าเป็นผู้เสนอและประธาน ด้วย</div>
-      <div style="margin-top:10px;"><b>ส่วนที่ 2 สำหรับสถานศึกษา</b><br>ความเห็นครูผู้รับผิดชอบกลุ่มนักศึกษาที่จัดทำกิจกรรม กพช.<br><div class="doc-section-indent">${esc(tOpinion)}</div></div>
-      <div class="sig-center" style="margin-left:35%;">ลงชื่อ..................................................ครูผู้รับผิดชอบกลุ่มนักศึกษาที่ทำกิจกรรม กพช.<br>(${esc(advisor)})</div>
-    </div>
-    <div>
+  return `
+  <div style="line-height:1.28; font-size:14.5pt;">
+    <div class="kpch-box-tag">กพช. 3</div>
+    <div class="doc-title-center" style="font-size:17pt !important;">แบบเสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต (สำหรับผู้เรียน)</div>
+    <div style="margin-top:4px;"><b>ส่วนที่ 1 สำหรับผู้เรียน</b> &nbsp;|&nbsp; เสนอต่อสถานศึกษา <b>${SCHOOL_NAME}</b></div>
+    <div><b>1. ชื่อโครงการ</b> &nbsp; ${esc(cfg.projName)}</div>
+    <div><b>2. หลักการและเหตุผล</b><div class="doc-section-indent">${esc(cfg.rationale).replace(/\n/g,'<br>')}</div></div>
+    <div><b>3. วัตถุประสงค์</b><div class="doc-section-indent">${esc(cfg.objectives).replace(/\n/g,'<br>')}</div></div>
+    <div><b>4. เป้าหมาย</b><div class="doc-section-indent">${esc(cfg.target).replace(/\n/g,'<br>')}</div></div>
+    <div><b>5. ขั้นตอน/แผนการปฏิบัติโครงการ</b><div class="doc-section-indent">${esc(cfg.steps).replace(/\n/g,'<br>')}</div></div>
+    <div><b>6. สถานที่ดำเนินการ</b> &nbsp; ${esc(cfg.loc)}</div>
+    <div><b>7. ระยะเวลาการดำเนินโครงการ</b> &nbsp; ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate}</div>
+    <div><b>8. ปัจจัยในการดำเนินโครงการ</b> &nbsp; 8.1 เงิน ${esc(cfg.budget)} &nbsp; 8.2 วัสดุ ${esc(cfg.material)} &nbsp; 8.3 แรงงาน ${esc(cfg.labor)}</div>
+    <div style="margin-bottom:4px;"><b>9. ผลที่คาดว่าจะได้รับ</b><div class="doc-section-indent">${esc(cfg.expected).replace(/\n/g,'<br>')}</div></div>
+    <div><b>10. ผู้รับผิดชอบโครงการ</b> ชื่อ ${isGroup ? '........................................' : esc(leader.student_name)} รหัส ${isGroup ? '........................' : esc(leader.student_id)} (กรณีเสนอเป็นรายบุคคล)</div>
+    <div><b>11. ผู้รับผิดชอบโครงการ</b> จำนวน ${isGroup ? items.length : '............'} คน ได้แก่ ${isGroup ? esc(leader.student_name) + ' และคณะ' : '........................................'} (กรณีเสนอเป็นกลุ่ม)</div>
+    <div style="text-align:center; font-weight:bold; margin-top:4px;">รายชื่อผู้เข้าร่วมทำ${esc(cfg.projName)}</div>
+    <table class="doc-table" style="font-size:14pt !important;">
+      <thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสนักศึกษา</th><th style="width:105px;">หมายเหตุ</th><th style="width:105px;">ระดับ</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div style="margin-top:6px;"><b>12. ที่ปรึกษาโครงการ</b> &nbsp;&nbsp; 1. ${esc(cfg.advisor)}</div>
+    <div class="sig-center" style="margin-left:38%; margin-top:10px;">ลงชื่อ..................................................ผู้เสนอ/ประธานโครงการ<br>(${esc(leader.student_name)})</div>
+    <div style="font-size:13.5pt !important; margin-top:4px;"><b>หมายเหตุ</b> ผู้เสนอ/ประธานโครงการ คัดเลือกจากนักศึกษาที่เข้าร่วมโครงการ หากทำโครงการคนเดียว ก็ถือว่าเป็นผู้เสนอและประธาน ด้วย</div>
+    <div style="margin-top:6px;"><b>ส่วนที่ 2 สำหรับสถานศึกษา</b> &nbsp; ความเห็นครูผู้รับผิดชอบกลุ่มนักศึกษาที่จัดทำกิจกรรม กพช.<div class="doc-section-indent">${esc(cfg.tOpinion)}</div></div>
+    <div class="sig-center" style="margin-left:35%; margin-top:10px;">ลงชื่อ..................................................ครูผู้รับผิดชอบกลุ่มนักศึกษาที่ทำกิจกรรม กพช.<br>(${esc(cfg.advisor)})</div>
+
+    <div class="page-break-before" style="page-break-inside:avoid;">
       <div><b>ความเห็นชอบของคณะกรรมการพิจารณาและประเมินผลการปฏิบัติโครงการ กพช.</b></div>
-      <div style="margin-left:1.5cm; margin-top:4px;">&#9744; เห็นควรดำเนินการได้ โดยประมาณค่าหน่วยกิจกรรมโครงการนี้ จำนวน ......<b>${esc(hours)}</b>...... ชั่วโมง<br>&#9744; ควรปรับปรุงแก้ไข<br>1. ..............................................................................................................<br>2. ..............................................................................................................<br>3. ..............................................................................................................</div>
-      <div class="sig-center" style="margin-top:18px;">
-        ลงชื่อ.................................................. ประธานคณะกรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(comm1)})<br><br>
-        ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(comm2)})<br><br>
-        ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการและเลขานุการ<br>(${esc(comm3)})
+      <div style="margin-left:1.5cm; margin-top:4px;">&#9744; เห็นควรดำเนินการได้ โดยประมาณค่าหน่วยกิจกรรมโครงการนี้ จำนวน ......<b>${esc(cfg.hours)}</b>...... ชั่วโมง<br>&#9744; ควรปรับปรุงแก้ไข<br>1. ..............................................................................................................<br>2. ..............................................................................................................<br>3. ..............................................................................................................</div>
+      <div class="sig-center" style="margin-top:16px;">
+        ลงชื่อ.................................................. ประธานคณะกรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(cfg.comm1)})<br><br>
+        ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(cfg.comm2)})<br><br>
+        ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการและเลขานุการ<br>(${esc(cfg.comm3)})
       </div>
-      <div class="sig-row-2" style="margin-top:26px;">
+      <div class="sig-row-2" style="margin-top:24px;">
         <div class="sig-col" style="text-align:left;"><b>เสนอหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................นายทะเบียน<br>(${registrarName ? esc(registrarName) : '..........................................'})</div></div>
-        <div class="sig-col" style="text-align:left;"><b>ความเห็นของหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................<br>(${esc(director)})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>วันที่............เดือน....................พ.ศ. .........</div></div>
+        <div class="sig-col" style="text-align:left;"><b>ความเห็นของหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................<br>(${esc(cfg.director)})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>วันที่............เดือน....................พ.ศ. .........</div></div>
       </div>
     </div>
   </div>`;
-  closeModalById('doc56Modal');
-  setTimeout(() => window.print(), 350);
 }
 
-// ==================== พิมพ์ กพช.1 และ กพช.2 ====================
-function printForm12(req12Id) {
-  const item = dash12Items.find(x => x.req12_id === req12Id);
-  if (!item) return;
+function buildKPCH12Html(item) {
   const nameParts = (item.student_name || '').trim().split(/\s+/);
-  const firstName = nameParts[0] || '';
-  const lastName = nameParts.slice(1).join(' ') || '-';
+  const firstName = nameParts[0] || '', lastName = nameParts.slice(1).join(' ') || '-';
   const termObj = parseTermParts(item.term);
   const dotsStr = '.'.repeat(120);
   const dotSpan = `<span style="flex:1; min-width:12px; overflow:hidden; white-space:nowrap; letter-spacing:1px;">${dotsStr}</span>`;
   const makeDotFlex = (val, extraStyle = '') => {
     const clean = esc(val);
-    return !clean
-      ? `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>`
-      : `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
+    return !clean ? `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
   };
   const makeDotInline = (val, extraStyle = '') => {
     const clean = esc(val);
-    return !clean
-      ? `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>`
-      : `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
+    return !clean ? `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
   };
   const blankDateLine = '<span style="letter-spacing:1px;">........./................../..............</span>';
   const regNameDisplay = registrarName ? esc(registrarName) : '<span style="letter-spacing:1px;">....................................</span>';
-  const fillRowStyle = 'display:flex; align-items:center; gap:10px; margin-bottom:14px; line-height:1.3;';
-  const sigRowStyle = 'display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; line-height:1.3;';
   let scores = [];
   try { scores = JSON.parse(item.eval_scores || '[]'); } catch (e) {}
-  const evalRowsHtml = EVAL_QUESTIONS_12.map((q, i) => {
-    const val = scores[i] || '';
-    return `<tr><td style="text-align:center;">${i + 1}</td><td>${q}</td><td style="text-align:center; font-weight:bold;">${val === 'มาก' ? '✓' : ''}</td><td style="text-align:center; font-weight:bold;">${val === 'ปานกลาง' ? '✓' : ''}</td><td style="text-align:center; font-weight:bold;">${val === 'น้อย' ? '✓' : ''}</td><td></td></tr>`;
-  }).join('');
-  const passChecked = item.status_12 !== 'REJECTED_12';
-  const rejectChecked = item.status_12 === 'REJECTED_12';
+  const evalRowsHtml = EVAL_QUESTIONS_12.map((q, i) => `<tr><td style="text-align:center;">${i + 1}</td><td>${q}</td><td style="text-align:center; font-weight:bold;">${scores[i] === 'มาก' ? '✓' : ''}</td><td style="text-align:center; font-weight:bold;">${scores[i] === 'ปานกลาง' ? '✓' : ''}</td><td style="text-align:center; font-weight:bold;">${scores[i] === 'น้อย' ? '✓' : ''}</td><td></td></tr>`).join('');
+  const passChecked = item.status_12 !== 'REJECTED_12', rejectChecked = item.status_12 === 'REJECTED_12';
 
-  document.getElementById('printOnlyContainer').innerHTML = `
-    <div class="memo-page" style="padding: 10px 16px; line-height: 1.9; font-size: 16pt;">
-      <div style="text-align:right; font-weight:bold; margin-bottom:14px;">กพช. 1</div>
+  return `
+    <div class="memo-page" style="padding: 10px 16px; line-height: 1.85; font-size: 16pt;">
+      <div style="text-align:right; font-weight:bold; margin-bottom:12px;">กพช. 1</div>
       <div style="text-align:center; font-weight:bold; font-size:18pt; margin-bottom:12px;">แบบลงทะเบียนกิจกรรมพัฒนาคุณภาพชีวิต (รายบุคคล)</div>
       <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:8px;"><b>สถานศึกษา</b>${makeDotInline(SCHOOL_NAME, 'width:390px;')}</div>
-      <div style="display:flex; justify-content:center; align-items:center; gap:6px; margin-bottom:28px;"><b>ภาคเรียนที่</b>${makeDotInline(termObj.no, 'width:65px;')}<span>/</span>${makeDotInline(termObj.year, 'width:95px;')}</div>
-      <div style="${fillRowStyle}"><span>ชื่อ</span>${makeDotFlex(firstName)}<span>สกุล</span>${makeDotFlex(lastName)}<span>รหัสประจำตัวนักศึกษา</span>${makeDotFlex(item.student_id, 'flex:0.9;')}</div>
-      <div style="${fillRowStyle}"><span>ระดับ</span>${makeDotFlex(item.level)}<span>กลุ่ม/กศน.ตำบล</span>${makeDotFlex(item.group_name || '-', 'flex:1.3;')}</div>
-      <div style="${fillRowStyle} margin-bottom:44px;"><span>ครูรับผิดชอบ</span>${makeDotFlex(item.teacher_name)}</div>
-      <div style="text-align:center; margin-bottom:68px;"><span style="${sigRowStyle}">ลงชื่อ${makeDotInline('', 'width:200px; margin:0 6px;')}นักศึกษา</span><br>( ${esc(item.student_name)} )<br>${blankDateLine}</div>
-      <div style="display:flex; justify-content:space-between; text-align:center; margin-top:40px;">
-        <div style="width:48%;"><span style="${sigRowStyle}">ลงชื่อ${makeDotInline('', 'width:140px; margin:0 6px;')}ผู้รับลงทะเบียน</span><br>( ${esc(item.teacher_name)} )<br>${blankDateLine}</div>
-        <div style="width:48%;"><span style="${sigRowStyle}">ลงชื่อ${makeDotInline('', 'width:140px; margin:0 6px;')}นายทะเบียน</span><br>( ${regNameDisplay} )<br>${blankDateLine}</div>
+      <div style="display:flex; justify-content:center; align-items:center; gap:6px; margin-bottom:26px;"><b>ภาคเรียนที่</b>${makeDotInline(termObj.no, 'width:65px;')}<span>/</span>${makeDotInline(termObj.year, 'width:95px;')}</div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;"><span>ชื่อ</span>${makeDotFlex(firstName)}<span>สกุล</span>${makeDotFlex(lastName)}<span>รหัสประจำตัวนักศึกษา</span>${makeDotFlex(item.student_id, 'flex:0.9;')}</div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;"><span>ระดับ</span>${makeDotFlex(item.level)}<span>กลุ่ม/กศน.ตำบล</span>${makeDotFlex(item.group_name || '-', 'flex:1.3;')}</div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:40px;"><span>ครูรับผิดชอบ</span>${makeDotFlex(item.teacher_name)}</div>
+      <div style="text-align:center; margin-bottom:60px;">ลงชื่อ${makeDotInline('', 'width:200px; margin:0 6px;')}นักศึกษา<br>( ${esc(item.student_name)} )<br>${blankDateLine}</div>
+      <div style="display:flex; justify-content:space-between; text-align:center;">
+        <div style="width:48%;">ลงชื่อ${makeDotInline('', 'width:140px; margin:0 6px;')}ผู้รับลงทะเบียน<br>( ${esc(item.teacher_name)} )<br>${blankDateLine}</div>
+        <div style="width:48%;">ลงชื่อ${makeDotInline('', 'width:140px; margin:0 6px;')}นายทะเบียน<br>( ${regNameDisplay} )<br>${blankDateLine}</div>
       </div>
     </div>
-    <div style="padding: 4px 8px; line-height: 1.4;">
+    <div class="memo-page" style="padding: 4px 8px; line-height: 1.38;">
       <div style="text-align:right; font-weight:bold; font-size:15pt;">กพช. 2</div>
       <div style="text-align:center; font-weight:bold; font-size:17pt; margin-bottom:6px;">แบบประเมินตนเองกิจกรรมพัฒนาคุณภาพชีวิต</div>
       <div style="font-weight:bold; font-size:15pt; margin-bottom:4px;">ส่วนที่ 1 สำหรับผู้เรียน</div>
-      <div style="font-size:14.5pt; margin-bottom:10px; line-height:1.3;">
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;"><span>ชื่อสถานศึกษา</span>${makeDotFlex(SCHOOL_NAME)}</div>
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;"><span>ชื่อ-สกุล</span>${makeDotFlex(item.student_name)}<span>รหัสประจำตัวนักศึกษา</span>${makeDotFlex(item.student_id, 'flex:0.8;')}</div>
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;"><span>ระดับการศึกษา</span>${makeDotFlex(item.level)}<span>ศูนย์การเรียน</span>${makeDotFlex(item.group_name || '-')}</div>
-        <div style="display:flex; align-items:center; gap:10px;"><span>ครูผู้รับผิดชอบ</span>${makeDotFlex(item.teacher_name)}</div>
+      <div style="font-size:14.5pt; margin-bottom:10px;">
+        <div style="display:flex; gap:10px; margin-bottom:5px;"><span>ชื่อสถานศึกษา</span>${makeDotFlex(SCHOOL_NAME)}</div>
+        <div style="display:flex; gap:10px; margin-bottom:5px;"><span>ชื่อ-สกุล</span>${makeDotFlex(item.student_name)}<span>รหัสประจำตัวนักศึกษา</span>${makeDotFlex(item.student_id, 'flex:0.8;')}</div>
+        <div style="display:flex; gap:10px; margin-bottom:5px;"><span>ระดับการศึกษา</span>${makeDotFlex(item.level)}<span>ศูนย์การเรียน</span>${makeDotFlex(item.group_name || '-')}</div>
+        <div style="display:flex; gap:10px;"><span>ครูผู้รับผิดชอบ</span>${makeDotFlex(item.teacher_name)}</div>
       </div>
-      <table class="batch-table" style="font-size:13.5pt !important;">
-        <thead><tr><th rowspan="2" style="width:5%;">ที่</th><th rowspan="2" style="width:57%;">รายการ</th><th colspan="3" style="width:26%;">ระดับความรู้ความเข้าใจ</th><th rowspan="2" style="width:12%;">หมายเหตุ</th></tr><tr><th>มาก</th><th>ปานกลาง</th><th>น้อย</th></tr></thead>
-        <tbody>${evalRowsHtml}</tbody>
-      </table>
-      <div style="text-align:center; margin:12px 0; font-size:15pt;"><span style="${sigRowStyle}">ลงชื่อ${makeDotInline('', 'width:190px; margin:0 6px;')}ผู้เรียน</span><br>( ${esc(item.student_name)} )</div>
-      <div style="display:flex; align-items:center; gap:10px; font-size:15pt; margin-bottom:14px;">
+      <table class="batch-table" style="font-size:13.5pt !important;"><thead><tr><th rowspan="2" style="width:5%;">ที่</th><th rowspan="2" style="width:57%;">รายการ</th><th colspan="3" style="width:26%;">ระดับความรู้ความเข้าใจ</th><th rowspan="2" style="width:12%;">หมายเหตุ</th></tr><tr><th>มาก</th><th>ปานกลาง</th><th>น้อย</th></tr></thead><tbody>${evalRowsHtml}</tbody></table>
+      <div style="text-align:center; margin:12px 0; font-size:15pt;">ลงชื่อ${makeDotInline('', 'width:190px; margin:0 6px;')}ผู้เรียน<br>( ${esc(item.student_name)} )</div>
+      <div style="display:flex; align-items:center; gap:10px; font-size:15pt; margin-bottom:12px;">
         <b>ส่วนที่ 2 สำหรับสถานศึกษา</b>
-        <span><span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px;">${passChecked ? '✓' : '&nbsp;'}</span> ผ่าน</span>
-        <span><span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center; line-height:15px;">${rejectChecked ? '✓' : '&nbsp;'}</span> เพิ่มเติมในเรื่อง</span>
+        <span><span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center;">${passChecked ? '✓' : '&nbsp;'}</span> ผ่าน</span>
+        <span><span style="display:inline-block; width:16px; height:16px; border:1px solid #000; text-align:center;">${rejectChecked ? '✓' : '&nbsp;'}</span> เพิ่มเติมในเรื่อง</span>
         ${makeDotFlex(rejectChecked ? item.reject_reason_12 : '', 'min-width:150px;')}
       </div>
-      <div style="text-align:center; font-size:15pt;"><span style="${sigRowStyle}">ลงชื่อ${makeDotInline('', 'width:190px; margin:0 6px;')}ครูผู้รับผิดชอบ</span><br>( ${esc(item.teacher_name)} )</div>
-    </div>
-  `;
-  setTimeout(() => window.print(), 400);
+      <div style="text-align:center; font-size:15pt;">ลงชื่อ${makeDotInline('', 'width:190px; margin:0 6px;')}ครูผู้รับผิดชอบ<br>( ${esc(item.teacher_name)} )</div>
+    </div>`;
 }
 
-// ==================== แบบประเมินผลการปฏิบัติโครงการ (กพช. 5) ====================
+function executePrintDoc56() {
+  const items = _doc56Items;
+  const cfg = {
+    docNo: document.getElementById('d56_doc_no').value.trim() || 'ศธ 07058.02/........',
+    docDate: document.getElementById('d56_doc_date').value.trim() || '........................',
+    advisorPos: document.getElementById('d56_advisor_pos').value.trim() || 'ครูประจำกลุ่ม',
+    projName: document.getElementById('d56_project_name').value.trim(),
+    hours: document.getElementById('d56_hours').value || '25',
+    rationale: document.getElementById('d56_rationale').value,
+    objectives: document.getElementById('d56_objectives').value,
+    target: document.getElementById('d56_target').value,
+    steps: document.getElementById('d56_steps').value,
+    loc: document.getElementById('d56_location').value,
+    sDate: formatThaiDateWithLabel(document.getElementById('d56_start_date').value),
+    eDate: formatThaiDateWithLabel(document.getElementById('d56_end_date').value),
+    budget: document.getElementById('d56_budget').value,
+    material: document.getElementById('d56_material').value,
+    labor: document.getElementById('d56_labor').value,
+    expected: document.getElementById('d56_expected').value,
+    advisor: document.getElementById('d56_advisor').value,
+    tOpinion: document.getElementById('d56_teacher_opinion').value,
+    comm1: document.getElementById('d56_comm1').value,
+    comm2: document.getElementById('d56_comm2').value,
+    comm3: document.getElementById('d56_comm3').value,
+    director: document.getElementById('d56_director').value
+  };
+  const include12 = document.getElementById('d56_include_12').checked;
+
+  const memo56Html = `
+    <div class="memo-page">
+      <div class="memo-header"><img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
+      <div class="memo-field"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp; <b>โทร.</b>02 524 0645</div>
+      <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp; ${esc(cfg.docNo)}</span><span><b>วันที่</b> &nbsp; ${esc(cfg.docDate)} &nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      <div class="memo-field"><b>เรื่อง</b> &nbsp; ขออนุมัติโครงการกิจกรรมพัฒนาคุณภาพชีวิต</div>
+      <div class="memo-divider"></div>
+      <div class="memo-field" style="margin-bottom:10px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
+      <div class="memo-indent">ด้วยนักศึกษา ${SCHOOL_NAME} ระดับประถม มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(cfg.projName)} ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate} สถานที่ปฏิบัติกิจกรรม ณ ${esc(cfg.loc)}</div>
+      <div class="memo-indent">ในการนี้ ข้าพเจ้า ได้ดำเนินการตรวจสอบแบบเสนอโครงการแล้ว ปรากฏว่ามีความครบถ้วน ถูกต้อง และเหมาะสมที่จะปฏิบัติได้</div>
+      <div class="memo-indent">จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ</div>
+      <div class="sig-center" style="margin-left:38%; margin-top:24px;">ลงชื่อ..................................................<br>(${esc(cfg.advisor)})<br>ตำแหน่ง &nbsp;&nbsp; ${esc(cfg.advisorPos)}</div>
+      <div style="margin-left:32%; margin-top:24px; line-height:1.6;">&#9744; อนุมัติ<br>&#9744; มอบคณะกรรมการตรวจสอบและประเมินค่าหน่วยกิจกรรม</div>
+      <div class="sig-center" style="margin-left:38%; margin-top:34px;">(${esc(cfg.director)})<br>ผู้อำนวยการ${SCHOOL_NAME}</div>
+    </div>`;
+
+  const k3Html = buildKPCH3BodyHtml(items, cfg);
+  const k12Html = include12 ? `<div class="page-break-before"></div>` + items.map(it => buildKPCH12Html(it)).join('') : '';
+
+  document.getElementById('printOnlyContainer').innerHTML = memo56Html + k3Html + k12Html;
+  closeModalById('doc56Modal');
+  markPrintedClient('13', items.map(x => x.req12_id));
+  setTimeout(() => window.print(), 350);
+}
+
+// ==================== แบบประเมิน กพช. 5 ====================
 function buildKPCH5Html(item, isLastInPrint, imagesBase64 = []) {
   const comm1Name = (adminUsers.find(u => u.role === 'COMM_1' && u.status === 'ACTIVE') || {}).full_name || COMM_1_NAME;
   const comm2Name = (adminUsers.find(u => u.role === 'COMM_2' && u.status === 'ACTIVE') || {}).full_name || COMM_2_NAME;
@@ -1660,23 +1467,18 @@ function buildKPCH5Html(item, isLastInPrint, imagesBase64 = []) {
   const dotSpan = `<span style="flex:1; min-width:12px; overflow:hidden; white-space:nowrap; letter-spacing:1px;">${dotsStr}</span>`;
   const makeDotFlex = (val, extraStyle = '') => {
     const clean = esc(val);
-    return !clean
-      ? `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>`
-      : `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
+    return !clean ? `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
   };
   const makeDotInline = (val, extraStyle = '') => {
     const clean = esc(val);
-    return !clean
-      ? `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>`
-      : `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
+    return !clean ? `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
   };
   const chkBox = '<span style="display:inline-block; width:13px; height:13px; border:1px solid #000; vertical-align:-2px; margin-right:5px;"></span>';
   const row5 = 'display:flex; align-items:center; gap:8px; margin-bottom:4px; line-height:1.3;';
   const phaseRow = (label) => `
     <div style="${row5} margin-top:4px;"><span style="white-space:nowrap;">${label}</span><span>เมื่อวันที่</span>${makeDotInline('', 'width:50px;')}<span>เดือน</span>${makeDotInline('', 'width:95px;')}<span>พ.ศ.</span>${makeDotFlex('', 'min-width:50px;')}</div>
     <div style="padding-left:22px; margin-bottom:4px;">${chkBox}ผ่าน &nbsp;&nbsp;&nbsp;&nbsp; ${chkBox}ปรับปรุง</div>
-    <div style="${row5} padding-left:22px; margin-bottom:6px;"><span>เหตุผลประกอบการประเมิน</span>${makeDotFlex('')}</div>
-  `;
+    <div style="${row5} padding-left:22px; margin-bottom:6px;"><span>เหตุผลประกอบการประเมิน</span>${makeDotFlex('')}</div>`;
   const startTxt = item.activity_date ? formatShortThaiDate(item.activity_date) : '';
   const endTxt = item.activity_end_date ? formatShortThaiDate(item.activity_end_date) : '';
   const photoPage = imagesBase64.length > 0 ? `
@@ -1695,9 +1497,7 @@ function buildKPCH5Html(item, isLastInPrint, imagesBase64 = []) {
       <div style="${row5}"><span>ระยะเวลาที่เริ่มปฏิบัติตามโครงการ</span>${makeDotFlex(startTxt)}<span>วันสิ้นสุดโครงการ</span>${makeDotFlex(endTxt)}</div>
       <div style="${row5} margin-bottom:10px;"><span>สถานที่ปฏิบัติโครงการ</span>${makeDotFlex(item.location || '')}</div>
       <div style="font-weight:bold; margin-bottom:4px;">บันทึกความก้าวหน้าโครงการ</div>
-      ${phaseRow('ระยะที่ 1 ก่อนดำเนินโครงการ')}
-      ${phaseRow('ระยะที่ 2 ระหว่างดำเนินโครงการ')}
-      ${phaseRow('ระยะที่ 3 เสร็จสิ้นโครงการ')}
+      ${phaseRow('ระยะที่ 1 ก่อนดำเนินโครงการ')}${phaseRow('ระยะที่ 2 ระหว่างดำเนินโครงการ')}${phaseRow('ระยะที่ 3 เสร็จสิ้นโครงการ')}
       <div style="font-weight:bold; margin-top:10px; margin-bottom:6px;">สรุปรายละเอียดการประเมินผลโครงการ</div>
       <table class="batch-table" style="font-size:13.5pt !important; margin-top:0;">
         <thead><tr><th rowspan="2" style="width:6%;">ที่</th><th rowspan="2" style="width:52%;">รายการ</th><th colspan="2" style="width:22%;">คะแนน</th><th rowspan="2" style="width:20%;">หมายเหตุ</th></tr><tr><th>เต็ม</th><th>ได้</th></tr></thead>
@@ -1716,24 +1516,64 @@ function buildKPCH5Html(item, isLastInPrint, imagesBase64 = []) {
     <div class="${(isLastInPrint && !photoPage) ? '' : 'memo-page'}" style="font-size:15pt; line-height:1.5;">
       <div style="text-align:center; margin-bottom:10px;">- 2 -</div>
       <div style="font-weight:bold; margin-bottom:8px;">ความเห็นของคณะกรรมการ</div>
-      <div style="display:flex; margin-bottom:10px;">${makeDotFlex('')}</div>
-      <div style="display:flex; margin-bottom:10px;">${makeDotFlex('')}</div>
-      <div style="display:flex; margin-bottom:26px;">${makeDotFlex('')}</div>
+      <div style="display:flex; margin-bottom:10px;">${makeDotFlex('')}</div><div style="display:flex; margin-bottom:10px;">${makeDotFlex('')}</div><div style="display:flex; margin-bottom:26px;">${makeDotFlex('')}</div>
       <div style="display:flex; justify-content:center; gap:6px; margin-bottom:24px;"><span>ประเมินผลเมื่อวันที่</span>${makeDotInline('', 'width:65px;')}<span>เดือน</span>${makeDotInline('', 'width:110px;')}<span>พ.ศ.</span>${makeDotInline('', 'width:70px;')}</div>
       <div style="margin-left:20%; margin-bottom:20px;"><div style="display:flex;"><span>ลงชื่อ</span><div style="text-align:center; margin:0 6px;">${makeDotInline('', 'width:190px;')}<br>(${esc(comm1Name)})</div><span>ประธานคณะกรรมการ</span></div></div>
       <div style="margin-left:20%; margin-bottom:20px;"><div style="display:flex;"><span>ลงชื่อ</span><div style="text-align:center; margin:0 6px;">${makeDotInline('', 'width:190px;')}<br>(${esc(comm2Name)})</div><span>คณะกรรมการ</span></div></div>
       <div style="margin-left:20%; margin-bottom:28px;"><div style="display:flex;"><span>ลงชื่อ</span><div style="text-align:center; margin:0 6px;">${makeDotInline('', 'width:190px;')}<br>(${esc(comm3Name)})</div><span>คณะกรรมการและเลขานุการ</span></div></div>
       <div style="font-weight:bold; margin-bottom:4px;">ผลการพิจารณาอนุมัติของผู้บริหารสถานศึกษา</div>
       <div style="display:flex; gap:6px; margin-bottom:10px;"><span>- อนุมัติ จำนวน</span>${makeDotInline('', 'width:100px;')}<span>ชั่วโมง.</span></div>
-      <div style="display:flex; margin-bottom:10px;">${makeDotFlex('')}</div>
-      <div style="display:flex; margin-bottom:28px;">${makeDotFlex('')}</div>
+      <div style="display:flex; margin-bottom:10px;">${makeDotFlex('')}</div><div style="display:flex; margin-bottom:28px;">${makeDotFlex('')}</div>
       <div style="text-align:center;">ลงชื่อ${makeDotInline('', 'width:190px; margin:0 6px;')}ผู้อนุมัติ<br>(${DIRECTOR_NAME})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>อนุมัติผลเมื่อวันที่${makeDotInline('', 'width:65px;')}เดือน${makeDotInline('', 'width:110px;')}พ.ศ.${makeDotInline('', 'width:70px;')}</div>
     </div>
-    ${photoPage}
-  `;
+    ${photoPage}`;
 }
 
-// ==================== ตารางส่งผลงาน กพช.4 & เอกสาร 57 ====================
+function buildKPCH4Html(items, cfg) {
+  const first = items[0];
+  const isGroup = items.length > 1;
+  const groupTable = isGroup ? `
+    <div style="margin-top:6px; font-weight:bold;">รายชื่อผู้ปฏิบัติโครงการ (กรณีรายกลุ่ม)</div>
+    <table class="doc-table"><thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสประจำตัว</th><th style="width:90px;">ระดับ</th><th style="width:125px;">ลายมือชื่อ</th></tr></thead>
+    <tbody>${items.map((x, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${esc(x.student_name)}</td><td style="text-align:center;">${esc(x.student_id)}</td><td style="text-align:center;">${esc(x.level||'')}</td><td></td></tr>`).join('')}</tbody></table>` : '';
+
+  return `
+    <div class="memo-page">
+      <div class="kpch-box-tag">กพช. 4</div>
+      <div class="doc-title-center">แบบรายงานผลสำเร็จของโครงการกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับผู้เรียน)</div>
+      <div style="margin-top:8px;"><b>1. ชื่อโครงการที่ปฏิบัติ</b> &nbsp; ${esc(cfg.projName)}</div>
+      <div><b>2. ระยะเวลาที่ปฏิบัติโครงการ</b> ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate}<br>&nbsp;&nbsp;&nbsp;&nbsp;สถานที่ปฏิบัติกิจกรรม &nbsp; ${esc(cfg.loc)}</div>
+      <div><b>3. ผู้ปฏิบัติโครงการ</b>
+        <div class="doc-section-indent">
+          3.1 กรณีรายบุคคล &nbsp; ชื่อ-สกุล ${isGroup ? '............................' : esc(first.student_name)} &nbsp; รหัสประจำตัว ${isGroup ? '....................' : esc(first.student_id)}<br>
+          ระดับ ${isGroup ? '................' : esc(first.level||'')} &nbsp; กศน.ตำบล/กลุ่ม ${esc(first.group_name||'-')} &nbsp; ภาคเรียนที่ ${esc(first.term||'-')}<br>
+          3.2 กรณีรายกลุ่ม ให้แนบรายชื่อ-สกุล พร้อมลายมือชื่อ รหัสประจำตัว
+        </div>
+      </div>
+      ${groupTable}
+      <div><b>4. ผลการปฏิบัติโครงการ ประกอบด้วย</b>
+        <div class="doc-section-indent">
+          <b>4.1 การคิด/การวางแผน</b><br>${esc(first.k4_plan || '-').replace(/\n/g,'<br>')}<br>
+          <b>4.2 การดำเนินงาน/ขั้นตอนการดำเนินงาน</b><br>${esc(first.activity_detail || '-').replace(/\n/g,'<br>')}<br>
+          <b>4.3 การเรียนรู้และประสบการณ์ที่ได้รับ</b><br>${esc(first.k4_learning || '-').replace(/\n/g,'<br>')}<br>
+          <b>4.4 ปัญหาที่พบและการแก้ไข</b><br>${esc(first.k4_problem || 'ไม่พบปัญหาในการทำงาน')}<br>
+          <b>4.5 การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><br>${esc(first.k4_apply || '-').replace(/\n/g,'<br>')}
+        </div>
+      </div>
+      <div><b>5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><div class="doc-section-indent">${esc(first.k4_apply || '-').replace(/\n/g,'<br>')}</div></div>
+      <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................ผู้ดำเนินงาน/ประธานโครงการ<br>(${esc(first.student_name)})</div>
+      <div style="page-break-inside:avoid; margin-top:18px;">
+        <div><b>ขอรับรองว่า ได้ให้คำแนะนำ และให้คำปรึกษาตลอดระยะเวลาการดำเนินโครงการจริง</b></div>
+        <div class="sig-center" style="margin-left:35%; margin-top:16px;">
+          ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(${esc(cfg.tName)})<br><br>
+          ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(..................................................)<br><br>
+          ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(..................................................)
+        </div>
+      </div>
+    </div>`;
+}
+
+// ==================== ตารางรายงานผล กพช. 4-6 ====================
 function toggleAllChecks(master) {
   document.querySelectorAll('.reg-check').forEach(cb => cb.checked = master.checked);
 }
@@ -1742,6 +1582,7 @@ function getFilteredDashItems() {
   const kw = (document.getElementById('dashSearchInput')?.value || '').toLowerCase().trim();
   const termVal = document.getElementById('dashTermFilter')?.value || 'ALL';
   const catVal = document.getElementById('dashCategoryFilter')?.value || 'ALL';
+  const printVal = document.getElementById('dashPrintFilter')?.value || 'ALL';
   const teacherVal = document.getElementById('dashTeacherFilter')?.value || 'ALL';
   const isTeacher = currentUser.role === 'TEACHER';
   const isPresentTab = isTeacher && teacherTabMode === 'present';
@@ -1749,16 +1590,13 @@ function getFilteredDashItems() {
 
   return dashItems.filter(item => {
     if (isPresentTab) {
-      if (presentSubMode === 'SENT') {
-        if (!['APPROVED_FOR_REGISTRAR', 'COMPLETED'].includes(item.current_step)) return false;
-      } else {
-        if (item.current_step !== 'WAIT_TEACHER_PRESENT') return false;
-      }
-    } else if (filterMode === 'PENDING' && !isMyPendingItem(item)) {
-      return false;
-    }
+      if (presentSubMode === 'SENT') { if (!['APPROVED_FOR_REGISTRAR', 'COMPLETED'].includes(item.current_step)) return false; }
+      else { if (item.current_step !== 'WAIT_TEACHER_PRESENT') return false; }
+    } else if (filterMode === 'PENDING' && !isMyPendingItem(item)) return false;
     if (!matchesTermFilter(getItemTerm(item), termVal)) return false;
     if (catVal !== 'ALL' && String(item.category || '').trim() !== catVal) return false;
+    if (printVal === 'PRINTED' && !item.printed_46_at) return false;
+    if (printVal === 'NOT_PRINTED' && !!item.printed_46_at) return false;
     if (showTeacherFilter && teacherVal !== 'ALL' && String(item.teacher_name || '').trim() !== teacherVal) return false;
     if (kw) {
       const text = `${item.req_id} ${item.ref_12_id || ''} ${item.student_id} ${item.student_name} ${item.activity_name} ${item.category || ''} ${item.teacher_name}`.toLowerCase();
@@ -1776,7 +1614,6 @@ function renderDashboardList() {
 
   const filtered = getFilteredDashItems();
   currentFilteredSubs = filtered;
-
   const tbody = document.getElementById('dashTableBody');
   const mobileBox = document.getElementById('dashMobileCards');
   const masterCb = document.getElementById('checkAllBox');
@@ -1792,6 +1629,9 @@ function renderDashboardList() {
     const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
     const canAct = !isPresentTab && isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
     const termTxt = getItemTerm(item);
+    const printBadge = item.printed_46_at
+      ? `<div class="mt-1"><span class="badge bg-success bg-opacity-15 text-success border border-success">✅ ปริ้นแล้ว</span></div>`
+      : `<div class="mt-1"><span class="badge bg-light text-muted border">⏳ ยังไม่ปริ้น</span></div>`;
     return `
       <tr>
         ${canCheck ? `<td><input type="checkbox" class="reg-check" value="${esc(item.req_id)}"></td>` : ''}
@@ -1799,10 +1639,10 @@ function renderDashboardList() {
         <td><div class="fw-semibold">${esc(item.student_name)}</div><div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div></td>
         <td class="small"><div>${esc(item.teacher_name)}</div>${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border">${esc(item.category)}</span>` : ''}</td>
         <td><div class="fw-semibold">${esc(item.activity_name)}</div><div class="small text-muted">${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)} | <b>${esc(item.hours)} ชม.</b></div></td>
-        <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
+        <td><span class="badge step-badge ${st.cls}">${st.text}</span>${printBadge}</td>
         <td class="text-end text-nowrap">
           <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="openDetailModal('${esc(item.req_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printProjectPDF('${esc(item.req_id)}')"><i class="bi bi-printer"></i> โครงการ</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printSingle46('${esc(item.req_id)}')"><i class="bi bi-printer"></i> กพช.4-6</button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>`;
@@ -1811,17 +1651,18 @@ function renderDashboardList() {
   mobileBox.innerHTML = filtered.map(item => {
     const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
     const canAct = !isPresentTab && isMyPendingItem(item) && !['REGISTRAR', 'ADMIN'].includes(currentUser.role);
+    const printBadge = item.printed_46_at ? `<span class="badge bg-success bg-opacity-15 text-success border border-success ms-1">✅ ปริ้นแล้ว</span>` : '';
     return `
       <div class="mobile-item-card">
         <div class="d-flex justify-content-between align-items-start mb-2">
-          <div>${canCheck ? `<input type="checkbox" class="reg-check me-2" value="${esc(item.req_id)}">` : ''}<span class="fw-bold text-primary">${esc(item.req_id)}</span></div>
+          <div>${canCheck ? `<input type="checkbox" class="reg-check me-2" value="${esc(item.req_id)}">` : ''}<span class="fw-bold text-primary">${esc(item.req_id)}</span>${printBadge}</div>
           <span class="badge step-badge ${st.cls}">${st.text}</span>
         </div>
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
-        <div class="small text-muted mb-2"><b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ประเภท:</b> ${esc(item.category || '-')}<br><b>ชั่วโมง:</b> ${esc(item.hours)} ชม. | <b>วันที่:</b> ${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)}</div>
+        <div class="small text-muted mb-2"><b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ชั่วโมง:</b> ${esc(item.hours)} ชม.</div>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="openDetailModal('${esc(item.req_id)}')"><i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printProjectPDF('${esc(item.req_id)}')"><i class="bi bi-printer"></i></button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printSingle46('${esc(item.req_id)}')"><i class="bi bi-printer"></i> กพช.4-6</button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
       </div>`;
@@ -1832,18 +1673,11 @@ function confirmBatchApproveSub() {
   const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
   const validIds = checkedIds.filter(id => { const it = dashItems.find(x => x.req_id === id); return it && isMyPendingItem(it); });
   if (validIds.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่รอดำเนินการอย่างน้อย 1 รายการ', 'warning');
-  Swal.fire({
-    title: `อนุมัติและส่งต่อ ${validIds.length} รายการ?`,
-    icon: 'question', showCancelButton: true,
-    confirmButtonText: 'ยืนยันอนุมัติทั้งหมด', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#10b981'
-  }).then(async res => {
+  Swal.fire({ title: `อนุมัติและส่งต่อ ${validIds.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยันอนุมัติทั้งหมด', confirmButtonColor: '#10b981' }).then(async res => {
     if (res.isConfirmed) {
-      showLoading(`กำลังอนุมัติ (${validIds.length} รายการ)...`);
-      try {
-        const r = await callApi('batchApproveSubmissions', { token: authToken, req_ids: validIds });
-        hideLoading(); safeAlert('สำเร็จ 🎉', `อนุมัติเรียบร้อยแล้ว ${r.count} รายการ`, 'success');
-        await loadDashboard();
-      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+      showLoading('กำลังอนุมัติ...');
+      try { const r = await callApi('batchApproveSubmissions', { token: authToken, req_ids: validIds }); hideLoading(); safeAlert('สำเร็จ 🎉', `อนุมัติเรียบร้อยแล้ว ${r.count} รายการ`, 'success'); await loadDashboard(); }
+      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
@@ -1853,20 +1687,14 @@ function confirmBatchRejectSub() {
   const validIds = checkedIds.filter(id => { const it = dashItems.find(x => x.req_id === id); return it && (isMyPendingItem(it) || currentUser.role === 'ADMIN'); });
   if (validIds.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่ต้องการตีกลับอย่างน้อย 1 รายการ', 'warning');
   Swal.fire({
-    title: `ตีกลับผลงาน (${validIds.length} รายการ)`,
-    input: 'textarea',
-    inputLabel: 'ระบุเหตุผลในการตีกลับให้นักศึกษาแก้ไข',
-    inputPlaceholder: 'เช่น รูปภาพไม่ชัดเจน, ชั่วโมงไม่ถูกต้อง, เนื้อหา กพช.4 ไม่ครบ...',
-    showCancelButton: true, confirmButtonText: 'ยืนยันตีกลับ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#ef4444',
+    title: `ตีกลับผลงาน (${validIds.length} รายการ)`, input: 'textarea', inputLabel: 'ระบุเหตุผลในการตีกลับให้นักศึกษาแก้ไข',
+    inputPlaceholder: 'เช่น รูปภาพไม่ชัดเจน, ชั่วโมงไม่ถูกต้อง, เนื้อหา กพช.4 ไม่ครบ...', showCancelButton: true, confirmButtonText: 'ยืนยันตีกลับ', confirmButtonColor: '#ef4444',
     inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลด้วยครับ'; }
   }).then(async res => {
     if (res.isConfirmed) {
       showLoading('กำลังบันทึกการตีกลับ...');
-      try {
-        const r = await callApi('batchRejectSubmissions', { token: authToken, req_ids: validIds, reason: res.value.trim() });
-        hideLoading(); safeAlert('ตีกลับเรียบร้อย', `ส่งคืนให้นักศึกษาแก้ไข ${r.count} รายการแล้ว`, 'success');
-        await loadDashboard();
-      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+      try { const r = await callApi('batchRejectSubmissions', { token: authToken, req_ids: validIds, reason: res.value.trim() }); hideLoading(); safeAlert('ตีกลับเรียบร้อย', `ส่งคืนให้นักศึกษาแก้ไข ${r.count} รายการแล้ว`, 'success'); await loadDashboard(); }
+      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
@@ -1879,29 +1707,32 @@ function confirmBatchDeleteSub() {
 
 function confirmDeleteSubmissions(reqIds) {
   if (!currentUser || currentUser.role !== 'ADMIN') return safeAlert('ไม่มีสิทธิ์', 'เฉพาะ Admin เท่านั้น', 'error');
-  Swal.fire({
-    title: `ย้ายผลงาน (${reqIds.length} รายการ) ลงถังขยะ?`,
-    icon: 'warning', showCancelButton: true,
-    confirmButtonText: '🗑️ ย้ายลงถังขยะ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#dc2626'
-  }).then(async res => {
+  Swal.fire({ title: `ย้ายผลงาน (${reqIds.length} รายการ) ลงถังขยะ?`, icon: 'warning', showCancelButton: true, confirmButtonText: '🗑️ ย้ายลงถังขยะ', confirmButtonColor: '#dc2626' }).then(async res => {
     if (res.isConfirmed) {
       showLoading('กำลังย้ายลงถังขยะ...');
-      try {
-        const r = await callApi('deleteSubmissions', { token: authToken, req_ids: reqIds });
-        hideLoading(); closeModalById('detailModal');
-        safeAlert('เรียบร้อย 🗑️', `ย้ายลงถังขยะแล้ว ${r.count} รายการ`, 'success');
-        await loadDashboard();
-      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+      try { const r = await callApi('deleteSubmissions', { token: authToken, req_ids: reqIds }); hideLoading(); closeModalById('detailModal'); safeAlert('เรียบร้อย 🗑️', `ย้ายลงถังขยะแล้ว ${r.count} รายการ`, 'success'); await loadDashboard(); }
+      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
 
-// ==================== จัดชุด & พิมพ์เอกสาร 57 (บันทึกข้อความ -> กพช.4 -> กพช.5 -> กพช.6) ====================
+// ==================== พิมพ์ชุด กพช. 4-6 (บังคับติ๊กเลือกเท่านั้น) ====================
+function printSingle46(reqId) {
+  const item = dashItems.find(x => x.req_id === reqId);
+  if (!item) return;
+  openDoc57ModalWithItems([item]);
+}
+
 function openDoc57ConfigAndPrint() {
   const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
-  const items = checkedIds.length > 0 ? currentFilteredSubs.filter(x => checkedIds.includes(x.req_id)) : currentFilteredSubs;
-  if (items.length === 0) return safeAlert('ไม่พบรายการ', 'กรุณาเลือกประเภท กพช. หรือติ๊กเลือกรายการอย่างน้อย 1 รายการก่อนสั่งพิมพ์', 'warning');
+  if (checkedIds.length === 0) {
+    return safeAlert('กรุณาติ๊กเลือกรายชื่อ', 'กรุณาติ๊กถูกหน้ารายชื่อนักศึกษาที่ต้องการพิมพ์ กพช. 4-6 อย่างน้อย 1 คนก่อนครับ (ระบบจะพิมพ์เฉพาะคนที่ติ๊กเลือกเท่านั้น)', 'warning');
+  }
+  const items = dashItems.filter(x => checkedIds.includes(x.req_id));
+  openDoc57ModalWithItems(items);
+}
 
+function openDoc57ModalWithItems(items) {
   _doc57TargetIds = items.map(x => x.req_id);
   const first = items[0];
   document.getElementById('d57_count').innerText = items.length;
@@ -1921,7 +1752,7 @@ function openDoc57ConfigAndPrint() {
 async function executePrintDoc57() {
   if (_doc57TargetIds.length === 0) return;
   closeModalById('doc57Modal');
-  showLoading(`กำลังจัดชุดเอกสาร 57 (${_doc57TargetIds.length} รายการ)...`);
+  showLoading(`กำลังจัดชุด กพช. 4-6 (${_doc57TargetIds.length} รายการ)...`);
   try {
     const batchData = await callApi('getSubmissionsBatchForPrint', { token: authToken, req_ids: _doc57TargetIds });
     hideLoading();
@@ -1942,7 +1773,6 @@ async function executePrintDoc57() {
     const director = document.getElementById('d57_director').value.trim();
     const sDate = formatThaiDateWithLabel(first.activity_date);
     const eDate = formatThaiDateWithLabel(first.activity_end_date);
-    const isGroup = items.length > 1;
 
     const memoHtml = `
       <div class="memo-page">
@@ -1961,48 +1791,8 @@ async function executePrintDoc57() {
         <div style="margin-top:20px;"><b>สำหรับงานทะเบียน</b><br>&nbsp;&nbsp;&nbsp;&nbsp;บันทึกผลลงในระบบเมื่อวันที่........เดือน............พ.ศ. ............<br><br><div style="margin-left:18%;">(..................................................)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;เจ้าหน้าที่งานทะเบียน</div></div>
       </div>`;
 
-    const groupTable = isGroup ? `
-      <div style="margin-top:6px; font-weight:bold;">รายชื่อผู้ปฏิบัติโครงการ (กรณีรายกลุ่ม)</div>
-      <table class="doc-table"><thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสประจำตัว</th><th style="width:90px;">ระดับ</th><th style="width:125px;">ลายมือชื่อ</th></tr></thead>
-      <tbody>${items.map((x, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${esc(x.student_name)}</td><td style="text-align:center;">${esc(x.student_id)}</td><td style="text-align:center;">${esc(x.level||'')}</td><td></td></tr>`).join('')}</tbody></table>` : '';
-
-    const k4Html = `
-      <div class="memo-page">
-        <div class="kpch-box-tag">กพช. 4</div>
-        <div class="doc-title-center">แบบรายงานผลสำเร็จของโครงการกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับผู้เรียน)</div>
-        <div style="margin-top:8px;"><b>1. ชื่อโครงการที่ปฏิบัติ</b> &nbsp; ${esc(projName)}</div>
-        <div><b>2. ระยะเวลาที่ปฏิบัติโครงการ</b> ระหว่างวันที่ ${sDate} ถึงวันที่ ${eDate}<br>&nbsp;&nbsp;&nbsp;&nbsp;สถานที่ปฏิบัติกิจกรรม &nbsp; ${esc(loc)}</div>
-        <div><b>3. ผู้ปฏิบัติโครงการ</b>
-          <div class="doc-section-indent">
-            3.1 กรณีรายบุคคล &nbsp; ชื่อ-สกุล ${isGroup ? '............................' : esc(first.student_name)} &nbsp; รหัสประจำตัว ${isGroup ? '....................' : esc(first.student_id)}<br>
-            ระดับ ${isGroup ? '................' : esc(first.level||'')} &nbsp; กศน.ตำบล/กลุ่ม ${esc(first.group_name||'-')} &nbsp; ภาคเรียนที่ ${esc(first.term||'-')}<br>
-            3.2 กรณีรายกลุ่ม ให้แนบรายชื่อ-สกุล พร้อมลายมือชื่อ รหัสประจำตัว
-          </div>
-        </div>
-        ${groupTable}
-        <div><b>4. ผลการปฏิบัติโครงการ ประกอบด้วย</b>
-          <div class="doc-section-indent">
-            <b>4.1 การคิด/การวางแผน</b><br>${esc(first.k4_plan || '-').replace(/\n/g,'<br>')}<br>
-            <b>4.2 การดำเนินงาน/ขั้นตอนการดำเนินงาน</b><br>${esc(first.activity_detail || '-').replace(/\n/g,'<br>')}<br>
-            <b>4.3 การเรียนรู้และประสบการณ์ที่ได้รับ</b><br>${esc(first.k4_learning || '-').replace(/\n/g,'<br>')}<br>
-            <b>4.4 ปัญหาที่พบและการแก้ไข</b><br>${esc(first.k4_problem || 'ไม่พบปัญหาในการทำงาน')}<br>
-            <b>4.5 การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><br>${esc(first.k4_apply || '-').replace(/\n/g,'<br>')}
-          </div>
-        </div>
-        <div><b>5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><div class="doc-section-indent">${esc(first.k4_apply || '-').replace(/\n/g,'<br>')}</div></div>
-        <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................ผู้ดำเนินงาน/ประธานโครงการ<br>(${esc(first.student_name)})</div>
-      </div>
-      <div class="memo-page">
-        <div style="margin-top:20px;"><b>ขอรับรองว่า ได้ให้คำแนะนำ และให้คำปรึกษาตลอดระยะเวลาการดำเนินโครงการจริง</b></div>
-        <div class="sig-center" style="margin-left:35%; margin-top:28px;">
-          ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(${esc(tName)})<br><br><br>
-          ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(..................................................)<br><br><br>
-          ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(..................................................)
-        </div>
-      </div>`;
-
+    const k4Html = buildKPCH4Html(items, { projName, sDate, eDate, loc, tName });
     const k5Html = buildKPCH5Html(first, false, batchData[0].imagesBase64 || []);
-
     const k6Html = items.map((s, idx) => `
       <div class="${idx === items.length - 1 ? '' : 'memo-page'}">
         <div class="kpch-box-tag">กพช. 6</div>
@@ -2034,89 +1824,8 @@ async function executePrintDoc57() {
       </div>`).join('');
 
     document.getElementById('printOnlyContainer').innerHTML = memoHtml + k4Html + k5Html + k6Html;
+    markPrintedClient('46', _doc57TargetIds);
     setTimeout(() => window.print(), 450);
-  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
-}
-
-// ==================== พิมพ์ชุดปะหน้าเดิม + รายละเอียด + กพช.5 ====================
-async function printTeacherPresentPackage() {
-  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
-  let targetIds = checkedIds;
-  if (targetIds.length === 0) {
-    const visibleList = getFilteredDashItems();
-    targetIds = (currentUser.role === 'TEACHER' && teacherTabMode === 'present' && presentSubMode === 'SENT')
-      ? visibleList.map(x => x.req_id)
-      : visibleList.filter(x => x.current_step === 'WAIT_TEACHER_PRESENT').map(x => x.req_id);
-  }
-  if (targetIds.length === 0) return safeAlert('ไม่พบรายการ', 'กรุณาติ๊กเลือกรายการที่ต้องการพิมพ์ก่อนครับ', 'warning');
-
-  const termFilterVal = document.getElementById('dashTermFilter')?.value || 'ALL';
-  const defaultTerm = termFilterVal.startsWith('TERM:') ? termFilterVal.slice(5) : '2/2569';
-  const { value: formValues } = await Swal.fire({
-    title: `พิมพ์ชุดเอกสารส่งทะเบียน (${targetIds.length} รายการ)`,
-    html: `<div class="text-start small"><label class="form-label fw-bold mb-1">ส่วนราชการ / กลุ่ม</label><input id="swal_dept" class="form-control mb-2" value="${esc(currentUser.group_name ? SCHOOL_NAME + ' (' + currentUser.group_name + ')' : SCHOOL_NAME)}"><label class="form-label fw-bold mb-1">เลขที่หนังสือ</label><input id="swal_docno" class="form-control mb-2" value="ศธ. 07058.02/......"><label class="form-label fw-bold mb-1">ภาคเรียน / ปีการศึกษา</label><input id="swal_term" class="form-control" value="${esc(defaultTerm)}"></div>`,
-    showCancelButton: true, confirmButtonText: '🖨️ จัดเตรียมชุดพิมพ์', cancelButtonText: 'ยกเลิก',
-    preConfirm: () => ({
-      dept: document.getElementById('swal_dept').value.trim() || SCHOOL_NAME,
-      docNo: document.getElementById('swal_docno').value.trim() || 'ศธ. 07058.02/............',
-      term: document.getElementById('swal_term').value.trim() || '..../........'
-    })
-  });
-  if (!formValues) return;
-
-  showLoading(`กำลังดึงรายละเอียดและรูปภาพ (${targetIds.length} รายการ)...`);
-  try {
-    const batchData = await callApi('getSubmissionsBatchForPrint', { token: authToken, req_ids: targetIds });
-    hideLoading();
-    const targetItems = batchData.map(b => b.item);
-    const totalHours = targetItems.reduce((sum, r) => sum + (Number(r.hours) || 0), 0);
-    const todayThai = formatThaiDate();
-    const tableRowsHtml = targetItems.map((r, idx) => `<tr><td style="text-align:center;">${idx + 1}</td><td>${esc(r.req_id)}</td><td>${esc(r.student_id)}</td><td>${esc(r.student_name)}</td><td style="text-align:center;">${esc(r.level)}</td><td>${esc(r.activity_name)}</td><td style="text-align:center;">${formatShortThaiDate(r.activity_date)} - ${formatShortThaiDate(r.activity_end_date)}</td><td style="text-align:center;"><b>${esc(r.hours)}</b></td><td>${esc(r.teacher_name)}</td></tr>`).join('');
-
-    const renderCompactDetailCard = (entry, idx, isTopOfPair) => {
-      const item = entry.item;
-      const imgs = entry.imagesBase64 || [];
-      const imgWidthPct = imgs.length >= 3 ? '32%' : '46%';
-      const imgsHtml = imgs.map((b64, i) => `<div style="width:${imgWidthPct}; text-align:center;"><img src="${b64}" style="max-height:135px; max-width:100%; object-fit:contain; border:1px solid #999; padding:2px;"><div style="font-size:11.5pt;">ภาพประกอบที่ ${i + 1}</div></div>`).join('');
-      const sepStyle = isTopOfPair ? 'border-bottom:1.5px dashed #666; margin-bottom:0.45cm;' : '';
-      return `
-        <div style="height:12.6cm; overflow:hidden; box-sizing:border-box; padding-bottom:6px; ${sepStyle}">
-          <div style="text-align:center; border-bottom:1.5px solid #000; padding-bottom:3px; margin-bottom:6px;"><div style="font-size:15pt; font-weight:bold;">รายละเอียดกิจกรรม กพช. และหลักฐานภาพถ่าย (รายการที่ ${idx + 1})</div><div style="font-size:12.5pt;">${SCHOOL_NAME} | รหัส: ${esc(item.req_id)}</div></div>
-          <table style="width:100%; border-collapse:collapse; margin-bottom:5px; font-size:13pt;" border="1" cellpadding="3">
-            <tr><td><b>ชื่อ-สกุล:</b> ${esc(item.student_name)}</td><td><b>รหัส:</b> ${esc(item.student_id)} (${esc(item.level)})</td></tr>
-            <tr><td><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</td><td><b>ชั่วโมง:</b> ${esc(item.hours)} ชม.</td></tr>
-            <tr><td><b>ระยะเวลา:</b> ${formatThaiDate(item.activity_date)} ถึง ${formatThaiDate(item.activity_end_date)}</td><td><b>สถานที่:</b> ${esc(item.location || '-')}</td></tr>
-          </table>
-          <div style="font-size:13pt; margin-bottom:3px;"><b>1. กิจกรรม:</b> ${esc(item.activity_name)}</div>
-          <div style="border:1px solid #000; padding:4px 6px; max-height:66px; overflow:hidden; white-space:pre-line; margin-bottom:5px; font-size:12.5pt;">${esc(item.activity_detail)}</div>
-          <div style="display:flex; justify-content:space-around; gap:6px;">${imgsHtml}</div>
-        </div>`;
-    };
-    let detailsPagesHtml = '';
-    for (let i = 0; i < batchData.length; i += 2) {
-      detailsPagesHtml += `<div class="memo-page">${renderCompactDetailCard(batchData[i], i, (i + 1 < batchData.length))}${(i + 1 < batchData.length) ? renderCompactDetailCard(batchData[i + 1], i + 1, false) : ''}</div>`;
-    }
-    const kpch5PagesHtml = batchData.map((entry, idx) => buildKPCH5Html(entry.item, idx === batchData.length - 1)).join('');
-
-    document.getElementById('printOnlyContainer').innerHTML = `
-      <div class="memo-page">
-        <div class="memo-header"><img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
-        <div class="memo-field"><b>ส่วนราชการ</b> &nbsp;${esc(formValues.dept)}</div>
-        <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp;${esc(formValues.docNo)}</span><span><b>วันที่</b> &nbsp;${todayThai}</span></div>
-        <div class="memo-field"><b>เรื่อง</b> &nbsp;ขอส่งผลการดำเนินกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) เพื่อบันทึกชั่วโมงเข้าระบบทะเบียน ประจำภาคเรียนที่ ${esc(formValues.term)}</div>
-        <div class="memo-divider"></div>
-        <div class="memo-field" style="margin-bottom:10px;"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME} (ผ่านงานทะเบียน)</div>
-        <div class="memo-indent">ตามที่นักศึกษา${SCHOOL_NAME} ได้ดำเนินการจัดทำกิจกรรม กพช. ประจำภาคเรียนที่ ${esc(formValues.term)} จำนวนทั้งสิ้น <b>${targetItems.length} ราย</b> รวม <b>${totalHours} ชั่วโมง</b> จึงขอส่งเอกสารหลักฐานพร้อมบัญชีรายชื่อแนบท้ายมาเพื่อบันทึกชั่วโมง กพช. ต่อไป</div>
-        <div style="width:60%; margin-left:auto; text-align:center; margin-top:20px;">ลงชื่อ......................................................<br>(${esc(currentUser.full_name)})<br>ผู้นำเสนอส่งทะเบียน</div>
-      </div>
-      <div class="memo-page">
-        <div style="text-align:center; margin-bottom:8px;"><div style="font-size:17pt; font-weight:bold;">บัญชีรายชื่อนักศึกษาผู้ผ่านการพิจารณาอนุมัติกิจกรรม กพช. (ภาคเรียนที่ ${esc(formValues.term)})</div></div>
-        <table class="batch-table"><thead><tr><th>ที่</th><th>รหัสอ้างอิง</th><th>รหัสนักศึกษา</th><th>ชื่อ-นามสกุล</th><th>ระดับ</th><th>ชื่อกิจกรรม</th><th>ช่วงวันที่จัด</th><th>ชม.</th><th>ครูประจำกลุ่ม</th></tr></thead><tbody>${tableRowsHtml}<tr><td colspan="7" style="text-align:right; font-weight:bold;">รวมทั้งสิ้น (${targetItems.length} รายการ)</td><td style="text-align:center; font-weight:bold;">${totalHours}</td><td style="text-align:center;">ชั่วโมง</td></tr></tbody></table>
-      </div>
-      ${detailsPagesHtml}
-      ${kpch5PagesHtml}
-    `;
-    setTimeout(() => window.print(), 600);
   } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
@@ -2124,18 +1833,11 @@ function confirmPresentToRegistrar() {
   const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
   const validIds = checkedIds.filter(id => { const it = dashItems.find(x => x.req_id === id); return it && it.current_step === 'WAIT_TEACHER_PRESENT'; });
   if (validIds.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่รอนำเสนอส่งทะเบียนอย่างน้อย 1 รายการ', 'warning');
-  Swal.fire({
-    title: `ยืนยันนำเสนอส่งต่อนายทะเบียน (${validIds.length} รายการ)?`,
-    icon: 'question', showCancelButton: true,
-    confirmButtonText: 'ยืนยันส่งต่อนายทะเบียน', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#10b981'
-  }).then(async res => {
+  Swal.fire({ title: `ยืนยันนำเสนอส่งต่อนายทะเบียน (${validIds.length} รายการ)?`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยันส่งต่อนายทะเบียน', confirmButtonColor: '#10b981' }).then(async res => {
     if (res.isConfirmed) {
       showLoading('กำลังส่งต่อนายทะเบียน...');
-      try {
-        const r = await callApi('presentToRegistrar', { token: authToken, req_ids: validIds });
-        hideLoading(); safeAlert('เรียบร้อย! 📤', `ส่งต่อทะเบียนสำเร็จ ${r.count} รายการ`, 'success');
-        await loadDashboard();
-      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+      try { const r = await callApi('presentToRegistrar', { token: authToken, req_ids: validIds }); hideLoading(); safeAlert('เรียบร้อย! 📤', `ส่งต่อทะเบียนสำเร็จ ${r.count} รายการ`, 'success'); await loadDashboard(); }
+      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
@@ -2167,7 +1869,7 @@ function openDetailModal(reqId) {
   const isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
     <div class="d-flex flex-wrap gap-2">
-      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printProjectPDF('${esc(item.req_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์บันทึกข้อความ + โครงการ + กพช.5</button>
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="closeModalById('detailModal'); printSingle46('${esc(item.req_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 4-6</button>
       ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -2181,117 +1883,17 @@ function submitDecision(reqId, decision) {
   closeModalById('detailModal');
   setTimeout(() => {
     if (decision === 'APPROVE') {
-      Swal.fire({
-        title: 'ยืนยันการอนุมัติ?',
-        text: `ต้องการอนุมัติคำขอ ${reqId} เพื่อส่งต่อไปยังขั้นตอนถัดไปใช่หรือไม่`,
-        icon: 'question', showCancelButton: true,
-        confirmButtonText: 'ยืนยันอนุมัติ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#10b981'
-      }).then(res => { if (res.isConfirmed) executeApproval(reqId, 'APPROVE', ''); });
+      Swal.fire({ title: 'ยืนยันการอนุมัติ?', text: `ต้องการอนุมัติคำขอ ${reqId} เพื่อส่งต่อไปยังขั้นตอนถัดไปใช่หรือไม่`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยันอนุมัติ', confirmButtonColor: '#10b981' }).then(res => { if (res.isConfirmed) executeApproval(reqId, 'APPROVE', ''); });
     } else {
-      Swal.fire({
-        title: 'ระบุเหตุผลในการตีกลับ',
-        input: 'textarea',
-        inputPlaceholder: 'เช่น รูปภาพไม่ชัดเจน, กรอกข้อมูล กพช.4 ไม่ครบ, ชั่วโมงผิด กรุณาส่งใหม่...',
-        showCancelButton: true, confirmButtonText: 'ส่งตีกลับ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#ef4444',
-        inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลด้วยครับ'; }
-      }).then(res => { if (res.isConfirmed) executeApproval(reqId, 'REJECT', res.value); });
+      Swal.fire({ title: 'ระบุเหตุผลในการตีกลับ', input: 'textarea', inputPlaceholder: 'เช่น รูปภาพไม่ชัดเจน, กรอกข้อมูล กพช.4 ไม่ครบ, ชั่วโมงผิด...', showCancelButton: true, confirmButtonText: 'ส่งตีกลับ', confirmButtonColor: '#ef4444', inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลด้วยครับ'; } }).then(res => { if (res.isConfirmed) executeApproval(reqId, 'REJECT', res.value); });
     }
   }, 220);
 }
 
 async function executeApproval(reqId, decision, reason) {
   showLoading('กำลังบันทึกผลการพิจารณา...');
-  try {
-    await callApi('processApproval', { token: authToken, req_id: reqId, decision, reason });
-    hideLoading(); safeAlert('สำเร็จ', 'บันทึกผลเรียบร้อยแล้ว', 'success');
-    await loadDashboard();
-  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
-}
-
-async function printProjectPDF(reqId) {
-  showLoading('กำลังจัดเตรียมเอกสาร...');
-  try {
-    const data = await callApi('getSubmissionForPrint', { token: authToken, req_id: reqId });
-    hideLoading();
-    const item = data.item;
-    const imgs = data.imagesBase64 || [];
-    const imgWidthPct = imgs.length >= 3 ? '32%' : '48%';
-    const imgsHtml = imgs.map((b64, i) => `<div style="width:${imgWidthPct}; text-align:center;"><img src="${b64}"><div style="font-size:13pt;">ภาพประกอบที่ ${i + 1}</div></div>`).join('');
-    const todayThai = formatThaiDate();
-    const startThai = formatThaiDate(item.activity_date);
-    const endThai = formatThaiDate(item.activity_end_date);
-
-    document.getElementById('printOnlyContainer').innerHTML = `
-      <div class="memo-page">
-        <div class="memo-header"><img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
-        <div class="memo-field"><b>ส่วนราชการ</b> &nbsp;${SCHOOL_NAME}</div>
-        <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp;ศธ. 07058.02/............</span><span><b>วันที่</b> &nbsp;${todayThai}</span></div>
-        <div class="memo-field"><b>เรื่อง</b> &nbsp;ขออนุมัติรับรองผลการทำกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) รายบุคคล</div>
-        <div class="memo-divider"></div>
-        <div class="memo-field" style="margin-bottom:10px;"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME}</div>
-        <div class="memo-indent">ด้วย <b>${esc(item.student_name)}</b> รหัสนักศึกษา <b>${esc(item.student_id)}</b> ระดับชั้น <b>${esc(item.level)}</b> ได้ดำเนินการจัดทำกิจกรรม กพช. เรื่อง <b>"${esc(item.activity_name)}"</b> ระหว่างวันที่ ${startThai} ถึงวันที่ ${endThai} ณ ${esc(item.location || '-')} รวมจำนวน <b>${esc(item.hours)} ชั่วโมง</b> จึงขออนุมัติชั่วโมง กพช. ตามรายละเอียดที่แนบมาพร้อมนี้</div>
-        <div style="width:60%; margin-left:auto; text-align:center; margin-top:20px;">ลงชื่อ......................................................<br>(${esc(item.teacher_name)})<br>ครูประจำกลุ่ม / ผู้เสนอโครงการ</div>
-        <div style="border:1px solid #000; padding:10px 14px; margin-top:20px;"><b>ความเห็น / คำสั่งผู้อำนวยการสถานศึกษา</b><br><div style="margin:6px 0 12px 20px;">[ &nbsp; ] อนุมัติ &nbsp;&nbsp;&nbsp;&nbsp; [ &nbsp; ] ไม่อนุมัติ</div><div style="width:60%; margin-left:auto; text-align:center;">ลงชื่อ......................................................<br>(${DIRECTOR_NAME})<br>ผู้อำนวยการ${SCHOOL_NAME}</div></div>
-      </div>
-      <div class="memo-page">
-        <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:6px; margin-bottom:10px;"><div style="font-size:18pt; font-weight:bold;">รายละเอียดกิจกรรมพัฒนาคุณภาพชีวิต (กพช.) และหลักฐานภาพถ่าย</div><div style="font-size:14pt;">${SCHOOL_NAME} | รหัสอ้างอิง: ${esc(item.req_id)}</div></div>
-        <table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:15pt;" border="1" cellpadding="4">
-          <tr><td><b>ชื่อ-สกุล:</b> ${esc(item.student_name)}</td><td><b>รหัสนักศึกษา:</b> ${esc(item.student_id)} (${esc(item.level)})</td></tr>
-          <tr><td><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</td><td><b>จำนวนชั่วโมง:</b> ${esc(item.hours)} ชั่วโมง</td></tr>
-          <tr><td><b>ระยะเวลา:</b> ${startThai} ถึง ${endThai}</td><td><b>สถานที่:</b> ${esc(item.location || '-')}</td></tr>
-        </table>
-        <div style="margin-bottom:4px;"><b>1. ชื่อกิจกรรม:</b> ${esc(item.activity_name)}</div>
-        <div style="border:1px solid #000; padding:8px; min-height:60px; white-space:pre-line; margin-bottom:10px; font-size:15pt;">${esc(item.activity_detail)}</div>
-        <div class="print-img-box" style="display:flex; justify-content:space-around; gap:8px;">${imgsHtml}</div>
-      </div>
-      ${buildKPCH5Html(item, true)}
-    `;
-    setTimeout(() => window.print(), 600);
-  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
-}
-
-async function printBatchMemo() {
-  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
-  let targetItems = checkedIds.length > 0
-    ? dashItems.filter(x => checkedIds.includes(x.req_id))
-    : currentFilteredSubs.filter(x => ['WAIT_TEACHER_PRESENT', 'APPROVED_FOR_REGISTRAR', 'COMPLETED'].includes(x.current_step));
-
-  if (targetItems.length === 0) return safeAlert('ไม่พบรายการ', 'กรุณาติ๊กเลือกรายการที่ต้องการพิมพ์สรุปรวมก่อนครับ', 'info');
-  const termFilterVal = document.getElementById('dashTermFilter')?.value || 'ALL';
-  const defaultTerm = termFilterVal.startsWith('TERM:') ? termFilterVal.slice(5) : '2/2569';
-  const { value: formValues } = await Swal.fire({
-    title: `จัดทำบันทึกข้อความสรุปรวม (${targetItems.length} รายการ)`,
-    html: `<div class="text-start small"><label class="form-label fw-bold mb-1">ส่วนราชการ</label><input id="swal_dept" class="form-control mb-2" value="${SCHOOL_NAME}"><label class="form-label fw-bold mb-1">เลขที่หนังสือ</label><input id="swal_docno" class="form-control mb-2" value="ศธ. 07058.02/......"><label class="form-label fw-bold mb-1">ภาคเรียน</label><input id="swal_term" class="form-control" value="${esc(defaultTerm)}"></div>`,
-    showCancelButton: true, confirmButtonText: '🖨️ พิมพ์', cancelButtonText: 'ยกเลิก',
-    preConfirm: () => ({
-      dept: document.getElementById('swal_dept').value.trim() || SCHOOL_NAME,
-      docNo: document.getElementById('swal_docno').value.trim() || 'ศธ. 07058.02/............',
-      term: document.getElementById('swal_term').value.trim() || '..../........'
-    })
-  });
-  if (!formValues) return;
-
-  const totalHours = targetItems.reduce((sum, r) => sum + (Number(r.hours) || 0), 0);
-  const todayThai = formatThaiDate();
-  const tableRowsHtml = targetItems.map((r, idx) => `<tr><td style="text-align:center;">${idx + 1}</td><td>${esc(r.req_id)}</td><td>${esc(r.student_id)}</td><td>${esc(r.student_name)}</td><td style="text-align:center;">${esc(r.level)}</td><td>${esc(r.activity_name)}</td><td style="text-align:center;">${formatShortThaiDate(r.activity_date)} - ${formatShortThaiDate(r.activity_end_date)}</td><td style="text-align:center;"><b>${esc(r.hours)}</b></td><td>${esc(r.teacher_name)}</td></tr>`).join('');
-
-  document.getElementById('printOnlyContainer').innerHTML = `
-    <div class="memo-page">
-      <div class="memo-header"><img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
-      <div class="memo-field"><b>ส่วนราชการ</b> &nbsp;${esc(formValues.dept)}</div>
-      <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp;${esc(formValues.docNo)}</span><span><b>วันที่</b> &nbsp;${todayThai}</span></div>
-      <div class="memo-field"><b>เรื่อง</b> &nbsp;ขออนุมัติผลการดำเนินกิจกรรม กพช. และบันทึกชั่วโมงเข้าระบบทะเบียน ประจำภาคเรียนที่ ${esc(formValues.term)}</div>
-      <div class="memo-divider"></div>
-      <div class="memo-field"><b>เรียน</b> &nbsp;ผู้อำนวยการ${SCHOOL_NAME}</div>
-      <div class="memo-indent">ตามที่นักศึกษาได้ดำเนินกิจกรรม กพช. ประจำภาคเรียนที่ ${esc(formValues.term)} จำนวนทั้งสิ้น <b>${targetItems.length} ราย</b> รวม <b>${totalHours} ชั่วโมง</b> จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติและมอบหมายงานทะเบียนบันทึกชั่วโมง กพช. ต่อไป</div>
-      <div style="width:60%; margin-left:auto; text-align:center; margin-top:20px;">ลงชื่อ......................................................<br>(${esc(currentUser.full_name)})</div>
-      <div style="border:1px solid #000; padding:10px 14px; margin-top:20px;"><b>คำสั่งผู้อำนวยการสถานศึกษา</b><br><div style="margin:6px 0 12px 20px;">[ &nbsp; ] อนุมัติ และมอบหมายงานทะเบียนดำเนินการต่อไป</div><div style="width:60%; margin-left:auto; text-align:center;">ลงชื่อ......................................................<br>(${DIRECTOR_NAME})<br>ผู้อำนวยการ${SCHOOL_NAME}</div></div>
-    </div>
-    <div>
-      <div style="text-align:center; margin-bottom:8px;"><div style="font-size:17pt; font-weight:bold;">บัญชีรายชื่อนักศึกษาผู้ผ่านการพิจารณาอนุมัติกิจกรรม กพช. (ภาคเรียนที่ ${esc(formValues.term)})</div></div>
-      <table class="batch-table"><thead><tr><th>ที่</th><th>รหัสอ้างอิง</th><th>รหัสนักศึกษา</th><th>ชื่อ-นามสกุล</th><th>ระดับ</th><th>ชื่อกิจกรรม</th><th>ช่วงวันที่จัด</th><th>ชม.</th><th>ครูประจำกลุ่ม</th></tr></thead><tbody>${tableRowsHtml}<tr><td colspan="7" style="text-align:right; font-weight:bold;">รวมทั้งสิ้น (${targetItems.length} รายการ)</td><td style="text-align:center; font-weight:bold;">${totalHours}</td><td style="text-align:center;">ชั่วโมง</td></tr></tbody></table>
-    </div>`;
-  setTimeout(() => window.print(), 500);
+  try { await callApi('processApproval', { token: authToken, req_id: reqId, decision, reason }); hideLoading(); safeAlert('สำเร็จ', 'บันทึกผลเรียบร้อยแล้ว', 'success'); await loadDashboard(); }
+  catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
 // ==================== นายทะเบียน & แอดมิน ====================
@@ -2305,9 +1907,7 @@ function exportRegistrarCSV() {
     lines.push([idx + 1, r.req_id, r.ref_12_id || '-', getItemTerm(r) || '-', r.category || '-', r.student_id, r.student_name, r.level, r.teacher_name, r.activity_name, formatShortThaiDate(r.activity_date), formatShortThaiDate(r.activity_end_date), r.location, r.hours].map(csvEscape).join(','));
   });
   const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `รายชื่ออนุมัติ_กพช_${new Date().toISOString().slice(0,10)}.csv`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `รายชื่ออนุมัติ_กพช_${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
@@ -2315,14 +1915,11 @@ function confirmRegistrarComplete() {
   const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
   const validIds = checkedIds.filter(id => { const it = dashItems.find(x => x.req_id === id); return it && it.current_step === 'APPROVED_FOR_REGISTRAR'; });
   if (validIds.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่รอนายทะเบียน', 'warning');
-  Swal.fire({ title: `ยืนยันปิดงาน ${validIds.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยัน', cancelButtonText: 'ยกเลิก' }).then(async res => {
+  Swal.fire({ title: `ยืนยันปิดงาน ${validIds.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยัน' }).then(async res => {
     if (res.isConfirmed) {
       showLoading('กำลังอัปเดต...');
-      try {
-        const r = await callApi('markRegistrarCompleted', { token: authToken, req_ids: validIds });
-        hideLoading(); safeAlert('เรียบร้อย', `ปิดงานสำเร็จ ${r.count} รายการ`, 'success');
-        await loadDashboard();
-      } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+      try { const r = await callApi('markRegistrarCompleted', { token: authToken, req_ids: validIds }); hideLoading(); safeAlert('เรียบร้อย', `ปิดงานสำเร็จ ${r.count} รายการ`, 'success'); await loadDashboard(); }
+      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
 }
@@ -2340,53 +1937,35 @@ function switchAdminTab(tab, btn) {
 }
 
 function renderAdminTrash() {
-  const subsBody = document.getElementById('trashSubsBody');
-  const req12Body = document.getElementById('trash12Body');
+  const subsBody = document.getElementById('trashSubsBody'), req12Body = document.getElementById('trash12Body');
   if (subsBody) {
-    subsBody.innerHTML = adminTrashSubs.length === 0
-      ? '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการในถังขยะ</td></tr>'
+    subsBody.innerHTML = adminTrashSubs.length === 0 ? '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการในถังขยะ</td></tr>'
       : adminTrashSubs.map(item => `<tr><td><b>${esc(item.req_id)}</b></td><td>${esc(item.student_name)} (${esc(item.student_id)})</td><td>${esc(item.activity_name)}</td><td>${esc(item.current_step)}</td><td class="small">${esc(item.deleted_at)}<br>${esc(item.deleted_by)}</td><td class="text-end text-nowrap"><button class="btn btn-success btn-sm rounded-pill me-1" onclick="confirmRestoreTrash('SUB', '${esc(item.req_id)}')">♻️ กู้คืน</button><button class="btn btn-outline-danger btn-sm rounded-pill" onclick="confirmPurgeTrash('SUB', '${esc(item.req_id)}')">🔥 ลบถาวร</button></td></tr>`).join('');
   }
   if (req12Body) {
-    req12Body.innerHTML = adminTrash12.length === 0
-      ? '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการในถังขยะ</td></tr>'
+    req12Body.innerHTML = adminTrash12.length === 0 ? '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการในถังขยะ</td></tr>'
       : adminTrash12.map(item => `<tr><td><b>${esc(item.req12_id)}</b></td><td>${esc(item.student_name)} (${esc(item.student_id)})</td><td>${esc(item.activity_name)}</td><td>${esc(item.status_12)}</td><td class="small">${esc(item.deleted_at)}<br>${esc(item.deleted_by)}</td><td class="text-end text-nowrap"><button class="btn btn-success btn-sm rounded-pill me-1" onclick="confirmRestoreTrash('12', '${esc(item.req12_id)}')">♻️ กู้คืน</button><button class="btn btn-outline-danger btn-sm rounded-pill" onclick="confirmPurgeTrash('12', '${esc(item.req12_id)}')">🔥 ลบถาวร</button></td></tr>`).join('');
   }
 }
 
 function confirmRestoreTrash(trashType, itemId) {
   Swal.fire({ title: `♻️ กู้คืน ${esc(itemId)}?`, icon: 'question', showCancelButton: true, confirmButtonText: 'กู้คืน', confirmButtonColor: '#10b981' }).then(async res => {
-    if (res.isConfirmed) {
-      showLoading('กำลังกู้คืน...');
-      try { await callApi('restoreTrash', { token: authToken, trash_type: trashType, item_id: itemId }); hideLoading(); await loadDashboard(); }
-      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
-    }
+    if (res.isConfirmed) { showLoading('กำลังกู้คืน...'); try { await callApi('restoreTrash', { token: authToken, trash_type: trashType, item_id: itemId }); hideLoading(); await loadDashboard(); } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); } }
   });
 }
 
 function confirmPurgeTrash(trashType, itemId) {
   Swal.fire({ title: `🔥 ยืนยันลบถาวร ${esc(itemId)}?`, icon: 'warning', showCancelButton: true, confirmButtonText: 'ลบถาวร', confirmButtonColor: '#dc2626' }).then(async res => {
-    if (res.isConfirmed) {
-      showLoading('กำลังลบถาวร...');
-      try { await callApi('purgeTrash', { token: authToken, trash_type: trashType, item_id: itemId }); hideLoading(); await loadDashboard(); }
-      catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
-    }
+    if (res.isConfirmed) { showLoading('กำลังลบถาวร...'); try { await callApi('purgeTrash', { token: authToken, trash_type: trashType, item_id: itemId }); hideLoading(); await loadDashboard(); } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); } }
   });
 }
 
 function renderAdminUsers() {
-  document.getElementById('adminUsersBody').innerHTML = adminUsers.map(u => `
-    <tr>
-      <td>${esc(u.user_id)}</td><td><b>${esc(u.username)}</b></td><td>${esc(u.full_name)}</td>
-      <td><span class="badge bg-info text-dark">${ROLE_LABELS[u.role] || u.role}</span></td><td>${esc(u.group_name)}</td>
-      <td><span class="badge ${u.status === 'ACTIVE' ? 'bg-success' : 'bg-danger'}">${esc(u.status)}</span></td>
-      <td><button type="button" class="btn btn-warning btn-sm rounded-pill" onclick="openUserModal('${esc(u.user_id)}')"><i class="bi bi-pencil"></i> แก้ไข</button></td>
-    </tr>`).join('');
+  document.getElementById('adminUsersBody').innerHTML = adminUsers.map(u => `<tr><td>${esc(u.user_id)}</td><td><b>${esc(u.username)}</b></td><td>${esc(u.full_name)}</td><td><span class="badge bg-info text-dark">${ROLE_LABELS[u.role] || u.role}</span></td><td>${esc(u.group_name)}</td><td><span class="badge ${u.status === 'ACTIVE' ? 'bg-success' : 'bg-danger'}">${esc(u.status)}</span></td><td><button type="button" class="btn btn-warning btn-sm rounded-pill" onclick="openUserModal('${esc(u.user_id)}')"><i class="bi bi-pencil"></i> แก้ไข</button></td></tr>`).join('');
 }
 
 function renderAdminLogs() {
-  document.getElementById('adminLogsBody').innerHTML = adminLogs.map(l => `
-    <tr><td class="text-nowrap">${esc(l.timestamp)}</td><td><b>${esc(l.req_id)}</b></td><td>${esc(l.actor_name)}</td><td>${esc(l.actor_role)}</td><td><span class="badge bg-secondary">${esc(l.action)}</span></td><td>${esc(l.remark)}</td></tr>`).join('');
+  document.getElementById('adminLogsBody').innerHTML = adminLogs.map(l => `<tr><td class="text-nowrap">${esc(l.timestamp)}</td><td><b>${esc(l.req_id)}</b></td><td>${esc(l.actor_name)}</td><td>${esc(l.actor_role)}</td><td><span class="badge bg-secondary">${esc(l.action)}</span></td><td>${esc(l.remark)}</td></tr>`).join('');
 }
 
 function openUserModal(userId) {
@@ -2409,19 +1988,12 @@ function openUserModal(userId) {
 }
 
 async function handleSaveUser() {
-  const uid = document.getElementById('u_id').value;
-  const uname = document.getElementById('u_username').value.trim();
-  const fname = document.getElementById('u_fullname').value.trim();
-  const pass = document.getElementById('u_password').value;
+  const uid = document.getElementById('u_id').value, uname = document.getElementById('u_username').value.trim(), fname = document.getElementById('u_fullname').value.trim(), pass = document.getElementById('u_password').value;
   if (!uname || !fname || (!uid && !pass)) return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลให้ครบ', 'warning');
   showLoading('กำลังบันทึกบุคลากร...');
   try {
-    await callApi('saveUserAdmin', {
-      token: authToken,
-      user_data: { user_id: uid, username: uname, full_name: fname, role: document.getElementById('u_role').value, group_name: document.getElementById('u_group').value.trim(), new_password: pass, status: document.getElementById('u_status').value }
-    });
-    hideLoading(); closeModalById('userModal'); safeAlert('สำเร็จ', 'บันทึกบุคลากรเรียบร้อยแล้ว', 'success');
-    await loadDashboard();
+    await callApi('saveUserAdmin', { token: authToken, user_data: { user_id: uid, username: uname, full_name: fname, role: document.getElementById('u_role').value, group_name: document.getElementById('u_group').value.trim(), new_password: pass, status: document.getElementById('u_status').value } });
+    hideLoading(); closeModalById('userModal'); safeAlert('สำเร็จ', 'บันทึกบุคลากรเรียบร้อยแล้ว', 'success'); await loadDashboard();
   } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
@@ -2433,22 +2005,14 @@ async function handleSaveAnnouncement() {
   try {
     let pdfFilePayload = null;
     if (file) pdfFilePayload = { name: file.name, base64Data: await readFileAsBase64(file) };
-    const res = await callApi('saveAnnouncement', {
-      token: authToken,
-      announcement: { visible: document.getElementById('ann_visible').checked, badge: document.getElementById('ann_badge').value.trim(), content: document.getElementById('ann_content').value.trim(), remove_pdf: document.getElementById('ann_remove_pdf')?.checked || false, pdf_file: pdfFilePayload }
-    });
-    hideLoading(); renderAnnouncement(res.announcement); renderAdminAnnPdfBox(res.announcement);
-    safeAlert('สำเร็จ', 'อัปเดตข่าวประกาศเรียบร้อยแล้ว', 'success');
+    const res = await callApi('saveAnnouncement', { token: authToken, announcement: { visible: document.getElementById('ann_visible').checked, badge: document.getElementById('ann_badge').value.trim(), content: document.getElementById('ann_content').value.trim(), remove_pdf: document.getElementById('ann_remove_pdf')?.checked || false, pdf_file: pdfFilePayload } });
+    hideLoading(); renderAnnouncement(res.announcement); renderAdminAnnPdfBox(res.announcement); safeAlert('สำเร็จ', 'อัปเดตข่าวประกาศเรียบร้อยแล้ว', 'success');
   } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
 async function handleChangeMyPassword() {
-  const oldPass = document.getElementById('cp_old').value;
-  const newPass = document.getElementById('cp_new').value;
-  const confirmPass = document.getElementById('cp_confirm').value;
-  if (!oldPass || !newPass || newPass.length < 4 || newPass !== confirmPass) {
-    return safeAlert('แจ้งเตือน', 'กรุณากรอกรหัสผ่านให้ถูกต้องและตรงกัน (อย่างน้อย 4 ตัวอักษร)', 'warning');
-  }
+  const oldPass = document.getElementById('cp_old').value, newPass = document.getElementById('cp_new').value, confirmPass = document.getElementById('cp_confirm').value;
+  if (!oldPass || !newPass || newPass.length < 4 || newPass !== confirmPass) return safeAlert('แจ้งเตือน', 'กรุณากรอกรหัสผ่านให้ถูกต้องและตรงกัน (อย่างน้อย 4 ตัวอักษร)', 'warning');
   showLoading('กำลังเปลี่ยนรหัสผ่าน...');
   try {
     await callApi('changePassword', { token: authToken, old_pass: oldPass, new_pass: newPass });
@@ -2459,15 +2023,10 @@ async function handleChangeMyPassword() {
 
 // ==================== เริ่มทำงาน ====================
 function initApp() {
-  const preloadGaruda = new Image();
-  preloadGaruda.src = GARUDA_URL;
-  renderNavbar();
-  loadPublicData();
+  const preloadGaruda = new Image(); preloadGaruda.src = GARUDA_URL;
+  renderNavbar(); loadPublicData();
   const savedToken = sessionStorage.getItem('kpch_token');
-  if (savedToken) {
-    authToken = savedToken;
-    loadDashboard(true);
-  }
+  if (savedToken) { authToken = savedToken; loadDashboard(true); }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initApp);
 else initApp();
