@@ -44,7 +44,7 @@
           </span>
           <span class="small text-muted fw-semibold" id="annBadgeText">กำลังโหลดประกาศ...</span>
         </div>
-        <div class="small text-dark" id="annContentText" style="line-height: 1.75; white-space: pre-line;"></div>
+        <div id="annContentText" class="ann-content-box" style="white-space: pre-line;"></div>
         <div id="annPdfArea" class="mt-3 d-none"></div>
       </div>
 
@@ -61,7 +61,7 @@
         </li>
         <li class="nav-item">
           <button type="button" class="nav-link cute-pill" id="tabBtnStatus" onclick="switchPublicTab('status')">
-            🔍 เช็กสถานะ / แก้ไข / พิมพ์
+            🔍 เช็กสถานะ / แก้ไข / พิมพ์ &amp; โหลด Word
           </button>
         </li>
         <li class="nav-item">
@@ -228,7 +228,7 @@
           </div>
           <div class="input-group">
             <input type="text" class="form-control" id="f_student_id" maxlength="10" inputmode="numeric" placeholder="กรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วย 6) แล้วกดตรวจสอบสิทธิ์..." onkeydown="if(event.key==='Enter') checkEligibilityUI()">
-            <button type="button" class="btn btn-primary fw-bold px-3" style="border-radius: 0 12px 12px 0;" onclick="checkEligibilityUI()">
+            <button type="button" class="btn btn-primary fw-bold px-3" onclick="checkEligibilityUI()">
               <i class="bi bi-shield-check me-1"></i>ตรวจสอบสิทธิ์
             </button>
           </div>
@@ -263,8 +263,8 @@
             <div class="col-12"><label class="form-label fw-semibold small">4.1 การคิด / การวางแผน</label><textarea class="form-control" id="f_k4_plan" rows="2"></textarea></div>
             <div class="col-12"><label class="form-label fw-semibold small">4.2 การดำเนินงาน / ขั้นตอนการดำเนินงาน <span class="text-danger">*</span></label><textarea class="form-control" id="f_activity_detail" rows="3"></textarea></div>
             <div class="col-12"><label class="form-label fw-semibold small">4.3 การเรียนรู้และประสบการณ์ที่ได้รับ</label><textarea class="form-control" id="f_k4_learning" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.4 ปัญหาที่พบและการแก้ไข</label><input type="text" class="form-control" id="f_k4_problem" value="ไม่พบปัญหาในการทำงาน"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.5 / 5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</label><input type="text" class="form-control" id="f_k4_apply"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.4 ปัญหาที่พบและการแก้ไข</label><textarea class="form-control" id="f_k4_problem" rows="2">ไม่พบปัญหาในการทำงาน</textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.5 / 5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</label><textarea class="form-control" id="f_k4_apply" rows="2"></textarea></div>
           </div>
         </div>
 
@@ -282,19 +282,18 @@
         </button>
       </div>
 
-      <!-- แท็บ 3: ตรวจสอบสถานะ & แก้ไข & พิมพ์ -->
+      <!-- แท็บ 3: ตรวจสอบสถานะ & แก้ไข & พิมพ์/โหลด Word -->
       <div id="publicStatusView" class="cute-card p-3 p-md-4 mx-auto d-none" style="max-width: 860px;">
-        <h4 class="fw-bold text-primary mb-2">🔍 ตรวจสอบสถานะ กพช. / แก้ไข / พิมพ์เอกสารของฉัน</h4>
-        <p class="small text-muted mb-3">กรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วย 6) — สามารถกด <b>"ปรับปรุง / แก้ไขข้อมูล"</b> หรือ <b>"สั่งพิมพ์"</b> เฉพาะรายการของตนเองได้</p>
+        <h4 class="fw-bold text-primary mb-2">🔍 ตรวจสอบสถานะ กพช. / แก้ไข / พิมพ์ &amp; โหลด Word</h4>
+        <p class="small text-muted mb-3">กรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วย 6) — สามารถกด <b>"ปรับปรุง / แก้ไขข้อมูล"</b> หรือ <b>"พิมพ์ / ดาวน์โหลดเป็นไฟล์ Word (.doc)"</b> เฉพาะรายการของตนเองได้</p>
         <div class="input-group mb-4">
           <input type="text" id="searchStudentId" maxlength="10" inputmode="numeric" class="form-control" placeholder="กรอกรหัสนักศึกษา 10 หลัก (เช่น 6912345678)..." onkeydown="if(event.key==='Enter') searchMyStatus()">
-          <button type="button" class="btn btn-primary px-4 fw-bold" style="border-radius: 0 12px 12px 0;" onclick="searchMyStatus()">ค้นหา</button>
+          <button type="button" class="btn btn-primary px-4 fw-bold" onclick="searchMyStatus()">ค้นหา</button>
         </div>
         <div id="statusResultArea"></div>
       </div>
     </div>
-
-    <!-- ==================== ส่วนหลังบ้าน (เหลือ 3 ขั้นตอน: นศ. -> ครู -> นายทะเบียน) ==================== -->
+    <!-- ==================== ส่วนหลังบ้าน (3 ขั้นตอน: นศ. -> ครู -> นายทะเบียน) ==================== -->
     <div id="dashboardSection" class="d-none">
       <div class="cute-card p-3 p-md-4 mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -314,7 +313,7 @@
         </div>
       </div>
 
-      <!-- แถบเมนูเฉพาะ ครู (2 แท็บชัดๆ: รายงานผล+พิมพ์ 4-6 | อนุมัติ 1-2+พิมพ์ 3) -->
+      <!-- แถบเมนูเฉพาะ ครู -->
       <ul class="nav nav-pills mb-3 gap-2 d-none flex-nowrap overflow-auto pb-1" id="teacherNavTabs">
         <li class="nav-item text-nowrap">
           <button type="button" class="nav-link cute-pill active" onclick="switchTeacherTab('sub', this)">
@@ -339,7 +338,7 @@
         <li class="nav-item text-nowrap"><button type="button" class="nav-link cute-pill" onclick="switchAdminTab('trash', this)">🗑️ ถังขยะ <span class="badge bg-danger rounded-pill ms-1 d-none" id="badgeTrashCount">0</span></button></li>
       </ul>
 
-      <!-- มุมมอง 1: รายงานผล กพช. 4-6 (ครูอนุมัติ -> ส่งถึงนายทะเบียนทันที & นายทะเบียนดึงรายชื่อรายครูได้) -->
+      <!-- มุมมอง 1: รายงานผล กพช. 4-6 -->
       <div id="dashSubmissionsView" class="cute-card p-3 p-md-4">
         <div class="row g-2 align-items-center mb-3" id="subFilterRow">
           <div class="col-12 col-lg-auto">
@@ -375,12 +374,12 @@
           </div>
         </div>
 
-        <!-- แถบครู: อนุมัติส่งนายทะเบียน + พิมพ์ชุด กพช. 4-6 -->
+        <!-- แถบครู: อนุมัติส่งนายทะเบียน + พิมพ์/โหลด Word ชุด กพช. 4-6 -->
         <div id="teacherSubActionBar" class="alert alert-info border-0 rounded-4 d-none mb-3">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
             <div class="small">
-              <strong><i class="bi bi-check2-square me-1"></i>ตรวจอนุมัติ &amp; พิมพ์ชุด กพช. 4-6 ส่งนายทะเบียน:</strong>
-              ติ๊กเลือกรายการที่ต้องการ เพื่ออนุมัติส่งตรงถึงนายทะเบียน หรือพิมพ์เอกสาร กพช. 4-6 ส่งกระดาษ
+              <strong><i class="bi bi-check2-square me-1"></i>ตรวจอนุมัติ &amp; พิมพ์/โหลด Word ชุด กพช. 4-6 ส่งนายทะเบียน:</strong>
+              ติ๊กเลือกรายการที่ต้องการ เพื่ออนุมัติส่งตรงถึงนายทะเบียน หรือเลือกพิมพ์/ดาวน์โหลดเป็นไฟล์ Word เพื่อแก้ไข
             </div>
             <div class="d-flex flex-wrap gap-2">
               <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchApproveSub()">
@@ -390,25 +389,25 @@
                 <i class="bi bi-arrow-return-left me-1"></i>ตีกลับระบุเหตุผล
               </button>
               <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openDoc57ConfigAndPrint()">
-                <i class="bi bi-printer me-1"></i>พิมพ์ชุด กพช. 4-6 + บันทึก (ที่ติ๊ก)
+                <i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช. 4-6 (ที่ติ๊ก)
               </button>
             </div>
           </div>
         </div>
 
-        <!-- แถบเครื่องมือนายทะเบียน (ดึงรายชื่อรายครู + โหลด Excel + พิมพ์ + ปิดงาน) -->
+        <!-- แถบเครื่องมือนายทะเบียน -->
         <div id="registrarTools" class="alert alert-success border-0 rounded-4 d-none mb-3">
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
             <div>
               <strong><i class="bi bi-file-earmark-excel me-1"></i>เครื่องมือนายทะเบียน (กรองดูรายครู / ภาคเรียน / ประเภท กพช. ได้ด้านบน)</strong>
-              <div class="small">ดาวน์โหลดรายชื่อที่ครูอนุมัติแล้วแยกตามครูประจำกลุ่ม หรือติ๊กเลือกเพื่อบันทึกปิดงาน</div>
+              <div class="small">ดาวน์โหลดรายชื่อที่ครูอนุมัติแล้วแยกตามครูประจำกลุ่ม หรือติ๊กเลือกเพื่อพิมพ์/โหลด Word และบันทึกปิดงาน</div>
             </div>
             <div class="d-flex flex-wrap gap-2">
               <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="exportRegistrarCSV()">
                 <i class="bi bi-download me-1"></i>โหลด Excel (.CSV) ที่รอลงทะเบียน
               </button>
               <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openDoc57ConfigAndPrint()">
-                <i class="bi bi-printer me-1"></i>พิมพ์ กพช. 4-6 (ที่ติ๊ก)
+                <i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช. 4-6 (ที่ติ๊ก)
               </button>
               <button type="button" class="btn btn-dark btn-sm rounded-pill px-3 fw-bold" onclick="confirmRegistrarComplete()">
                 <i class="bi bi-check2-all me-1"></i>ยืนยันบันทึกทะเบียนแล้ว (ที่ติ๊ก)
@@ -447,7 +446,7 @@
         <div class="d-block d-md-none" id="dashMobileCards"></div>
       </div>
 
-      <!-- มุมมอง 2: อนุมัติ กพช. 1-2 & พิมพ์ กพช. 3 + บันทึกข้อความ -->
+      <!-- มุมมอง 2: อนุมัติ กพช. 1-2 & พิมพ์/โหลด Word กพช. 3 + บันทึกข้อความ -->
       <div id="dash12View" class="cute-card p-3 p-md-4 d-none">
         <div class="row g-2 align-items-center mb-3">
           <div class="col-12 col-lg-auto">
@@ -484,10 +483,10 @@
           <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
             <div class="small">
               <strong><i class="bi bi-file-earmark-richtext me-1"></i>จัดชุดเสนอโครงการ (กพช. 3 + บันทึกข้อความ):</strong>
-              ติ๊กเลือกรายการที่ <b>อนุมัติ กพช.1-2 แล้ว</b> (รวมกลุ่มหลายคนได้) เพื่อสั่งพิมพ์ชุด กพช. 3 + บันทึกข้อความ &nbsp;|&nbsp; <span class="text-muted">ส่วนใบ กพช. 1-2 กดพิมพ์รายคนได้ที่ปุ่มท้ายแถว</span>
+              ติ๊กเลือกรายการที่ <b>อนุมัติ กพช.1-2 แล้ว</b> เพื่อสั่งพิมพ์หรือดาวน์โหลดไฟล์ Word &nbsp;|&nbsp; <span class="text-muted">ส่วนใบ กพช. 1-2 กดที่ปุ่มท้ายแถว</span>
             </div>
             <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openDoc56PrintModal()">
-              <i class="bi bi-printer me-1"></i>พิมพ์ชุด กพช. 3 + บันทึก (ที่ติ๊กเลือก)
+              <i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word ชุด กพช. 3 + บันทึก (ที่ติ๊ก)
             </button>
           </div>
         </div>
@@ -544,7 +543,7 @@
         <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>รหัส</th><th>ชื่อประเภท กพช.</th><th>ชื่อโครงการแนะนำ</th><th>ชม.มาตรฐาน</th><th>สถานะ</th><th class="text-end">จัดการ</th></tr></thead><tbody id="adminCategoriesBody"></tbody></table></div>
       </div>
 
-      <!-- มุมมองแอดมิน: จัดการผู้ใช้ (เหลือบทบาทหลักที่ใช้งานจริง) -->
+      <!-- มุมมองแอดมิน: จัดการผู้ใช้ -->
       <div id="adminUsersView" class="cute-card p-3 p-md-4 d-none">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h5 class="fw-bold mb-0">👥 รายชื่อบุคลากรในระบบ</h5><button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openUserModal()"><i class="bi bi-person-plus me-1"></i>เพิ่มบุคลากรใหม่</button></div>
         <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>ID</th><th>Username</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>กลุ่ม/สังกัด</th><th>สถานะ</th><th>แก้ไข</th></tr></thead><tbody id="adminUsersBody"></tbody></table></div>
@@ -621,13 +620,13 @@
     </div>
   </div>
 
-  <!-- Modal จัดชุด & พิมพ์ กพช. 3 + บันทึกข้อความ -->
+  <!-- Modal จัดชุด & พิมพ์/โหลด Word กพช. 3 + บันทึกข้อความ -->
   <div class="modal fade no-print" id="doc56Modal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content rounded-4 border-0">
-        <div class="modal-header bg-primary text-white"><h5 class="modal-title fw-bold">🖨️ พิมพ์ชุด กพช. 3 + บันทึกข้อความ (เอกสาร 56)</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header bg-primary text-white"><h5 class="modal-title fw-bold">🖨️ พิมพ์ / ดาวน์โหลด Word ชุด กพช. 3 + บันทึกข้อความ (เอกสาร 56)</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-          <div class="alert alert-info small py-2 mb-2">รวมรายชื่อนักศึกษาที่ผ่านการอนุมัติ กพช.1-2 แล้ว จำนวน <strong id="d56_count">0</strong> คน (จัดพิมพ์เป็น 1 ชุดเอกสาร)</div>
+          <div class="alert alert-info small py-2 mb-2">รวมรายชื่อนักศึกษาที่ผ่านการอนุมัติ กพช.1-2 แล้ว จำนวน <strong id="d56_count">0</strong> คน (เลือกพิมพ์ทันที หรือดาวน์โหลดไฟล์ Word เพื่อแก้ไขบางบรรทัด)</div>
           <div class="row g-2">
             <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control" id="d56_doc_no" value="ศธ 07058.02/"></div>
             <div class="col-12 col-md-4"><label class="form-label fw-semibold small">วันที่ (บันทึกข้อความ)</label><input type="text" class="form-control" id="d56_doc_date"></div>
@@ -653,18 +652,25 @@
             <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control" id="d56_director"></div>
           </div>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-primary w-100 rounded-pill fw-bold py-2" onclick="executePrintDoc56()"><i class="bi bi-printer me-2"></i>สั่งพิมพ์ชุด กพช. 3 + บันทึกข้อความ</button></div>
+        <div class="modal-footer d-flex flex-column flex-sm-row gap-2">
+          <button type="button" class="btn btn-outline-primary flex-fill rounded-pill fw-bold py-2" onclick="executeOutputDoc56('word')">
+            <i class="bi bi-file-earmark-word me-2"></i>ดาวน์โหลดไฟล์ Word (.doc) เพื่อแก้ไข
+          </button>
+          <button type="button" class="btn btn-primary flex-fill rounded-pill fw-bold py-2" onclick="executeOutputDoc56('print')">
+            <i class="bi bi-printer me-2"></i>สั่งปริ้นทันที
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal จัดชุด & พิมพ์ กพช. 4-6 + บันทึกข้อความ -->
+  <!-- Modal จัดชุด & พิมพ์/โหลด Word กพช. 4-6 + บันทึกข้อความ -->
   <div class="modal fade no-print" id="doc57Modal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content rounded-4 border-0">
-        <div class="modal-header bg-success text-white"><h5 class="modal-title fw-bold">🖨️ พิมพ์ชุด กพช. 4-6 + บันทึกข้อความ (เอกสาร 57)</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header bg-success text-white"><h5 class="modal-title fw-bold">🖨️ พิมพ์ / ดาวน์โหลด Word ชุด กพช. 4-6 + บันทึกข้อความ (เอกสาร 57)</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-          <div class="alert alert-success small py-2">จำนวนรายการที่ติ๊กเลือก: <strong id="d57_count">0</strong> คน</div>
+          <div class="alert alert-success small py-2">จำนวนรายการที่ติ๊กเลือก: <strong id="d57_count">0</strong> คน (เลือกพิมพ์ทันที หรือดาวน์โหลดไฟล์ Word เพื่อแก้ไขบางบรรทัด)</div>
           <div class="row g-2">
             <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control" id="d57_doc_no" value="ศธ 07058.02/"></div>
             <div class="col-12 col-md-6"><label class="form-label fw-semibold small">วันที่บันทึกข้อความ</label><input type="text" class="form-control" id="d57_doc_date"></div>
@@ -681,7 +687,14 @@
             <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control" id="d57_director"></div>
           </div>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-success w-100 rounded-pill fw-bold py-2" onclick="executePrintDoc57()"><i class="bi bi-printer me-2"></i>สั่งพิมพ์ชุด กพช. 4-6 + บันทึกข้อความ</button></div>
+        <div class="modal-footer d-flex flex-column flex-sm-row gap-2">
+          <button type="button" class="btn btn-outline-success flex-fill rounded-pill fw-bold py-2" onclick="executeOutputDoc57('word')">
+            <i class="bi bi-file-earmark-word me-2"></i>ดาวน์โหลดไฟล์ Word (.doc) เพื่อแก้ไข
+          </button>
+          <button type="button" class="btn btn-success flex-fill rounded-pill fw-bold py-2" onclick="executeOutputDoc57('print')">
+            <i class="bi bi-printer me-2"></i>สั่งปริ้นทันที
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -711,8 +724,8 @@
                 <div class="col-12"><label class="form-label fw-semibold small">4.1 การคิด/การวางแผน</label><textarea class="form-control" id="se_k4_plan" rows="2"></textarea></div>
                 <div class="col-12"><label class="form-label fw-semibold small">4.2 การดำเนินงาน / รายละเอียด</label><textarea class="form-control" id="se_detail" rows="3"></textarea></div>
                 <div class="col-12"><label class="form-label fw-semibold small">4.3 การเรียนรู้และประสบการณ์</label><textarea class="form-control" id="se_k4_learning" rows="2"></textarea></div>
-                <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.4 ปัญหาและการแก้ไข</label><input type="text" class="form-control" id="se_k4_problem"></div>
-                <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.5 / 5. การนำไปใช้</label><input type="text" class="form-control" id="se_k4_apply"></div>
+                <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.4 ปัญหาและการแก้ไข</label><textarea class="form-control" id="se_k4_problem" rows="2"></textarea></div>
+                <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.5 / 5. การนำไปใช้</label><textarea class="form-control" id="se_k4_apply" rows="2"></textarea></div>
                 <div class="col-12"><label class="form-label fw-semibold small">📸 เปลี่ยนรูปภาพใหม่ (2-3 ภาพ)</label><input type="file" class="form-control" id="se_images" accept="image/*" multiple onchange="handleEditImageSelection(this)"><div id="se_imagePreviewBox" class="d-flex flex-wrap gap-2 mt-2"></div></div>
               </div>
             </div>
@@ -723,7 +736,7 @@
     </div>
   </div>
 
-  <!-- Modal เพิ่ม/แก้ไขผู้ใช้ (3 บทบาทหลัก) -->
+  <!-- Modal เพิ่ม/แก้ไขผู้ใช้ -->
   <div class="modal fade no-print" id="userModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content rounded-4 border-0">
