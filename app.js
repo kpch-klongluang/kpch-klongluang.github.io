@@ -11,10 +11,10 @@ const EVAL_QUESTIONS_12 = [
   'ท่านได้รับความรู้เกี่ยวกับโครงสร้างและประโยชน์ของ กพช. ระดับใด',
   'ท่านมีความรู้ในเรื่องแนวทางการพัฒนาตนเอง ครอบครัว ชุมชน สังคมในระดับใด',
   'ท่านได้รับความรู้เกี่ยวกับกระบวนการกลุ่มในระดับใด',
-  'ท่านได้รับความรู้ในเรื่องกระบวนการคิดเป็น ทำเป็น แก้ปัญหาเป็น และการนำไปใช้ในการดำเนินชีวิตใน ระดับใด',
-  'ท่านได้รับความรู้ในเรื่องการประสานเครือข่ายในระดับ ใด',
+  'ท่านได้รับความรู้ในเรื่องกระบวนการคิดเป็น ทำเป็น แก้ปัญหาเป็น และการนำไปใช้ในการดำเนินชีวิตในระดับใด',
+  'ท่านได้รับความรู้ในเรื่องการประสานเครือข่ายในระดับใด',
   'ท่านได้รับความรู้ในเรื่องการเป็นผู้นำผู้ตามในระดับใด',
-  'ท่านมีความรู้ในเรื่องการวางแผน และประโยชน์ของการ วางแผนในระดับใด',
+  'ท่านมีความรู้ในเรื่องการวางแผน และประโยชน์ของการวางแผนในระดับใด',
   'ท่านมีความรู้ในเรื่องมนุษยสัมพันธ์ในระดับใด',
   'ท่านได้รับความรู้ในเรื่องการเขียนโครงการในระดับใด'
 ];
@@ -87,13 +87,48 @@ function esc(str) {
   if (str === null || str === undefined) return '';
   return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+function escJs(str) {
+  if (str === null || str === undefined) return '';
+  return esc(String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r/g, '\\r').replace(/\n/g, '\\n'));
+}
 function validateStudentId10(sid) {
   return /^6\d{9}$/.test(String(sid || '').trim());
 }
 function getDriveThumb(url) {
   if (!url) return '';
-  const m = url.match(/[-\w]{25,}/);
+  const m = String(url).match(/[-\w]{25,}/);
   return m ? `https://drive.google.com/thumbnail?id=${m[0]}&sz=w800` : url;
+}
+function waitForPrintImages(container, maxWaitMs = 2500) {
+  const imgs = Array.from(container.querySelectorAll('img'));
+  if (imgs.length === 0) return Promise.resolve();
+  const promises = imgs.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    });
+  });
+  return Promise.race([
+    Promise.all(promises),
+    new Promise(resolve => setTimeout(resolve, maxWaitMs))
+  ]);
+}
+async function triggerPrint() {
+  const container = document.getElementById('printOnlyContainer');
+  await waitForPrintImages(container);
+  setTimeout(() => window.print(), 150);
+}
+function syncCheckPair(cb, cls) {
+  document.querySelectorAll(`.${cls}`).forEach(el => {
+    if (el !== cb && el.value === cb.value) el.checked = cb.checked;
+  });
+}
+function getCheckedUniqueIds(cls) {
+  const all = Array.from(document.querySelectorAll(`.${cls}:checked`));
+  const visible = all.filter(cb => cb.offsetParent !== null);
+  const source = visible.length > 0 ? visible : all;
+  return Array.from(new Set(source.map(cb => cb.value)));
 }
 function formatThaiDate(dateInput) {
   const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -224,6 +259,7 @@ function closeModalById(id) {
 }
 function renderNavbar() {
   const area = document.getElementById('navUserArea');
+  if (!area) return;
   if (currentUser) {
     area.innerHTML = `
       <span class="text-white small">
@@ -244,7 +280,7 @@ function populateCategorySelects() {
 
   ['p12_category', 'f_category', 'se_category'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { const prev = el.value; el.innerHTML = studentOpts; if (prev) el.value = prev; }
+    if (el) { const prev = el.value; el.innerHTML = studentOpts; if (prev && Array.from(el.options).some(o => o.value === prev)) el.value = prev; }
   });
   ['dashCategoryFilter', 'dash12CategoryFilter'].forEach(id => {
     const el = document.getElementById(id);
@@ -277,8 +313,8 @@ function renderAdminCategories() {
       <td class="text-center">${esc(c.default_hours || 25)}</td>
       <td><span class="badge ${c.status === 'INACTIVE' ? 'bg-secondary' : 'bg-success'}">${esc(c.status)}</span></td>
       <td class="text-end text-nowrap">
-        <button type="button" class="btn btn-warning btn-sm rounded-pill" onclick="openCategoryModal('${esc(c.cat_id)}')"><i class="bi bi-pencil"></i> แก้ไข</button>
-        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDeleteCategory('${esc(c.cat_id)}')"><i class="bi bi-trash"></i></button>
+        <button type="button" class="btn btn-warning btn-sm rounded-pill" onclick="openCategoryModal('${escJs(c.cat_id)}')"><i class="bi bi-pencil"></i> แก้ไข</button>
+        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDeleteCategory('${escJs(c.cat_id)}')"><i class="bi bi-trash"></i></button>
       </td>
     </tr>`).join('');
 }
@@ -344,6 +380,7 @@ function switchPublicTab(tab) {
 
 function renderAnnouncement(ann) {
   const box = document.getElementById('announcementBox'), pdfArea = document.getElementById('annPdfArea');
+  if (!box) return;
   if (!ann || !ann.visible) { box.classList.add('d-none'); if (pdfArea) { pdfArea.classList.add('d-none'); pdfArea.innerHTML = ''; } return; }
   box.classList.remove('d-none');
   document.getElementById('annBadgeText').innerText = ann.badge || '';
@@ -367,11 +404,14 @@ async function loadPublicData() {
     publicTeachersList = data.teachers || [];
     const html = publicTeachersList.length === 0 ? '<option value="">-- ยังไม่มีรายชื่อครูในระบบ --</option>'
       : '<option value="">-- กรุณาเลือกครูประจำกลุ่ม --</option>' + publicTeachersList.map(t => `<option value="${esc(t.user_id)}">${esc(t.full_name)} (${esc(t.group_name)})</option>`).join('');
-    sel1.innerHTML = html; sel2.innerHTML = html;
+    if (sel1) sel1.innerHTML = html;
+    if (sel2) sel2.innerHTML = html;
     if (selEdit) selEdit.innerHTML = html;
   } catch (err) {
     const errOpt = '<option value="">-- โหลดรายชื่อครูไม่สำเร็จ --</option>';
-    sel1.innerHTML = errOpt; sel2.innerHTML = errOpt;
+    if (sel1) sel1.innerHTML = errOpt;
+    if (sel2) sel2.innerHTML = errOpt;
+    if (selEdit) selEdit.innerHTML = errOpt;
     if (errEl) { errEl.innerText = err.message; errEl.classList.remove('d-none'); }
   }
 }
@@ -383,10 +423,22 @@ function onSelectPre12Teacher() {
 }
 
 async function handlePre12Submit() {
-  const sid = document.getElementById('p12_student_id').value.trim(), sname = document.getElementById('p12_student_name').value.trim(), lvl = document.getElementById('p12_level').value, tid = document.getElementById('p12_teacher_id').value, grp = document.getElementById('p12_group_name').value.trim(), cat = document.getElementById('p12_category').value, term = document.getElementById('p12_term').value.trim(), roleNote = document.getElementById('p12_role_note').value, actName = document.getElementById('p12_activity_name').value.trim(), startDate = document.getElementById('p12_start_date').value, endDate = document.getElementById('p12_end_date').value, loc = document.getElementById('p12_location').value.trim(), evalOk = document.getElementById('p12_self_eval_ok').checked;
+  const sid = document.getElementById('p12_student_id').value.trim(),
+        sname = document.getElementById('p12_student_name').value.trim(),
+        lvl = document.getElementById('p12_level').value,
+        tid = document.getElementById('p12_teacher_id').value,
+        grp = document.getElementById('p12_group_name').value.trim(),
+        cat = document.getElementById('p12_category').value,
+        term = document.getElementById('p12_term').value.trim(),
+        roleNote = document.getElementById('p12_role_note').value,
+        actName = document.getElementById('p12_activity_name').value.trim(),
+        startDate = document.getElementById('p12_start_date').value,
+        endDate = document.getElementById('p12_end_date').value,
+        loc = document.getElementById('p12_location').value.trim(),
+        evalOk = document.getElementById('p12_self_eval_ok').checked;
 
   if (!validateStudentId10(sid)) return safeAlert('รหัสนักศึกษาไม่ถูกต้อง', 'กรุณากรอกรหัสนักศึกษาที่ขึ้นต้นด้วยเลข 6 และมี 10 หลักเท่านั้น (เช่น 6912345678)', 'warning');
-  if (!sname || !lvl || !tid || !grp || !cat || !actName || !startDate || !endDate) return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * และเลือกประเภท กพช. ให้ครบทุกช่อง', 'warning');
+  if (!sname || !lvl || !tid || !grp || !cat || !term || !actName || !startDate || !endDate) return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * และเลือกประเภท กพช. ให้ครบทุกช่อง', 'warning');
   if (endDate < startDate) return safeAlert('วันที่ไม่ถูกต้อง', 'วันที่คาดว่าจะสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม', 'warning');
 
   const evalScores = [];
@@ -418,7 +470,10 @@ async function handlePre12Submit() {
     });
     hideLoading();
     safeAlert('ยื่นขอ กพช.1-2 สำเร็จ! 📋', `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req12_id)}</b><br>กรุณารอครูประจำกลุ่มอนุมัติก่อนลงมือทำกิจกรรม`, 'success');
-    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_category','p12_role_note','p12_activity_name','p12_start_date','p12_end_date'].forEach(id => { document.getElementById(id).value = ''; });
+    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_category','p12_role_note','p12_activity_name','p12_start_date','p12_end_date','p12_location'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
     for (let i = 1; i <= 10; i++) document.querySelectorAll(`input[name="eval_q${i}"]`).forEach(el => el.checked = false);
     document.getElementById('p12_self_eval_ok').checked = false;
   } catch (err) { hideLoading(); safeAlert('เกิดข้อผิดพลาด', err.message, 'error'); }
@@ -443,14 +498,14 @@ async function checkEligibilityUI() {
     hideLoading(); banner.classList.remove('d-none');
     if (!res.hasAny12) {
       resetSubmitLock('ไม่สามารถส่งได้ (ยังไม่ได้ขออนุมัติ กพช.1-2)');
-      banner.innerHTML = `<div class="alert alert-danger mb-0 rounded-3 small"><div class="fw-bold mb-1">❌ ยังไม่พบคำขออนุมัติทำ กพช. ของรหัส ${esc(sid)}</div><button type="button" class="btn btn-danger btn-sm rounded-pill mt-1 fw-bold" onclick="goToPre12WithId('${esc(sid)}')">📋 ไปหน้าขออนุมัติ กพช.1-2 ทันที</button></div>`;
+      banner.innerHTML = `<div class="alert alert-danger mb-0 rounded-3 small"><div class="fw-bold mb-1">❌ ยังไม่พบคำขออนุมัติทำ กพช. ของรหัส ${esc(sid)}</div><button type="button" class="btn btn-danger btn-sm rounded-pill mt-1 fw-bold" onclick="goToPre12WithId('${escJs(sid)}')">📋 ไปหน้าขออนุมัติ กพช.1-2 ทันที</button></div>`;
       return;
     }
     const approvedList = (res.approvals12 || []).filter(x => x.status_12 === 'APPROVED_12');
     if (approvedList.length === 0) {
       const latest = res.approvals12[0], st = STEP12_LABELS[latest.status_12] || { text: latest.status_12 };
       resetSubmitLock('รอครูอนุมัติ กพช.1-2 ก่อนจึงจะส่งผลงานได้');
-      banner.innerHTML = `<div class="alert alert-warning mb-0 rounded-3 small"><div class="fw-bold mb-1">⏳ ยังไม่สามารถส่งผลงานได้ (สถานะ: ${st.text})</div><div>รหัส: <b>${esc(latest.req12_id)}</b> | ${esc(latest.activity_name)}</div>${latest.status_12 === 'REJECTED_12' ? `<div class="text-danger mt-1"><b>เหตุผลที่ตีกลับ:</b> ${esc(latest.reject_reason_12)} — ไปแก้ไขได้ที่แท็บ <b>"🔍 เช็กสถานะ"</b></div>` : ''}</div>`;
+      banner.innerHTML = `<div class="alert alert-warning mb-0 rounded-3 small"><div class="fw-bold mb-1">⏳ ยังไม่สามารถส่งผลงานได้ (สถานะ: ${esc(st.text)})</div><div>รหัส: <b>${esc(latest.req12_id)}</b> | ${esc(latest.activity_name)}</div>${latest.status_12 === 'REJECTED_12' ? `<div class="text-danger mt-1"><b>เหตุผลที่ตีกลับ:</b> ${esc(latest.reject_reason_12)} — ไปแก้ไขได้ที่แท็บ <b>"🔍 เช็กสถานะ"</b></div>` : ''}</div>`;
       return;
     }
     currentEligibleList12 = approvedList;
@@ -495,8 +550,10 @@ async function handleImageSelection(input) {
       compressedImages.push({ name: file.name, mimeType: 'image/jpeg', base64Data: b64.split(',')[1] });
       box.innerHTML += `<img src="${b64}" class="thumb-preview">`;
     }
-  } catch (err) { safeAlert('ผิดพลาด', 'ไม่สามารถอ่านไฟล์รูปภาพได้', 'error'); }
-  finally { hideLoading(); }
+  } catch (err) {
+    compressedImages = []; box.innerHTML = ''; input.value = '';
+    safeAlert('ผิดพลาด', 'ไม่สามารถอ่านไฟล์รูปภาพได้', 'error');
+  } finally { hideLoading(); }
 }
 
 async function handleEditImageSelection(input) {
@@ -511,6 +568,9 @@ async function handleEditImageSelection(input) {
       editCompressedImages.push({ name: file.name, mimeType: 'image/jpeg', base64Data: b64.split(',')[1] });
       box.innerHTML += `<img src="${b64}" class="thumb-preview">`;
     }
+  } catch (err) {
+    editCompressedImages = []; box.innerHTML = ''; input.value = '';
+    safeAlert('ผิดพลาด', 'ไม่สามารถอ่านไฟล์รูปภาพได้', 'error');
   } finally { hideLoading(); }
 }
 
@@ -533,11 +593,23 @@ function compressImageFile(file, maxSize, quality) {
 }
 
 async function handleStudentSubmit() {
-  const sid = document.getElementById('f_student_id').value.trim(), ref12Id = document.getElementById('f_ref_12_id').value, sname = document.getElementById('f_student_name').value.trim(), lvl = document.getElementById('f_level').value, cat = document.getElementById('f_category').value, tid = document.getElementById('f_teacher_id').value, grp = document.getElementById('f_group_name').value.trim(), hrs = document.getElementById('f_hours').value, actName = document.getElementById('f_activity_name').value.trim(), startDate = document.getElementById('f_activity_date').value, endDate = document.getElementById('f_activity_end_date').value, loc = document.getElementById('f_location').value.trim(), detail = document.getElementById('f_activity_detail').value.trim();
+  const sid = document.getElementById('f_student_id').value.trim(),
+        ref12Id = document.getElementById('f_ref_12_id').value,
+        sname = document.getElementById('f_student_name').value.trim(),
+        lvl = document.getElementById('f_level').value,
+        cat = document.getElementById('f_category').value,
+        tid = document.getElementById('f_teacher_id').value,
+        grp = document.getElementById('f_group_name').value.trim(),
+        hrs = document.getElementById('f_hours').value,
+        actName = document.getElementById('f_activity_name').value.trim(),
+        startDate = document.getElementById('f_activity_date').value,
+        endDate = document.getElementById('f_activity_end_date').value,
+        loc = document.getElementById('f_location').value.trim(),
+        detail = document.getElementById('f_activity_detail').value.trim();
 
   if (!validateStudentId10(sid)) return safeAlert('รหัสนักศึกษาไม่ถูกต้อง', 'รหัสนักศึกษาต้องขึ้นต้นด้วยเลข 6 และมี 10 หลักเท่านั้น', 'warning');
   if (!ref12Id) return safeAlert('ยังไม่ได้รับอนุมัติ กพช.1-2', 'กรุณาตรวจสอบสิทธิ์ กพช.1-2 ก่อนส่งผลงาน', 'warning');
-  if (!sname || !lvl || !cat || !tid || !grp || !hrs || !actName || !startDate || !endDate || !detail) return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * และเลือกประเภท กพช. ให้ครบ', 'warning');
+  if (!sname || !lvl || !cat || !tid || !grp || !hrs || Number(hrs) <= 0 || !actName || !startDate || !endDate || !detail) return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลที่มีเครื่องหมาย * และเลือกประเภท กพช. ให้ครบ', 'warning');
   if (endDate < startDate) return safeAlert('วันที่ไม่ถูกต้อง', 'วันสิ้นสุดโครงการต้องไม่น้อยกว่าวันที่เริ่มโครงการ', 'warning');
   if (compressedImages.length < 2 || compressedImages.length > 3) return safeAlert('รูปภาพไม่ครบ', 'กรุณาแนบรูปภาพกิจกรรม 2 - 3 ภาพ', 'warning');
 
@@ -554,7 +626,10 @@ async function handleStudentSubmit() {
     });
     hideLoading();
     safeAlert('ส่งรายงานผล กพช.4 สำเร็จ! 🎉', `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req_id)}</b><br>เรื่องถูกส่งไปยังครูประจำกลุ่มเรียบร้อยแล้ว`, 'success');
-    ['f_student_id','f_student_name','f_level','f_category','f_teacher_id','f_group_name','f_hours','f_activity_name','f_activity_date','f_activity_end_date','f_location','f_k4_plan','f_activity_detail','f_k4_learning','f_k4_apply','f_images'].forEach(id => { document.getElementById(id).value = ''; });
+    ['f_student_id','f_student_name','f_level','f_category','f_teacher_id','f_group_name','f_hours','f_activity_name','f_activity_date','f_activity_end_date','f_location','f_k4_plan','f_activity_detail','f_k4_learning','f_k4_problem','f_k4_apply','f_images'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
     document.getElementById('imagePreviewBox').innerHTML = ''; document.getElementById('eligibilityBanner').classList.add('d-none');
     compressedImages = []; resetSubmitLock();
   } catch (err) { hideLoading(); safeAlert('เกิดข้อผิดพลาด', err.message, 'error'); }
@@ -574,7 +649,7 @@ async function searchMyStatus() {
     const area = document.getElementById('statusResultArea');
 
     if (list12.length === 0 && listSubs.length === 0) {
-      area.innerHTML = `<div class="alert alert-warning rounded-4 text-center"><div class="fw-bold mb-1">❌ ยังไม่พบประวัติของรหัส ${esc(sid)}</div><button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold mt-2" onclick="goToPre12WithId('${esc(sid)}')">📋 ไปยื่นขอ กพช.1-2 ตอนนี้</button></div>`;
+      area.innerHTML = `<div class="alert alert-warning rounded-4 text-center"><div class="fw-bold mb-1">❌ ยังไม่พบประวัติของรหัส ${esc(sid)}</div><button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold mt-2" onclick="goToPre12WithId('${escJs(sid)}')">📋 ไปยื่นขอ กพช.1-2 ตอนนี้</button></div>`;
       return;
     }
 
@@ -595,8 +670,8 @@ async function searchMyStatus() {
             ${r.status_12 === 'APPROVED_12' ? `<div class="small text-success fw-semibold mt-2">✅ อนุมัติเมื่อ: ${esc(r.approved_at_12)}</div>` : ''}
             ${r.reject_reason_12 ? `<div class="alert alert-danger mt-2 mb-1 py-2 small rounded-3"><b>เหตุผลที่ครูตีกลับ:</b> ${esc(r.reject_reason_12)}</div>` : ''}
             <div class="d-flex flex-wrap gap-2 mt-2">
-              ${canEdit ? `<button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('12', '${esc(r.req12_id)}')"><i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล</button>` : ''}
-              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf12('${esc(r.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช.1-2 ของฉัน</button>
+              ${canEdit ? `<button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('12', '${escJs(r.req12_id)}')"><i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล</button>` : ''}
+              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf12('${escJs(r.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช.1-2 ของฉัน</button>
             </div>
           </div>`;
       }).join('');
@@ -625,8 +700,8 @@ async function searchMyStatus() {
             <div class="cute-progress-bar">${progHtml}</div>
             ${r.reject_reason ? `<div class="alert alert-danger mt-2 mb-1 py-2 small rounded-3"><b>เหตุผลที่ครูตีกลับ:</b> ${esc(r.reject_reason)}</div>` : ''}
             <div class="d-flex flex-wrap gap-2 mt-2">
-              ${canEdit ? `<button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('sub', '${esc(r.req_id)}')"><i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล</button>` : ''}
-              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf4('${esc(r.req_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์รายงานผล กพช.4 ของฉัน</button>
+              ${canEdit ? `<button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('sub', '${escJs(r.req_id)}')"><i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล</button>` : ''}
+              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf4('${escJs(r.req_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์รายงานผล กพช.4 ของฉัน</button>
             </div>
           </div>`;
       }).join('');
@@ -639,7 +714,7 @@ function printMySelf12(req12Id) {
   const item = lastStatus12List.find(x => x.req12_id === req12Id);
   if (!item) return;
   document.getElementById('printOnlyContainer').innerHTML = buildKPCH12Html(item);
-  setTimeout(() => window.print(), 350);
+  triggerPrint();
 }
 
 function printMySelf4(reqId) {
@@ -650,7 +725,7 @@ function printMySelf4(reqId) {
   const k4 = buildKPCH4Html([item], { projName: item.activity_name || '', sDate, eDate, loc: item.location || '', tName: item.teacher_name || '' });
   const photoPage = imgs.length > 0 ? `<div class="page-break-before"><div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:10px;">ภาพถ่ายประกอบการดำเนินกิจกรรม (${esc(item.student_name)})</div><div class="photo-grid">${imgs.map(u => `<img src="${esc(u)}">`).join('')}</div></div>` : '';
   document.getElementById('printOnlyContainer').innerHTML = k4 + photoPage;
-  setTimeout(() => window.print(), 500);
+  triggerPrint();
 }
 
 function openStudentEditModal(itemType, id) {
@@ -661,7 +736,16 @@ function openStudentEditModal(itemType, id) {
   document.getElementById('se_type').value = itemType; document.getElementById('se_id').value = id; document.getElementById('se_req_id').innerText = id;
   document.getElementById('se_student_name').value = item.student_name || ''; document.getElementById('se_level').value = item.level || '';
   document.getElementById('se_teacher_id').value = item.teacher_id || ''; document.getElementById('se_group_name').value = item.group_name || '';
-  document.getElementById('se_category').value = item.category || ''; document.getElementById('se_activity_name').value = item.activity_name || '';
+
+  const catSel = document.getElementById('se_category');
+  if (item.category && !Array.from(catSel.options).some(o => o.value === item.category)) {
+    const opt = document.createElement('option');
+    opt.value = item.category;
+    opt.textContent = item.category;
+    catSel.appendChild(opt);
+  }
+  catSel.value = item.category || '';
+  document.getElementById('se_activity_name').value = item.activity_name || '';
   document.getElementById('se_location').value = item.location || '';
 
   const rejEl = document.getElementById('se_reject_alert'), rejMsg = itemType === '12' ? item.reject_reason_12 : item.reject_reason;
@@ -698,16 +782,29 @@ async function saveStudentEdit() {
     start_date: document.getElementById('se_start_date').value, end_date: document.getElementById('se_end_date').value,
     location: document.getElementById('se_location').value.trim()
   };
-  if (itemType === '12') payload.role_note = document.getElementById('se_role_note').value;
-  else {
+
+  if (!payload.student_name || !payload.level || !payload.teacher_id || !payload.group_name || !payload.category || !payload.activity_name || !payload.start_date || !payload.end_date) {
+    return safeAlert('ข้อมูลไม่ครบ', 'กรุณากรอกข้อมูลสำคัญให้ครบทุกช่อง', 'warning');
+  }
+  if (payload.end_date < payload.start_date) {
+    return safeAlert('วันที่ไม่ถูกต้อง', 'วันสิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม', 'warning');
+  }
+
+  if (itemType === '12') {
+    payload.role_note = document.getElementById('se_role_note').value;
+  } else {
     payload.hours = document.getElementById('se_hours').value;
     payload.k4_plan = document.getElementById('se_k4_plan').value.trim();
     payload.activity_detail = document.getElementById('se_detail').value.trim();
     payload.k4_learning = document.getElementById('se_k4_learning').value.trim();
     payload.k4_problem = document.getElementById('se_k4_problem').value.trim();
     payload.k4_apply = document.getElementById('se_k4_apply').value.trim();
+    if (!payload.hours || Number(payload.hours) <= 0 || !payload.activity_detail) {
+      return safeAlert('ข้อมูลไม่ครบ', 'กรุณาระบุจำนวนชั่วโมง (มากกว่า 0) และรายละเอียดการดำเนินงานให้ครบ', 'warning');
+    }
     if (editCompressedImages.length >= 2) payload.images = editCompressedImages;
   }
+
   showLoading('กำลังบันทึกการแก้ไขข้อมูล...');
   try {
     await callApi('studentUpdateRecord', { payload });
@@ -809,6 +906,7 @@ function handleLogout() {
 }
 
 function updateSubmissionsBarsVisibility() {
+  if (!currentUser) return;
   const isTeacher = currentUser.role === 'TEACHER';
   const isReg = currentUser.role === 'REGISTRAR';
   const isAdmin = currentUser.role === 'ADMIN';
@@ -887,8 +985,11 @@ async function loadDashboard(silentOnExpire = false) {
     if (isTeacher || isAdmin) render12List();
   } catch (err) {
     hideLoading();
-    if (silentOnExpire) { authToken = null; sessionStorage.removeItem('kpch_token'); renderNavbar(); }
-    else safeAlert('ผิดพลาด', err.message, 'error');
+    if (silentOnExpire) {
+      authToken = null; sessionStorage.removeItem('kpch_token');
+      renderNavbar();
+      loadPublicData();
+    } else safeAlert('ผิดพลาด', err.message, 'error');
   }
 }
 
@@ -916,6 +1017,7 @@ function setFilter12Mode(mode, btn) {
 }
 
 function isMyPendingItem(item) {
+  if (!currentUser) return true;
   if (currentUser.role === 'TEACHER' || currentUser.role === 'ADMIN') return item.current_step === 'WAIT_TEACHER';
   if (currentUser.role === 'REGISTRAR') return item.current_step === 'APPROVED_FOR_REGISTRAR';
   return true;
@@ -946,11 +1048,11 @@ function toggleAll12Checks(master) {
 }
 
 function render12List() {
-  const kw = document.getElementById('dash12SearchInput').value.toLowerCase().trim();
+  const kw = (document.getElementById('dash12SearchInput')?.value || '').toLowerCase().trim();
   const termVal = document.getElementById('dash12TermFilter')?.value || 'ALL';
   const catVal = document.getElementById('dash12CategoryFilter')?.value || 'ALL';
   const printVal = document.getElementById('dash12PrintFilter')?.value || 'ALL';
-  const isAdmin = currentUser.role === 'ADMIN';
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   const filtered = dash12Items.filter(item => {
     if (filter12Mode === 'PENDING' && item.status_12 !== 'WAIT_TEACHER_12') return false;
@@ -984,16 +1086,16 @@ function render12List() {
     const b3 = item.printed_3_at ? `<span class="badge bg-primary bg-opacity-15 text-primary border border-primary">✅ ปริ้น 3 แล้ว</span>` : '';
     return `
       <tr>
-        <td><input type="checkbox" class="chk-12" value="${esc(item.req12_id)}"></td>
+        <td><input type="checkbox" class="chk-12" value="${esc(item.req12_id)}" onchange="syncCheckPair(this, 'chk-12')"></td>
         <td><div class="fw-bold text-primary">${esc(item.req12_id)}</div><div class="small text-muted">${esc(item.created_at)}</div></td>
         <td><div class="fw-semibold">${esc(item.student_name)}</div><div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div></td>
         <td class="small">${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border mb-1">${esc(item.category)}</span><br>` : ''}ภาค: ${esc(formatTermText(item.term))}</td>
         <td><div class="fw-semibold">${esc(item.activity_name)}</div><div class="small text-muted">${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} ${item.role_note ? `| <b>${esc(item.role_note)}</b>` : ''}</div></td>
         <td><span class="badge step-badge ${st.cls}">${st.text}</span><div class="mt-1">${b12}${b3}</div></td>
         <td class="text-end text-nowrap">
-          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="open12DetailModal('${esc(item.req12_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-2</button>
-          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="open12DetailModal('${escJs(item.req12_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${escJs(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-2</button>
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDelete12(['${escJs(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>`;
   }).join('');
@@ -1006,22 +1108,22 @@ function render12List() {
     return `
       <div class="mobile-item-card">
         <div class="d-flex justify-content-between align-items-start mb-2">
-          <div><input type="checkbox" class="chk-12 me-2" value="${esc(item.req12_id)}"><span class="fw-bold text-primary">${esc(item.req12_id)}</span>${b12}${b3}</div>
+          <div><input type="checkbox" class="chk-12 me-2" value="${esc(item.req12_id)}" onchange="syncCheckPair(this, 'chk-12')"><span class="fw-bold text-primary">${esc(item.req12_id)}</span>${b12}${b3}</div>
           <span class="badge step-badge ${st.cls}">${st.text}</span>
         </div>
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
         <div class="small text-muted mb-2"><b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ประเภท:</b> ${esc(item.category || '-')}</div>
         <div class="d-flex gap-2">
-          <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="open12DetailModal('${esc(item.req12_id)}')"><i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-2</button>
-          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
+          <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="open12DetailModal('${escJs(item.req12_id)}')"><i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printForm12('${escJs(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-2</button>
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${escJs(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
       </div>`;
   }).join('');
 }
 
 function confirmBatchApprove12() {
-  const ids = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
+  const ids = getCheckedUniqueIds('chk-12');
   if (ids.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการ กพช.1-2 อย่างน้อย 1 รายการครับ', 'warning');
   Swal.fire({ title: `อนุมัติ กพช.1-2 จำนวน ${ids.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยันอนุมัติทั้งหมด', confirmButtonColor: '#10b981' }).then(async res => {
     if (res.isConfirmed) {
@@ -1033,7 +1135,7 @@ function confirmBatchApprove12() {
 }
 
 function confirmBatchReject12() {
-  const ids = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
+  const ids = getCheckedUniqueIds('chk-12');
   if (ids.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่ต้องการตีกลับอย่างน้อย 1 รายการ', 'warning');
   Swal.fire({
     title: `ตีกลับ กพช.1-2 (${ids.length} รายการ)`, input: 'textarea', inputLabel: 'ระบุเหตุผลในการตีกลับให้นักศึกษาทราบ',
@@ -1049,7 +1151,7 @@ function confirmBatchReject12() {
 }
 
 function confirmBatchDelete12() {
-  const ids = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
+  const ids = getCheckedUniqueIds('chk-12');
   if (ids.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่ต้องการย้ายลงถังขยะ', 'warning');
   confirmDelete12(ids);
 }
@@ -1063,6 +1165,13 @@ function confirmDelete12(req12Ids) {
       catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
   });
+}
+
+function openDoc56ById(req12Id) {
+  const found = dash12Items.find(x => x.req12_id === req12Id);
+  if (!found) return;
+  closeModalById('detailModal');
+  setTimeout(() => openDoc56ModalWithItems([found]), 220);
 }
 
 function open12DetailModal(req12Id) {
@@ -1095,12 +1204,12 @@ function open12DetailModal(req12Id) {
   const isApproved = item.status_12 === 'APPROVED_12', isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
     <div class="d-flex flex-wrap gap-2">
-      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 1-2</button>
-      ${isApproved ? `<button type="button" class="btn btn-primary btn-sm rounded-pill px-3" onclick="closeModalById('detailModal'); openDoc56ModalWithItems([dash12Items.find(x=>x.req12_id==='${esc(item.req12_id)}')])"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 3 + บันทึก</button>` : ''}
-      ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${escJs(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 1-2</button>
+      ${isApproved ? `<button type="button" class="btn btn-primary btn-sm rounded-pill px-3" onclick="openDoc56ById('${escJs(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 3 + บันทึก</button>` : ''}
+      ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${escJs(item.req12_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
     </div>
     <div class="d-flex flex-wrap gap-2">
-      ${canAct ? `<button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'REJECT')"><i class="bi bi-x-circle me-1"></i>ตีกลับ (ระบุเหตุผล)</button><button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'APPROVE')"><i class="bi bi-check-circle me-1"></i>อนุมัติ กพช.1-2</button>` : ''}
+      ${canAct ? `<button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision12('${escJs(item.req12_id)}', 'REJECT')"><i class="bi bi-x-circle me-1"></i>ตีกลับ (ระบุเหตุผล)</button><button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision12('${escJs(item.req12_id)}', 'APPROVE')"><i class="bi bi-check-circle me-1"></i>อนุมัติ กพช.1-2</button>` : ''}
       <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">ปิด</button>
     </div>`;
   openModalById('detailModal');
@@ -1128,12 +1237,12 @@ function printForm12(req12Id) {
   if (!item) return;
   document.getElementById('printOnlyContainer').innerHTML = buildKPCH12Html(item);
   markPrintedClient('12', [req12Id]);
-  setTimeout(() => window.print(), 350);
+  triggerPrint();
 }
 
 // ==================== พิมพ์ชุด กพช. 3 + บันทึกข้อความ ====================
 function openDoc56PrintModal() {
-  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
+  const checkedIds = getCheckedUniqueIds('chk-12');
   if (checkedIds.length === 0) {
     return safeAlert('กรุณาติ๊กเลือกรายชื่อ', 'กรุณาติ๊กถูกหน้ารายชื่อนักศึกษาที่ต้องการพิมพ์ กพช. 3 อย่างน้อย 1 คนครับ', 'warning');
   }
@@ -1176,6 +1285,7 @@ function openDoc56ModalWithItems(items) {
 
 function executePrintDoc56() {
   const items = _doc56Items;
+  if (!items || items.length === 0) return;
   const cfg = {
     docNo: document.getElementById('d56_doc_no').value.trim() || 'ศธ 07058.02/........',
     docDate: document.getElementById('d56_doc_date').value.trim() || '........................',
@@ -1206,12 +1316,12 @@ function executePrintDoc56() {
   const memo56Html = `
     <div class="memo-page">
       <div class="memo-header"><img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
-      <div class="memo-field"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp; <b>โทร.</b>02 524 0645</div>
+      <div class="memo-field"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp; <b>โทร.</b> 02 524 0645</div>
       <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp; ${esc(cfg.docNo)}</span><span><b>วันที่</b> &nbsp; ${esc(cfg.docDate)} &nbsp;&nbsp;&nbsp;&nbsp;</span></div>
       <div class="memo-field"><b>เรื่อง</b> &nbsp; ขออนุมัติโครงการกิจกรรมพัฒนาคุณภาพชีวิต</div>
       <div class="memo-divider"></div>
       <div class="memo-field" style="margin-bottom:10px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
-      <div class="memo-indent">ด้วยนักศึกษา ${SCHOOL_NAME} ระดับประถม มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(cfg.projName)} ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate} สถานที่ปฏิบัติกิจกรรม ณ ${esc(cfg.loc)}</div>
+      <div class="memo-indent">ด้วยนักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(cfg.projName)} ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate} สถานที่ปฏิบัติกิจกรรม ณ ${esc(cfg.loc)}</div>
       <div class="memo-indent">ในการนี้ ข้าพเจ้า ได้ดำเนินการตรวจสอบแบบเสนอโครงการแล้ว ปรากฏว่ามีความครบถ้วน ถูกต้อง และเหมาะสมที่จะปฏิบัติได้</div>
       <div class="memo-indent">จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ</div>
       <div class="sig-center" style="margin-left:38%; margin-top:24px;">ลงชื่อ..................................................<br>(${esc(cfg.advisor)})<br>ตำแหน่ง &nbsp;&nbsp; ${esc(cfg.advisorPos)}</div>
@@ -1261,17 +1371,18 @@ function executePrintDoc56() {
   document.getElementById('printOnlyContainer').innerHTML = memo56Html + k3Html;
   closeModalById('doc56Modal');
   markPrintedClient('3', items.map(x => x.req12_id));
-  setTimeout(() => window.print(), 350);
+  triggerPrint();
 }
 
 // ==================== แบบประเมิน กพช. 5 & กพช. 4 ====================
-function buildKPCH5Html(item, isLastInPrint, imagesBase64 = []) {
+function buildKPCH5Html(item, isLastInPrint, imagesBase64 = [], directorNameOverride = '') {
   const dotsStr = '.'.repeat(140), dotSpan = `<span style="flex:1; min-width:12px; overflow:hidden; white-space:nowrap; letter-spacing:1px;">${dotsStr}</span>`;
   const makeDotFlex = (val, extraStyle = '') => { const clean = esc(val); return !clean ? `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`; };
   const makeDotInline = (val, extraStyle = '') => { const clean = esc(val); return !clean ? `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`; };
   const chkBox = '<span style="display:inline-block; width:13px; height:13px; border:1px solid #000; vertical-align:-2px; margin-right:5px;"></span>', row5 = 'display:flex; align-items:center; gap:8px; margin-bottom:4px; line-height:1.3;';
   const phaseRow = (label) => `<div style="${row5} margin-top:4px;"><span style="white-space:nowrap;">${label}</span><span>เมื่อวันที่</span>${makeDotInline('', 'width:50px;')}<span>เดือน</span>${makeDotInline('', 'width:95px;')}<span>พ.ศ.</span>${makeDotFlex('', 'min-width:50px;')}</div><div style="padding-left:22px; margin-bottom:4px;">${chkBox}ผ่าน &nbsp;&nbsp;&nbsp;&nbsp; ${chkBox}ปรับปรุง</div><div style="${row5} padding-left:22px; margin-bottom:6px;"><span>เหตุผลประกอบการประเมิน</span>${makeDotFlex('')}</div>`;
   const startTxt = item.activity_date ? formatShortThaiDate(item.activity_date) : '', endTxt = item.activity_end_date ? formatShortThaiDate(item.activity_end_date) : '';
+  const dirDisplay = esc(directorNameOverride || DIRECTOR_NAME);
   const photoPage = imagesBase64.length > 0 ? `<div class="${isLastInPrint ? '' : 'memo-page'}"><div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:8px;">ภาพถ่ายประกอบการดำเนินกิจกรรม (${esc(item.student_name)})</div><div style="text-align:center; font-size:14pt; margin-bottom:10px;">โครงการ: ${esc(item.activity_name)} | รหัสอ้างอิง: ${esc(item.req_id)}</div><div class="photo-grid">${imagesBase64.map(b => `<img src="${b}">`).join('')}</div></div>` : '';
 
   return `
@@ -1310,13 +1421,14 @@ function buildKPCH5Html(item, isLastInPrint, imagesBase64 = []) {
       <div style="font-weight:bold; margin-bottom:4px;">ผลการพิจารณาอนุมัติของผู้บริหารสถานศึกษา</div>
       <div style="display:flex; gap:6px; margin-bottom:10px;"><span>- อนุมัติ จำนวน</span>${makeDotInline('', 'width:100px;')}<span>ชั่วโมง.</span></div>
       <div style="display:flex; margin-bottom:10px;">${makeDotFlex('')}</div><div style="display:flex; margin-bottom:28px;">${makeDotFlex('')}</div>
-      <div style="text-align:center;">ลงชื่อ${makeDotInline('', 'width:190px; margin:0 6px;')}ผู้อนุมัติ<br>(${DIRECTOR_NAME})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>อนุมัติผลเมื่อวันที่${makeDotInline('', 'width:65px;')}เดือน${makeDotInline('', 'width:110px;')}พ.ศ.${makeDotInline('', 'width:70px;')}</div>
+      <div style="text-align:center;">ลงชื่อ${makeDotInline('', 'width:190px; margin:0 6px;')}ผู้อนุมัติ<br>(${dirDisplay})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>อนุมัติผลเมื่อวันที่${makeDotInline('', 'width:65px;')}เดือน${makeDotInline('', 'width:110px;')}พ.ศ.${makeDotInline('', 'width:70px;')}</div>
     </div>
     ${photoPage}`;
 }
 
 function buildKPCH4Html(items, cfg) {
   const first = items[0], isGroup = items.length > 1;
+  const termText = getItemTerm(first) || '-';
   const groupTable = isGroup ? `<div style="margin-top:6px; font-weight:bold;">รายชื่อผู้ปฏิบัติโครงการ (กรณีรายกลุ่ม)</div><table class="doc-table"><thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสประจำตัว</th><th style="width:90px;">ระดับ</th><th style="width:125px;">ลายมือชื่อ</th></tr></thead><tbody>${items.map((x, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${esc(x.student_name)}</td><td style="text-align:center;">${esc(x.student_id)}</td><td style="text-align:center;">${esc(x.level||'')}</td><td></td></tr>`).join('')}</tbody></table>` : '';
 
   return `
@@ -1328,7 +1440,7 @@ function buildKPCH4Html(items, cfg) {
       <div><b>3. ผู้ปฏิบัติโครงการ</b>
         <div class="doc-section-indent">
           3.1 กรณีรายบุคคล &nbsp; ชื่อ-สกุล ${isGroup ? '............................' : esc(first.student_name)} &nbsp; รหัสประจำตัว ${isGroup ? '....................' : esc(first.student_id)}<br>
-          ระดับ ${isGroup ? '................' : esc(first.level||'')} &nbsp; กศน.ตำบล/กลุ่ม ${esc(first.group_name||'-')} &nbsp; ภาคเรียนที่ ${esc(first.term||'-')}<br>
+          ระดับ ${isGroup ? '................' : esc(first.level||'')} &nbsp; กศน.ตำบล/กลุ่ม ${esc(first.group_name||'-')} &nbsp; ภาคเรียนที่ ${esc(termText)}<br>
           3.2 กรณีรายกลุ่ม ให้แนบรายชื่อ-สกุล พร้อมลายมือชื่อ รหัสประจำตัว
         </div>
       </div>
@@ -1338,8 +1450,7 @@ function buildKPCH4Html(items, cfg) {
           <b>4.1 การคิด/การวางแผน</b><br>${esc(first.k4_plan || '-').replace(/\n/g,'<br>')}<br>
           <b>4.2 การดำเนินงาน/ขั้นตอนการดำเนินงาน</b><br>${esc(first.activity_detail || '-').replace(/\n/g,'<br>')}<br>
           <b>4.3 การเรียนรู้และประสบการณ์ที่ได้รับ</b><br>${esc(first.k4_learning || '-').replace(/\n/g,'<br>')}<br>
-          <b>4.4 ปัญหาที่พบและการแก้ไข</b><br>${esc(first.k4_problem || 'ไม่พบปัญหาในการทำงาน')}<br>
-          <b>4.5 การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><br>${esc(first.k4_apply || '-').replace(/\n/g,'<br>')}
+          <b>4.4 ปัญหาที่พบและการแก้ไข</b><br>${esc(first.k4_problem || 'ไม่พบปัญหาในการทำงาน')}
         </div>
       </div>
       <div><b>5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><div class="doc-section-indent">${esc(first.k4_apply || '-').replace(/\n/g,'<br>')}</div></div>
@@ -1366,7 +1477,7 @@ function getFilteredDashItems() {
   const catVal = document.getElementById('dashCategoryFilter')?.value || 'ALL';
   const printVal = document.getElementById('dashPrintFilter')?.value || 'ALL';
   const teacherVal = document.getElementById('dashTeacherFilter')?.value || 'ALL';
-  const showTeacherFilter = ['REGISTRAR', 'ADMIN'].includes(currentUser.role);
+  const showTeacherFilter = ['REGISTRAR', 'ADMIN'].includes(currentUser?.role);
 
   return dashItems.filter(item => {
     if (filterMode === 'PENDING' && !isMyPendingItem(item)) return false;
@@ -1384,63 +1495,63 @@ function getFilteredDashItems() {
 }
 
 function renderDashboardList() {
-  const isAdmin = currentUser.role === 'ADMIN';
-  const canCheck = ['TEACHER', 'REGISTRAR', 'ADMIN'].includes(currentUser.role);
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const canCheck = ['TEACHER', 'REGISTRAR', 'ADMIN'].includes(currentUser?.role);
   const filtered = getFilteredDashItems();
   currentFilteredSubs = filtered;
   const tbody = document.getElementById('dashTableBody'), mobileBox = document.getElementById('dashMobileCards'), masterCb = document.getElementById('checkAllBox');
   if (masterCb) masterCb.checked = false;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">ไม่มีรายการในหมวดหมู่นี้</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${canCheck ? 7 : 6}" class="text-center py-4 text-muted">ไม่มีรายการในหมวดหมู่นี้</td></tr>`;
     mobileBox.innerHTML = `<div class="text-center py-4 text-muted">ไม่มีรายการในหมวดหมู่นี้</div>`;
     return;
   }
 
   tbody.innerHTML = filtered.map(item => {
     const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
-    const canAct = item.current_step === 'WAIT_TEACHER' && ['TEACHER', 'ADMIN'].includes(currentUser.role);
+    const canAct = item.current_step === 'WAIT_TEACHER' && ['TEACHER', 'ADMIN'].includes(currentUser?.role);
     const termTxt = getItemTerm(item);
     const printBadge = item.printed_46_at ? `<div class="mt-1"><span class="badge bg-success bg-opacity-15 text-success border border-success">✅ ปริ้น 4-6 แล้ว</span></div>` : `<div class="mt-1"><span class="badge bg-light text-muted border">⏳ ยังไม่ปริ้น 4-6</span></div>`;
     return `
       <tr>
-        ${canCheck ? `<td><input type="checkbox" class="reg-check" value="${esc(item.req_id)}"></td>` : ''}
+        ${canCheck ? `<td><input type="checkbox" class="reg-check" value="${esc(item.req_id)}" onchange="syncCheckPair(this, 'reg-check')"></td>` : ''}
         <td><div class="fw-bold text-primary">${esc(item.req_id)}</div><div class="small text-muted">${esc(item.created_at)} ${termTxt ? `<span class="badge bg-light text-dark border ms-1">ภาค ${esc(termTxt)}</span>` : ''}</div></td>
         <td><div class="fw-semibold">${esc(item.student_name)}</div><div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div></td>
         <td class="small"><div>${esc(item.teacher_name)}</div>${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border">${esc(item.category)}</span>` : ''}</td>
         <td><div class="fw-semibold">${esc(item.activity_name)}</div><div class="small text-muted">${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)} | <b>${esc(item.hours)} ชม.</b></div></td>
         <td><span class="badge step-badge ${st.cls}">${st.text}</span>${printBadge}</td>
         <td class="text-end text-nowrap">
-          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="openDetailModal('${esc(item.req_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printSingle46('${esc(item.req_id)}')"><i class="bi bi-printer"></i> กพช.4-6</button>
-          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="openDetailModal('${escJs(item.req_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printSingle46('${escJs(item.req_id)}')"><i class="bi bi-printer"></i> กพช.4-6</button>
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDeleteSubmissions(['${escJs(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>`;
   }).join('');
 
   mobileBox.innerHTML = filtered.map(item => {
     const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
-    const canAct = item.current_step === 'WAIT_TEACHER' && ['TEACHER', 'ADMIN'].includes(currentUser.role);
+    const canAct = item.current_step === 'WAIT_TEACHER' && ['TEACHER', 'ADMIN'].includes(currentUser?.role);
     const printBadge = item.printed_46_at ? `<span class="badge bg-success bg-opacity-15 text-success border border-success ms-1">✅ 4-6</span>` : '';
     return `
       <div class="mobile-item-card">
         <div class="d-flex justify-content-between align-items-start mb-2">
-          <div>${canCheck ? `<input type="checkbox" class="reg-check me-2" value="${esc(item.req_id)}">` : ''}<span class="fw-bold text-primary">${esc(item.req_id)}</span>${printBadge}</div>
+          <div>${canCheck ? `<input type="checkbox" class="reg-check me-2" value="${esc(item.req_id)}" onchange="syncCheckPair(this, 'reg-check')">` : ''}<span class="fw-bold text-primary">${esc(item.req_id)}</span>${printBadge}</div>
           <span class="badge step-badge ${st.cls}">${st.text}</span>
         </div>
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
         <div class="small text-muted mb-2"><b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ชั่วโมง:</b> ${esc(item.hours)} ชม.</div>
         <div class="d-flex gap-2">
-          <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="openDetailModal('${esc(item.req_id)}')"><i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printSingle46('${esc(item.req_id)}')"><i class="bi bi-printer"></i> กพช.4-6</button>
-          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
+          <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="openDetailModal('${escJs(item.req_id)}')"><i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printSingle46('${escJs(item.req_id)}')"><i class="bi bi-printer"></i> กพช.4-6</button>
+          ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${escJs(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
       </div>`;
   }).join('');
 }
 
 function confirmBatchApproveSub() {
-  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  const checkedIds = getCheckedUniqueIds('reg-check');
   const validIds = checkedIds.filter(id => { const it = dashItems.find(x => x.req_id === id); return it && it.current_step === 'WAIT_TEACHER'; });
   if (validIds.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่ "รอครูประจำกลุ่มอนุมัติ" อย่างน้อย 1 รายการ', 'warning');
   Swal.fire({ title: `อนุมัติและส่งตรงนายทะเบียน ${validIds.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยันอนุมัติส่งทะเบียน', confirmButtonColor: '#10b981' }).then(async res => {
@@ -1453,7 +1564,7 @@ function confirmBatchApproveSub() {
 }
 
 function confirmBatchRejectSub() {
-  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  const checkedIds = getCheckedUniqueIds('reg-check');
   const validIds = checkedIds.filter(id => { const it = dashItems.find(x => x.req_id === id); return it && it.current_step === 'WAIT_TEACHER'; });
   if (validIds.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่รอครูตรวจอย่างน้อย 1 รายการ', 'warning');
   Swal.fire({
@@ -1470,7 +1581,7 @@ function confirmBatchRejectSub() {
 }
 
 function confirmBatchDeleteSub() {
-  const ids = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  const ids = getCheckedUniqueIds('reg-check');
   if (ids.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่ต้องการย้ายลงถังขยะ', 'warning');
   confirmDeleteSubmissions(ids);
 }
@@ -1494,7 +1605,7 @@ function printSingle46(reqId) {
 }
 
 function openDoc57ConfigAndPrint() {
-  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  const checkedIds = getCheckedUniqueIds('reg-check');
   if (checkedIds.length === 0) {
     return safeAlert('กรุณาติ๊กเลือกรายชื่อ', 'กรุณาติ๊กถูกหน้ารายชื่อนักศึกษาที่ต้องการพิมพ์ กพช. 4-6 อย่างน้อย 1 คนก่อนครับ', 'warning');
   }
@@ -1502,13 +1613,14 @@ function openDoc57ConfigAndPrint() {
 }
 
 function openDoc57ModalWithItems(items) {
+  if (!items || !items[0]) return;
   _doc57TargetIds = items.map(x => x.req_id);
   const first = items[0];
   document.getElementById('d57_count').innerText = items.length;
   document.getElementById('d57_doc_no').value = 'ศธ 07058.02/';
   document.getElementById('d57_doc_date').value = formatThaiDate();
   document.getElementById('d57_project_name').value = first.activity_name || '';
-  document.getElementById('d57_location').value = first.location || 'ห้องสมุดประชาชนอำเภอคลองหลวง จังหวัดปทุมธานี';
+  document.getElementById('d57_location').value = first.location || 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง จังหวัดปทุมธานี';
   document.getElementById('d57_pass_count').value = items.length;
   document.getElementById('d57_fail_count').value = 0;
   document.getElementById('d57_hours').value = first.hours || 25;
@@ -1525,8 +1637,21 @@ async function executePrintDoc57() {
   try {
     const batchData = await callApi('getSubmissionsBatchForPrint', { token: authToken, req_ids: _doc57TargetIds });
     hideLoading();
+    if (!batchData || batchData.length === 0) return safeAlert('ไม่พบข้อมูล', 'ไม่สามารถดึงข้อมูลสำหรับพิมพ์ได้', 'warning');
     const items = batchData.map(b => b.item), first = items[0];
-    const docNo = document.getElementById('d57_doc_no').value.trim(), docDate = document.getElementById('d57_doc_date').value.trim(), projName = document.getElementById('d57_project_name').value.trim(), loc = document.getElementById('d57_location').value.trim(), passCount = document.getElementById('d57_pass_count').value, failCount = document.getElementById('d57_fail_count').value, hours = document.getElementById('d57_hours').value, tName = document.getElementById('d57_teacher_name').value.trim(), tPos = document.getElementById('d57_teacher_pos').value.trim(), filler = document.getElementById('d57_filler').value.trim(), checker = document.getElementById('d57_checker').value.trim(), regName = document.getElementById('d57_registrar').value.trim(), director = document.getElementById('d57_director').value.trim();
+    const docNo = document.getElementById('d57_doc_no').value.trim(),
+          docDate = document.getElementById('d57_doc_date').value.trim(),
+          projName = document.getElementById('d57_project_name').value.trim(),
+          loc = document.getElementById('d57_location').value.trim(),
+          passCount = document.getElementById('d57_pass_count').value,
+          failCount = document.getElementById('d57_fail_count').value,
+          hours = document.getElementById('d57_hours').value,
+          tName = document.getElementById('d57_teacher_name').value.trim(),
+          tPos = document.getElementById('d57_teacher_pos').value.trim(),
+          filler = document.getElementById('d57_filler').value.trim(),
+          checker = document.getElementById('d57_checker').value.trim(),
+          regName = document.getElementById('d57_registrar').value.trim(),
+          director = document.getElementById('d57_director').value.trim();
     const sDate = formatThaiDateWithLabel(first.activity_date), eDate = formatThaiDateWithLabel(first.activity_end_date);
 
     const memoHtml = `
@@ -1541,13 +1666,14 @@ async function executePrintDoc57() {
         <div class="memo-indent">ในการนี้ การปฏิบัติกิจกรรมตามโครงการได้เสร็จสิ้นเรียบร้อยแล้ว มีนักศึกษาเข้าร่วมโครงการและปฏิบัติกิจกรรมดังกล่าวโดยผ่านกิจกรรมจำนวน ${esc(passCount)} คน และไม่ผ่านกิจกรรมจำนวน ${esc(failCount)} คน และข้าพเจ้าได้ตรวจสอบเอกสารแล้ว มีความครบถ้วนถูกต้อง ทั้งนี้ได้แนบภาพถ่ายและใบลงชื่อมาด้วยแล้ว</div>
         <div class="memo-indent">จึงเรียนมาเพื่อโปรดทราบ และอนุมัติชั่วโมงกิจกรรม</div>
         <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................<br>(${esc(tName)})<br>ตำแหน่ง ${esc(tPos)}</div>
-        <div style="margin-left:35%; margin-top:14px; line-height:1.4;">&#9744; ทราบ<br>&#9744; อนุมัติ<br>&#9744; มอบงานทะเบียนบันทึกผลลงในระบบ ชั่วโมงกิจกรรม</div>
+        <div style="margin-left:35%; margin-top:14px; line-height:1.4;">&#9744; ทราบ<br>&#9744; อนุมัติ<br>&#9744; มอบงานทะเบียนบันทึกผลลงในระบบกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)</div>
         <div class="sig-center" style="margin-left:38%; margin-top:24px;">(${esc(director)})<br>ผู้อำนวยการ${SCHOOL_NAME}</div>
         <div style="margin-top:20px;"><b>สำหรับงานทะเบียน</b><br>&nbsp;&nbsp;&nbsp;&nbsp;บันทึกผลลงในระบบเมื่อวันที่........เดือน............พ.ศ. ............<br><br><div style="margin-left:18%;">(..................................................)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;เจ้าหน้าที่งานทะเบียน</div></div>
       </div>`;
 
+    const uniqueImgs = Array.from(new Set(batchData.flatMap(b => b.imagesBase64 || [])));
     const k4Html = buildKPCH4Html(items, { projName, sDate, eDate, loc, tName });
-    const k5Html = buildKPCH5Html(first, false, batchData[0].imagesBase64 || []);
+    const k5Html = buildKPCH5Html(first, false, uniqueImgs, director);
     const k6Html = items.map((s, idx) => `
       <div class="${idx === items.length - 1 ? '' : 'memo-page'}">
         <div class="kpch-box-tag">กพช. 6</div>
@@ -1580,7 +1706,7 @@ async function executePrintDoc57() {
 
     document.getElementById('printOnlyContainer').innerHTML = memoHtml + k4Html + k5Html + k6Html;
     markPrintedClient('46', _doc57TargetIds);
-    setTimeout(() => window.print(), 450);
+    triggerPrint();
   } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
@@ -1610,11 +1736,11 @@ function openDetailModal(reqId) {
   const canAct = item.current_step === 'WAIT_TEACHER' && ['TEACHER', 'ADMIN'].includes(currentUser.role), isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
     <div class="d-flex flex-wrap gap-2">
-      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="closeModalById('detailModal'); printSingle46('${esc(item.req_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 4-6</button>
-      ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="closeModalById('detailModal'); setTimeout(() => printSingle46('${escJs(item.req_id)}'), 220)"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 4-6</button>
+      ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${escJs(item.req_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
     </div>
     <div class="d-flex flex-wrap gap-2">
-      ${canAct ? `<button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision('${esc(item.req_id)}', 'REJECT')"><i class="bi bi-x-circle me-1"></i>ตีกลับ (ระบุเหตุผล)</button><button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision('${esc(item.req_id)}', 'APPROVE')"><i class="bi bi-check-circle me-1"></i>อนุมัติส่งนายทะเบียน</button>` : ''}
+      ${canAct ? `<button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision('${escJs(item.req_id)}', 'REJECT')"><i class="bi bi-x-circle me-1"></i>ตีกลับ (ระบุเหตุผล)</button><button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision('${escJs(item.req_id)}', 'APPROVE')"><i class="bi bi-check-circle me-1"></i>อนุมัติส่งนายทะเบียน</button>` : ''}
       <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">ปิด</button>
     </div>`;
   openModalById('detailModal');
@@ -1651,7 +1777,7 @@ function exportRegistrarCSV() {
 }
 
 function confirmRegistrarComplete() {
-  const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
+  const checkedIds = getCheckedUniqueIds('reg-check');
   const validIds = checkedIds.filter(id => { const it = dashItems.find(x => x.req_id === id); return it && it.current_step === 'APPROVED_FOR_REGISTRAR'; });
   if (validIds.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่รอนายทะเบียน', 'warning');
   Swal.fire({ title: `ยืนยันปิดงาน ${validIds.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'ยืนยัน' }).then(async res => {
@@ -1673,8 +1799,8 @@ function switchAdminTab(tab, btn) {
 
 function renderAdminTrash() {
   const subsBody = document.getElementById('trashSubsBody'), req12Body = document.getElementById('trash12Body');
-  if (subsBody) subsBody.innerHTML = adminTrashSubs.length === 0 ? '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการในถังขยะ</td></tr>' : adminTrashSubs.map(item => `<tr><td><b>${esc(item.req_id)}</b></td><td>${esc(item.student_name)} (${esc(item.student_id)})</td><td>${esc(item.activity_name)}</td><td>${esc(item.current_step)}</td><td class="small">${esc(item.deleted_at)}<br>${esc(item.deleted_by)}</td><td class="text-end text-nowrap"><button class="btn btn-success btn-sm rounded-pill me-1" onclick="confirmRestoreTrash('SUB', '${esc(item.req_id)}')">♻️ กู้คืน</button><button class="btn btn-outline-danger btn-sm rounded-pill" onclick="confirmPurgeTrash('SUB', '${esc(item.req_id)}')">🔥 ลบถาวร</button></td></tr>`).join('');
-  if (req12Body) req12Body.innerHTML = adminTrash12.length === 0 ? '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการในถังขยะ</td></tr>' : adminTrash12.map(item => `<tr><td><b>${esc(item.req12_id)}</b></td><td>${esc(item.student_name)} (${esc(item.student_id)})</td><td>${esc(item.activity_name)}</td><td>${esc(item.status_12)}</td><td class="small">${esc(item.deleted_at)}<br>${esc(item.deleted_by)}</td><td class="text-end text-nowrap"><button class="btn btn-success btn-sm rounded-pill me-1" onclick="confirmRestoreTrash('12', '${esc(item.req12_id)}')">♻️ กู้คืน</button><button class="btn btn-outline-danger btn-sm rounded-pill" onclick="confirmPurgeTrash('12', '${esc(item.req12_id)}')">🔥 ลบถาวร</button></td></tr>`).join('');
+  if (subsBody) subsBody.innerHTML = adminTrashSubs.length === 0 ? '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการในถังขยะ</td></tr>' : adminTrashSubs.map(item => `<tr><td><b>${esc(item.req_id)}</b></td><td>${esc(item.student_name)} (${esc(item.student_id)})</td><td>${esc(item.activity_name)}</td><td>${esc(item.current_step)}</td><td class="small">${esc(item.deleted_at)}<br>${esc(item.deleted_by)}</td><td class="text-end text-nowrap"><button class="btn btn-success btn-sm rounded-pill me-1" onclick="confirmRestoreTrash('SUB', '${escJs(item.req_id)}')">♻️ กู้คืน</button><button class="btn btn-outline-danger btn-sm rounded-pill" onclick="confirmPurgeTrash('SUB', '${escJs(item.req_id)}')">🔥 ลบถาวร</button></td></tr>`).join('');
+  if (req12Body) req12Body.innerHTML = adminTrash12.length === 0 ? '<tr><td colspan="6" class="text-center py-4 text-muted">ไม่มีรายการในถังขยะ</td></tr>' : adminTrash12.map(item => `<tr><td><b>${esc(item.req12_id)}</b></td><td>${esc(item.student_name)} (${esc(item.student_id)})</td><td>${esc(item.activity_name)}</td><td>${esc(item.status_12)}</td><td class="small">${esc(item.deleted_at)}<br>${esc(item.deleted_by)}</td><td class="text-end text-nowrap"><button class="btn btn-success btn-sm rounded-pill me-1" onclick="confirmRestoreTrash('12', '${escJs(item.req12_id)}')">♻️ กู้คืน</button><button class="btn btn-outline-danger btn-sm rounded-pill" onclick="confirmPurgeTrash('12', '${escJs(item.req12_id)}')">🔥 ลบถาวร</button></td></tr>`).join('');
 }
 
 function confirmRestoreTrash(trashType, itemId) {
@@ -1690,7 +1816,7 @@ function confirmPurgeTrash(trashType, itemId) {
 }
 
 function renderAdminUsers() {
-  document.getElementById('adminUsersBody').innerHTML = adminUsers.map(u => `<tr><td>${esc(u.user_id)}</td><td><b>${esc(u.username)}</b></td><td>${esc(u.full_name)}</td><td><span class="badge bg-info text-dark">${ROLE_LABELS[u.role] || u.role}</span></td><td>${esc(u.group_name)}</td><td><span class="badge ${u.status === 'ACTIVE' ? 'bg-success' : 'bg-danger'}">${esc(u.status)}</span></td><td><button type="button" class="btn btn-warning btn-sm rounded-pill" onclick="openUserModal('${esc(u.user_id)}')"><i class="bi bi-pencil"></i> แก้ไข</button></td></tr>`).join('');
+  document.getElementById('adminUsersBody').innerHTML = adminUsers.map(u => `<tr><td>${esc(u.user_id)}</td><td><b>${esc(u.username)}</b></td><td>${esc(u.full_name)}</td><td><span class="badge bg-info text-dark">${ROLE_LABELS[u.role] || u.role}</span></td><td>${esc(u.group_name)}</td><td><span class="badge ${u.status === 'ACTIVE' ? 'bg-success' : 'bg-danger'}">${esc(u.status)}</span></td><td><button type="button" class="btn btn-warning btn-sm rounded-pill" onclick="openUserModal('${escJs(u.user_id)}')"><i class="bi bi-pencil"></i> แก้ไข</button></td></tr>`).join('');
 }
 
 function renderAdminLogs() {
@@ -1705,6 +1831,7 @@ function openUserModal(userId) {
   document.getElementById('u_status_wrap').classList.toggle('d-none', !isEdit);
   if (isEdit) {
     const u = adminUsers.find(x => x.user_id === userId);
+    if (!u) return;
     document.getElementById('u_id').value = u.user_id; document.getElementById('u_username').value = u.username;
     document.getElementById('u_fullname').value = u.full_name; document.getElementById('u_role').value = u.role;
     document.getElementById('u_group').value = u.group_name; document.getElementById('u_status').value = u.status;
@@ -1749,9 +1876,14 @@ async function handleChangeMyPassword() {
 // ==================== เริ่มทำงาน ====================
 function initApp() {
   const preloadGaruda = new Image(); preloadGaruda.src = GARUDA_URL;
-  renderNavbar(); loadPublicData();
+  renderNavbar();
   const savedToken = sessionStorage.getItem('kpch_token');
-  if (savedToken) { authToken = savedToken; loadDashboard(true); }
+  if (savedToken) {
+    authToken = savedToken;
+    loadDashboard(true);
+  } else {
+    loadPublicData();
+  }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initApp);
 else initApp();
