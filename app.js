@@ -42,6 +42,7 @@ let lastStatus12List = [];
 let lastStatusSubList = [];
 let _doc56Items = [];
 let _doc57TargetIds = [];
+let _garudaDataUrlCache = null;
 
 // 3 ขั้นตอน: นักศึกษา -> ครูประจำกลุ่ม -> นายทะเบียน
 const STEP_LABELS = {
@@ -119,6 +120,236 @@ async function triggerPrint() {
   await waitForPrintImages(container);
   setTimeout(() => window.print(), 150);
 }
+
+// ==================== ระบบเลือก พิมพ์ / ดาวน์โหลดไฟล์ Word (.doc) ====================
+async function getGarudaForWord() {
+  if (_garudaDataUrlCache) return _garudaDataUrlCache;
+  try {
+    const res = await fetch(GARUDA_URL);
+    if (res.ok) {
+      const blob = await res.blob();
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image')) {
+        _garudaDataUrlCache = dataUrl;
+        return dataUrl;
+      }
+    }
+  } catch (e) {}
+  try {
+    return new URL(GARUDA_URL, window.location.href).href;
+  } catch (e) {
+    return GARUDA_URL;
+  }
+}
+
+function encodeQuotedPrintable(str) {
+  const bytes = new TextEncoder().encode(str);
+  let out = '';
+  let lineLen = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    if (b === 13) continue;
+    if (b === 10) {
+      out += '\r\n';
+      lineLen = 0;
+      continue;
+    }
+    let token;
+    if ((b >= 33 && b <= 60) || (b >= 62 && b <= 126) || b === 9 || b === 32) {
+      if ((b === 32 || b === 9) && (i + 1 >= bytes.length || bytes[i + 1] === 10 || bytes[i + 1] === 13)) {
+        token = '=' + b.toString(16).toUpperCase().padStart(2, '0');
+      } else {
+        token = String.fromCharCode(b);
+      }
+    } else {
+      token = '=' + b.toString(16).toUpperCase().padStart(2, '0');
+    }
+    if (lineLen + token.length > 74) {
+      out += '=\r\n';
+      lineLen = 0;
+    }
+    out += token;
+    lineLen += token.length;
+  }
+  return out;
+}
+
+function buildWordHtmlEnvelope(bodyHtml) {
+  return `<!DOCTYPE html>
+<html xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="ProgId" content="Word.Document">
+<meta name="Generator" content="Microsoft Word 15">
+<!--[if gte mso 9]><xml>
+<w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+  <w:DoNotOptimizeForBrowser/>
+</w:WordDocument>
+</xml><![endif]-->
+<style>
+  @page WordSection1 {
+    size: 21.0cm 29.7cm;
+    margin: 1.5cm 2.0cm 1.5cm 2.0cm;
+    mso-header-margin: 1.0cm;
+    mso-footer-margin: 1.0cm;
+    mso-paper-source: 0;
+  }
+  div.WordSection1 { page: WordSection1; }
+  body, div, p, span, td, th, li, b, strong, u {
+    font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif;
+  }
+  body {
+    font-size: 16pt;
+    line-height: 1.35;
+    color: #000000;
+    margin: 0;
+    padding: 0;
+  }
+  p { margin: 0 0 4pt 0; }
+  table { border-collapse: collapse; }
+  .memo-field { margin-bottom: 3pt; font-size: 16pt; }
+  .memo-divider { border-top: 1.5pt solid #000000; margin: 6pt 0 10pt 0; font-size: 1pt; line-height: 1pt; }
+  .memo-indent { text-indent: 2.5cm; text-align: justify; margin-bottom: 8pt; font-size: 16pt; }
+  .doc-title-center {
+    text-align: center;
+    font-weight: bold;
+    font-size: 18pt;
+    line-height: 1.3;
+    margin-bottom: 6pt;
+  }
+  .doc-section-indent {
+    margin-left: 1.2cm;
+    text-align: justify;
+  }
+  .doc-table, .batch-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6pt 0;
+    font-size: 14pt;
+  }
+  .doc-table th, .doc-table td,
+  .batch-table th, .batch-table td {
+    border: 1pt solid #000000;
+    padding: 4pt 6pt;
+    vertical-align: middle;
+  }
+  .doc-table th, .batch-table th {
+    background-color: #f1f5f9;
+    text-align: center;
+    font-weight: bold;
+  }
+  .sig-center {
+    text-align: center;
+    margin-top: 14pt;
+  }
+</style>
+</head>
+<body>
+<div class="WordSection1">
+${bodyHtml}
+</div>
+</body>
+</html>`;
+}
+
+function exportHtmlToWord(filename, bodyHtml) {
+  const fullHtml = buildWordHtmlEnvelope(bodyHtml);
+  const embeddedImages = [];
+  const processedHtml = fullHtml.replace(
+    /src="(data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\r\n]+))"/gi,
+    (match, _fullUri, mime, b64) => {
+      const idx = embeddedImages.length;
+      const ext = mime.split('/')[1].replace('jpeg', 'jpg').replace(/[^a-z0-9]/gi, '') || 'png';
+      const loc = `file:///C:/kpch_doc/image_${idx}.${ext}`;
+      embeddedImages.push({ loc, mime, b64: b64.replace(/\s+/g, '') });
+      return `src="${loc}"`;
+    }
+  );
+
+  let blob;
+  if (embeddedImages.length > 0) {
+    const boundary = '----=_NextPart_KPCH_WORD_DOC';
+    const parts = [
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/related; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Location: file:///C:/kpch_doc/document.htm',
+      'Content-Transfer-Encoding: quoted-printable',
+      'Content-Type: text/html; charset="utf-8"',
+      '',
+      encodeQuotedPrintable(processedHtml),
+      ''
+    ];
+    embeddedImages.forEach(img => {
+      const wrappedB64 = img.b64.replace(/(.{76})/g, '$1\r\n');
+      parts.push(`--${boundary}`);
+      parts.push(`Content-Location: ${img.loc}`);
+      parts.push('Content-Transfer-Encoding: base64');
+      parts.push(`Content-Type: ${img.mime}`);
+      parts.push('');
+      parts.push(wrappedB64);
+      parts.push('');
+    });
+    parts.push(`--${boundary}--`);
+    blob = new Blob([parts.join('\r\n')], { type: 'application/msword' });
+  } else {
+    blob = new Blob(['\ufeff', fullHtml], { type: 'application/msword;charset=utf-8' });
+  }
+
+  const safeName = String(filename || 'document').replace(/[\\/:*?"<>|]/g, '_');
+  const finalName = safeName.toLowerCase().endsWith('.doc') ? safeName : `${safeName}.doc`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = finalName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function choosePrintOrWord(docTitle, onPrint, onWord) {
+  Swal.fire({
+    title: 'เลือกรูปแบบเอกสาร',
+    html: `<div class="fw-semibold text-primary mb-2">${esc(docTitle)}</div><div class="small text-muted">สามารถ <b>สั่งปริ้นทันที</b> หรือ <b>ดาวน์โหลดเป็นไฟล์ Word (.doc)</b> เพื่อปรับแก้ข้อความในบางบรรทัดได้</div>`,
+    icon: 'question',
+    showDenyButton: true,
+    showCancelButton: true,
+    confirmButtonText: '<i class="bi bi-printer me-1"></i> สั่งปริ้นทันที',
+    denyButtonText: '<i class="bi bi-file-earmark-word me-1"></i> ดาวน์โหลด Word (.doc)',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#4f46e5',
+    denyButtonColor: '#0d9488'
+  }).then(res => {
+    if (res.isConfirmed && typeof onPrint === 'function') onPrint();
+    else if (res.isDenied && typeof onWord === 'function') onWord();
+  });
+}
+
+function wordBoxTagHtml(label) {
+  return `<table style="width:100%; border:none; margin-bottom:4pt;"><tr><td style="border:none;"></td><td style="width:82pt; border:1.5pt solid #000000; text-align:center; font-weight:bold; font-size:16pt; padding:2pt 8pt;">${esc(label)}</td></tr></table>`;
+}
+
+function wordLineFill(val, emptyDots = '........................................') {
+  const clean = esc(val);
+  return clean ? `&nbsp;<u>&nbsp;&nbsp;${clean}&nbsp;&nbsp;</u>&nbsp;` : `&nbsp;${emptyDots}&nbsp;`;
+}
+
+function wordPageBreak() {
+  return '<br clear="all" style="page-break-before:always; mso-break-type:page-break" />';
+}
+
 function syncCheckPair(cb, cls) {
   document.querySelectorAll(`.${cls}`).forEach(el => {
     if (el !== cb && el.value === cb.value) el.checked = cb.checked;
@@ -470,10 +701,12 @@ async function handlePre12Submit() {
     });
     hideLoading();
     safeAlert('ยื่นขอ กพช.1-2 สำเร็จ! 📋', `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req12_id)}</b><br>กรุณารอครูประจำกลุ่มอนุมัติก่อนลงมือทำกิจกรรม`, 'success');
-    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_category','p12_role_note','p12_activity_name','p12_start_date','p12_end_date','p12_location'].forEach(id => {
+    ['p12_student_id','p12_student_name','p12_level','p12_teacher_id','p12_group_name','p12_category','p12_role_note','p12_activity_name','p12_start_date','p12_end_date'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+    const locEl = document.getElementById('p12_location');
+    if (locEl) locEl.value = 'ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง จังหวัดปทุมธานี';
     for (let i = 1; i <= 10; i++) document.querySelectorAll(`input[name="eval_q${i}"]`).forEach(el => el.checked = false);
     document.getElementById('p12_self_eval_ok').checked = false;
   } catch (err) { hideLoading(); safeAlert('เกิดข้อผิดพลาด', err.message, 'error'); }
@@ -626,16 +859,17 @@ async function handleStudentSubmit() {
     });
     hideLoading();
     safeAlert('ส่งรายงานผล กพช.4 สำเร็จ! 🎉', `รหัสคำขอของคุณคือ <b class="text-primary">${esc(res.req_id)}</b><br>เรื่องถูกส่งไปยังครูประจำกลุ่มเรียบร้อยแล้ว`, 'success');
-    ['f_student_id','f_student_name','f_level','f_category','f_teacher_id','f_group_name','f_hours','f_activity_name','f_activity_date','f_activity_end_date','f_location','f_k4_plan','f_activity_detail','f_k4_learning','f_k4_problem','f_k4_apply','f_images'].forEach(id => {
+    ['f_student_id','f_student_name','f_level','f_category','f_teacher_id','f_group_name','f_hours','f_activity_name','f_activity_date','f_activity_end_date','f_location','f_k4_plan','f_activity_detail','f_k4_learning','f_k4_apply','f_images'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+    const probEl = document.getElementById('f_k4_problem');
+    if (probEl) probEl.value = 'ไม่พบปัญหาในการทำงาน';
     document.getElementById('imagePreviewBox').innerHTML = ''; document.getElementById('eligibilityBanner').classList.add('d-none');
     compressedImages = []; resetSubmitLock();
   } catch (err) { hideLoading(); safeAlert('เกิดข้อผิดพลาด', err.message, 'error'); }
 }
-
-// ==================== เช็กสถานะ + แก้ไข + นักศึกษาพิมพ์ของตัวเอง ====================
+// ==================== เช็กสถานะ + แก้ไข + นักศึกษาพิมพ์ / โหลด Word ของตัวเอง ====================
 async function searchMyStatus() {
   const sid = document.getElementById('searchStudentId').value.trim();
   if (!validateStudentId10(sid)) return safeAlert('รหัสนักศึกษาไม่ถูกต้อง', 'กรุณากรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วยเลข 6)', 'warning');
@@ -671,7 +905,7 @@ async function searchMyStatus() {
             ${r.reject_reason_12 ? `<div class="alert alert-danger mt-2 mb-1 py-2 small rounded-3"><b>เหตุผลที่ครูตีกลับ:</b> ${esc(r.reject_reason_12)}</div>` : ''}
             <div class="d-flex flex-wrap gap-2 mt-2">
               ${canEdit ? `<button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('12', '${escJs(r.req12_id)}')"><i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล</button>` : ''}
-              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf12('${escJs(r.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช.1-2 ของฉัน</button>
+              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf12('${escJs(r.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช.1-2 ของฉัน</button>
             </div>
           </div>`;
       }).join('');
@@ -701,7 +935,7 @@ async function searchMyStatus() {
             ${r.reject_reason ? `<div class="alert alert-danger mt-2 mb-1 py-2 small rounded-3"><b>เหตุผลที่ครูตีกลับ:</b> ${esc(r.reject_reason)}</div>` : ''}
             <div class="d-flex flex-wrap gap-2 mt-2">
               ${canEdit ? `<button type="button" class="btn btn-warning btn-sm rounded-pill fw-bold" onclick="openStudentEditModal('sub', '${escJs(r.req_id)}')"><i class="bi bi-pencil-square me-1"></i>ปรับปรุง / แก้ไขข้อมูล</button>` : ''}
-              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf4('${escJs(r.req_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์รายงานผล กพช.4 ของฉัน</button>
+              <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="printMySelf4('${escJs(r.req_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช.4 ของฉัน</button>
             </div>
           </div>`;
       }).join('');
@@ -713,19 +947,61 @@ async function searchMyStatus() {
 function printMySelf12(req12Id) {
   const item = lastStatus12List.find(x => x.req12_id === req12Id);
   if (!item) return;
-  document.getElementById('printOnlyContainer').innerHTML = buildKPCH12Html(item);
-  triggerPrint();
+  choosePrintOrWord(
+    `กพช.1-2 (${item.req12_id})`,
+    () => {
+      document.getElementById('printOnlyContainer').innerHTML = buildKPCH12Html(item, false);
+      triggerPrint();
+    },
+    () => {
+      exportHtmlToWord(`กพช1-2_${item.student_id || 'doc'}_${item.req12_id}`, buildKPCH12Html(item, true));
+    }
+  );
+}
+
+function buildMySelf4Html(item, forWord = false) {
+  const sDate = formatThaiDateWithLabel(item.activity_date), eDate = formatThaiDateWithLabel(item.activity_end_date);
+  const imgs = [item.img_1, item.img_2, item.img_3].filter(Boolean).map(u => getDriveThumb(u));
+  const k4 = buildKPCH4Html([item], { projName: item.activity_name || '', sDate, eDate, loc: item.location || '', tName: item.teacher_name || '' }, forWord);
+  if (imgs.length === 0) return k4;
+
+  if (forWord) {
+    const rows = [];
+    for (let i = 0; i < imgs.length; i += 2) {
+      const c1 = `<td style="width:50%; text-align:center; padding:8px; vertical-align:top;"><img src="${esc(imgs[i])}" width="250" style="width:250px; max-width:100%; height:auto; border:1px solid #cbd5e1;" /></td>`;
+      const c2 = imgs[i + 1]
+        ? `<td style="width:50%; text-align:center; padding:8px; vertical-align:top;"><img src="${esc(imgs[i + 1])}" width="250" style="width:250px; max-width:100%; height:auto; border:1px solid #cbd5e1;" /></td>`
+        : `<td style="width:50%;"></td>`;
+      rows.push(`<tr>${c1}${c2}</tr>`);
+    }
+    const photoPageWord = `
+      ${wordPageBreak()}
+      <div>
+        <div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:10px;">ภาพถ่ายประกอบการดำเนินกิจกรรม (${esc(item.student_name)})</div>
+        <table border="0" cellspacing="0" cellpadding="4" style="width:100%; border-collapse:collapse;">
+          <tbody>${rows.join('')}</tbody>
+        </table>
+      </div>`;
+    return k4 + photoPageWord;
+  }
+
+  const photoPage = `<div class="page-break-before"><div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:10px;">ภาพถ่ายประกอบการดำเนินกิจกรรม (${esc(item.student_name)})</div><div class="photo-grid">${imgs.map(u => `<img src="${esc(u)}">`).join('')}</div></div>`;
+  return k4 + photoPage;
 }
 
 function printMySelf4(reqId) {
   const item = lastStatusSubList.find(x => x.req_id === reqId);
   if (!item) return;
-  const sDate = formatThaiDateWithLabel(item.activity_date), eDate = formatThaiDateWithLabel(item.activity_end_date);
-  const imgs = [item.img_1, item.img_2, item.img_3].filter(Boolean).map(u => getDriveThumb(u));
-  const k4 = buildKPCH4Html([item], { projName: item.activity_name || '', sDate, eDate, loc: item.location || '', tName: item.teacher_name || '' });
-  const photoPage = imgs.length > 0 ? `<div class="page-break-before"><div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:10px;">ภาพถ่ายประกอบการดำเนินกิจกรรม (${esc(item.student_name)})</div><div class="photo-grid">${imgs.map(u => `<img src="${esc(u)}">`).join('')}</div></div>` : '';
-  document.getElementById('printOnlyContainer').innerHTML = k4 + photoPage;
-  triggerPrint();
+  choosePrintOrWord(
+    `รายงานผล กพช.4 (${item.req_id})`,
+    () => {
+      document.getElementById('printOnlyContainer').innerHTML = buildMySelf4Html(item, false);
+      triggerPrint();
+    },
+    () => {
+      exportHtmlToWord(`กพช4_${item.student_id || 'doc'}_${item.req_id}`, buildMySelf4Html(item, true));
+    }
+  );
 }
 
 function openStudentEditModal(itemType, id) {
@@ -814,10 +1090,81 @@ async function saveStudentEdit() {
   } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
-function buildKPCH12Html(item) {
+function buildKPCH12Html(item, forWord = false) {
   const nameParts = (item.student_name || '').trim().split(/\s+/);
   const firstName = nameParts[0] || '', lastName = nameParts.slice(1).join(' ') || '-';
   const termObj = parseTermParts(item.term);
+  const blankDateLine = '........./................../..............';
+  const regNameDisplay = registrarName ? esc(registrarName) : '....................................';
+  let scores = [];
+  try { scores = JSON.parse(item.eval_scores || '[]'); } catch (e) {}
+  const passChecked = item.status_12 !== 'REJECTED_12', rejectChecked = item.status_12 === 'REJECTED_12';
+
+  if (forWord) {
+    const evalRowsWord = EVAL_QUESTIONS_12.map((q, i) => `
+      <tr>
+        <td style="border:1px solid #000; text-align:center; padding:3px 5px;">${i + 1}</td>
+        <td style="border:1px solid #000; padding:3px 6px;">${q}</td>
+        <td style="border:1px solid #000; text-align:center; font-weight:bold; padding:3px 5px;">${scores[i] === 'มาก' ? '✓' : ''}</td>
+        <td style="border:1px solid #000; text-align:center; font-weight:bold; padding:3px 5px;">${scores[i] === 'ปานกลาง' ? '✓' : ''}</td>
+        <td style="border:1px solid #000; text-align:center; font-weight:bold; padding:3px 5px;">${scores[i] === 'น้อย' ? '✓' : ''}</td>
+        <td style="border:1px solid #000; padding:3px 5px;"></td>
+      </tr>`).join('');
+
+    return `
+      <div style="line-height:1.75; font-size:16pt;">
+        <div style="text-align:right; font-weight:bold; margin-bottom:10px;">กพช. 1</div>
+        <div style="text-align:center; font-weight:bold; font-size:18pt; margin-bottom:12px;">แบบลงทะเบียนกิจกรรมพัฒนาคุณภาพชีวิต (รายบุคคล)</div>
+        <div style="text-align:center; margin-bottom:8px;"><b>สถานศึกษา</b> &nbsp; ${wordLineFill(SCHOOL_NAME, '..............................................................')}</div>
+        <div style="text-align:center; margin-bottom:24px;"><b>ภาคเรียนที่</b> &nbsp; ${wordLineFill(termObj.no, '........')} &nbsp;/&nbsp; ${wordLineFill(termObj.year, '............')}</div>
+        <div style="margin-bottom:12px;">ชื่อ ${wordLineFill(firstName, '..............................')} &nbsp;&nbsp; สกุล ${wordLineFill(lastName, '....................................')} &nbsp;&nbsp; รหัสประจำตัวนักศึกษา ${wordLineFill(item.student_id, '........................')}</div>
+        <div style="margin-bottom:12px;">ระดับ ${wordLineFill(item.level, '..............................')} &nbsp;&nbsp; กลุ่ม/กศน.ตำบล ${wordLineFill(item.group_name || '-', '..................................................')}</div>
+        <div style="margin-bottom:36px;">ครูรับผิดชอบ ${wordLineFill(item.teacher_name, '........................................................................')}</div>
+        <div style="text-align:center; margin-bottom:50px;">ลงชื่อ............................................................นักศึกษา<br>( ${esc(item.student_name)} )<br>${blankDateLine}</div>
+        <table border="0" cellspacing="0" cellpadding="4" style="width:100%; border-collapse:collapse;">
+          <tr>
+            <td style="width:50%; text-align:center; vertical-align:top;">ลงชื่อ..........................................ผู้รับลงทะเบียน<br>( ${esc(item.teacher_name)} )<br>${blankDateLine}</td>
+            <td style="width:50%; text-align:center; vertical-align:top;">ลงชื่อ..........................................นายทะเบียน<br>( ${regNameDisplay} )<br>${blankDateLine}</td>
+          </tr>
+        </table>
+      </div>
+      ${wordPageBreak()}
+      <div style="line-height:1.38; font-size:14.5pt;">
+        <div style="text-align:right; font-weight:bold; font-size:15pt;">กพช. 2</div>
+        <div style="text-align:center; font-weight:bold; font-size:17pt; margin-bottom:6px;">แบบประเมินตนเองกิจกรรมพัฒนาคุณภาพชีวิต</div>
+        <div style="font-weight:bold; font-size:15pt; margin-bottom:4px;">ส่วนที่ 1 สำหรับผู้เรียน</div>
+        <div style="margin-bottom:10px; line-height:1.5;">
+          <div>ชื่อสถานศึกษา &nbsp; ${wordLineFill(SCHOOL_NAME, '................................................................................')}</div>
+          <div>ชื่อ-สกุล &nbsp; ${wordLineFill(item.student_name, '..................................................')} &nbsp;&nbsp; รหัสประจำตัวนักศึกษา &nbsp; ${wordLineFill(item.student_id, '........................')}</div>
+          <div>ระดับการศึกษา &nbsp; ${wordLineFill(item.level, '......................................')} &nbsp;&nbsp; ศูนย์การเรียน &nbsp; ${wordLineFill(item.group_name || '-', '........................................')}</div>
+          <div>ครูผู้รับผิดชอบ &nbsp; ${wordLineFill(item.teacher_name, '........................................................................')}</div>
+        </div>
+        <table border="1" cellspacing="0" cellpadding="4" style="width:100%; border-collapse:collapse; font-size:13.5pt;">
+          <thead>
+            <tr>
+              <th rowspan="2" style="border:1px solid #000; width:6%; text-align:center; padding:4px;">ที่</th>
+              <th rowspan="2" style="border:1px solid #000; width:56%; text-align:center; padding:4px;">รายการ</th>
+              <th colspan="3" style="border:1px solid #000; width:26%; text-align:center; padding:4px;">ระดับความรู้ความเข้าใจ</th>
+              <th rowspan="2" style="border:1px solid #000; width:12%; text-align:center; padding:4px;">หมายเหตุ</th>
+            </tr>
+            <tr>
+              <th style="border:1px solid #000; text-align:center; padding:4px;">มาก</th>
+              <th style="border:1px solid #000; text-align:center; padding:4px;">ปานกลาง</th>
+              <th style="border:1px solid #000; text-align:center; padding:4px;">น้อย</th>
+            </tr>
+          </thead>
+          <tbody>${evalRowsWord}</tbody>
+        </table>
+        <div style="text-align:center; margin:12px 0; font-size:15pt;">ลงชื่อ........................................................ผู้เรียน<br>( ${esc(item.student_name)} )</div>
+        <div style="font-size:15pt; margin-bottom:12px;">
+          <b>ส่วนที่ 2 สำหรับสถานศึกษา</b> &nbsp;&nbsp;
+          ${passChecked ? '&#9745;' : '&#9744;'} ผ่าน &nbsp;&nbsp;&nbsp;
+          ${rejectChecked ? '&#9745;' : '&#9744;'} เพิ่มเติมในเรื่อง &nbsp; ${wordLineFill(rejectChecked ? item.reject_reason_12 : '', '............................................................')}
+        </div>
+        <div style="text-align:center; font-size:15pt;">ลงชื่อ........................................................ครูผู้รับผิดชอบ<br>( ${esc(item.teacher_name)} )</div>
+      </div>`;
+  }
+
   const dotsStr = '.'.repeat(120);
   const dotSpan = `<span style="flex:1; min-width:12px; overflow:hidden; white-space:nowrap; letter-spacing:1px;">${dotsStr}</span>`;
   const makeDotFlex = (val, extraStyle = '') => {
@@ -828,12 +1175,7 @@ function buildKPCH12Html(item) {
     const clean = esc(val);
     return !clean ? `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`;
   };
-  const blankDateLine = '<span style="letter-spacing:1px;">........./................../..............</span>';
-  const regNameDisplay = registrarName ? esc(registrarName) : '<span style="letter-spacing:1px;">....................................</span>';
-  let scores = [];
-  try { scores = JSON.parse(item.eval_scores || '[]'); } catch (e) {}
   const evalRowsHtml = EVAL_QUESTIONS_12.map((q, i) => `<tr><td style="text-align:center;">${i + 1}</td><td>${q}</td><td style="text-align:center; font-weight:bold;">${scores[i] === 'มาก' ? '✓' : ''}</td><td style="text-align:center; font-weight:bold;">${scores[i] === 'ปานกลาง' ? '✓' : ''}</td><td style="text-align:center; font-weight:bold;">${scores[i] === 'น้อย' ? '✓' : ''}</td><td></td></tr>`).join('');
-  const passChecked = item.status_12 !== 'REJECTED_12', rejectChecked = item.status_12 === 'REJECTED_12';
 
   return `
     <div class="memo-page" style="padding: 10px 16px; line-height: 1.85; font-size: 16pt;">
@@ -844,10 +1186,10 @@ function buildKPCH12Html(item) {
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;"><span>ชื่อ</span>${makeDotFlex(firstName)}<span>สกุล</span>${makeDotFlex(lastName)}<span>รหัสประจำตัวนักศึกษา</span>${makeDotFlex(item.student_id, 'flex:0.9;')}</div>
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;"><span>ระดับ</span>${makeDotFlex(item.level)}<span>กลุ่ม/กศน.ตำบล</span>${makeDotFlex(item.group_name || '-', 'flex:1.3;')}</div>
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:40px;"><span>ครูรับผิดชอบ</span>${makeDotFlex(item.teacher_name)}</div>
-      <div style="text-align:center; margin-bottom:60px;">ลงชื่อ${makeDotInline('', 'width:200px; margin:0 6px;')}นักศึกษา<br>( ${esc(item.student_name)} )<br>${blankDateLine}</div>
+      <div style="text-align:center; margin-bottom:60px;">ลงชื่อ${makeDotInline('', 'width:200px; margin:0 6px;')}นักศึกษา<br>( ${esc(item.student_name)} )<br><span style="letter-spacing:1px;">${blankDateLine}</span></div>
       <div style="display:flex; justify-content:space-between; text-align:center;">
-        <div style="width:48%;">ลงชื่อ${makeDotInline('', 'width:140px; margin:0 6px;')}ผู้รับลงทะเบียน<br>( ${esc(item.teacher_name)} )<br>${blankDateLine}</div>
-        <div style="width:48%;">ลงชื่อ${makeDotInline('', 'width:140px; margin:0 6px;')}นายทะเบียน<br>( ${regNameDisplay} )<br>${blankDateLine}</div>
+        <div style="width:48%;">ลงชื่อ${makeDotInline('', 'width:140px; margin:0 6px;')}ผู้รับลงทะเบียน<br>( ${esc(item.teacher_name)} )<br><span style="letter-spacing:1px;">${blankDateLine}</span></div>
+        <div style="width:48%;">ลงชื่อ${makeDotInline('', 'width:140px; margin:0 6px;')}นายทะเบียน<br>( ${regNameDisplay} )<br><span style="letter-spacing:1px;">${blankDateLine}</span></div>
       </div>
     </div>
     <div style="padding: 4px 8px; line-height: 1.38;">
@@ -871,6 +1213,7 @@ function buildKPCH12Html(item) {
       <div style="text-align:center; font-size:15pt;">ลงชื่อ${makeDotInline('', 'width:190px; margin:0 6px;')}ครูผู้รับผิดชอบ<br>( ${esc(item.teacher_name)} )</div>
     </div>`;
 }
+
 // ==================== ล็อคอิน / หลังบ้าน (3 ขั้นตอน) ====================
 function resetDashboardTabViews() {
   document.getElementById('dashSubmissionsView').classList.remove('d-none');
@@ -1041,8 +1384,7 @@ async function markPrintedClient(docType, ids) {
     }
   } catch (e) { console.warn('markPrinted error:', e); }
 }
-
-// ==================== ตาราง กพช. 1-2 & พิมพ์ กพช. 3 ====================
+// ==================== ตาราง กพช. 1-2 & พิมพ์ / โหลด Word กพช. 3 ====================
 function toggleAll12Checks(master) {
   document.querySelectorAll('.chk-12').forEach(cb => cb.checked = master.checked);
 }
@@ -1094,7 +1436,7 @@ function render12List() {
         <td><span class="badge step-badge ${st.cls}">${st.text}</span><div class="mt-1">${b12}${b3}</div></td>
         <td class="text-end text-nowrap">
           <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="open12DetailModal('${escJs(item.req12_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${escJs(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-2</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" title="พิมพ์หรือดาวน์โหลด Word กพช.1-2" onclick="printForm12('${escJs(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-2</button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDelete12(['${escJs(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>`;
@@ -1204,8 +1546,8 @@ function open12DetailModal(req12Id) {
   const isApproved = item.status_12 === 'APPROVED_12', isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
     <div class="d-flex flex-wrap gap-2">
-      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${escJs(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 1-2</button>
-      ${isApproved ? `<button type="button" class="btn btn-primary btn-sm rounded-pill px-3" onclick="openDoc56ById('${escJs(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 3 + บันทึก</button>` : ''}
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${escJs(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช. 1-2</button>
+      ${isApproved ? `<button type="button" class="btn btn-primary btn-sm rounded-pill px-3" onclick="openDoc56ById('${escJs(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช. 3 + บันทึก</button>` : ''}
       ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${escJs(item.req12_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -1235,21 +1577,30 @@ async function executeApproval12(req12Id, decision, reason) {
 function printForm12(req12Id) {
   const item = dash12Items.find(x => x.req12_id === req12Id);
   if (!item) return;
-  document.getElementById('printOnlyContainer').innerHTML = buildKPCH12Html(item);
-  markPrintedClient('12', [req12Id]);
-  triggerPrint();
+  choosePrintOrWord(
+    `กพช.1-2 (${item.req12_id})`,
+    () => {
+      document.getElementById('printOnlyContainer').innerHTML = buildKPCH12Html(item, false);
+      markPrintedClient('12', [req12Id]);
+      triggerPrint();
+    },
+    () => {
+      markPrintedClient('12', [req12Id]);
+      exportHtmlToWord(`กพช1-2_${item.student_id || 'doc'}_${item.req12_id}`, buildKPCH12Html(item, true));
+    }
+  );
 }
 
-// ==================== พิมพ์ชุด กพช. 3 + บันทึกข้อความ ====================
+// ==================== พิมพ์ / โหลด Word ชุด กพช. 3 + บันทึกข้อความ ====================
 function openDoc56PrintModal() {
   const checkedIds = getCheckedUniqueIds('chk-12');
   if (checkedIds.length === 0) {
-    return safeAlert('กรุณาติ๊กเลือกรายชื่อ', 'กรุณาติ๊กถูกหน้ารายชื่อนักศึกษาที่ต้องการพิมพ์ กพช. 3 อย่างน้อย 1 คนครับ', 'warning');
+    return safeAlert('กรุณาติ๊กเลือกรายชื่อ', 'กรุณาติ๊กถูกหน้ารายชื่อนักศึกษาที่ต้องการพิมพ์ กพช. 3 อย่างน้อย 1 คนก่อนครับ', 'warning');
   }
   const items = dash12Items.filter(x => checkedIds.includes(x.req12_id));
   const notApproved = items.filter(x => x.status_12 !== 'APPROVED_12');
   if (notApproved.length > 0) {
-    return safeAlert('ยังไม่ได้อนุมัติ กพช. 1-2', `รายการ <b>${esc(notApproved.map(x => x.req12_id).join(', '))}</b> ยังไม่ได้รับการอนุมัติ กพช. 1-2<br>กรุณากดอนุมัติ กพช. 1-2 ก่อน จึงจะสั่งพิมพ์ กพช. 3 ได้ครับ`, 'warning');
+    return safeAlert('ยังไม่ได้อนุมัติ กพช. 1-2', `รายการ <b>${esc(notApproved.map(x => x.req12_id).join(', '))}</b> ยังไม่ได้รับการอนุมัติ กพช. 1-2<br>กรุณากดอนุมัติ กพช. 1-2 ก่อน จึงจะออกเอกสาร กพช. 3 ได้ครับ`, 'warning');
   }
   openDoc56ModalWithItems(items);
 }
@@ -1283,7 +1634,205 @@ function openDoc56ModalWithItems(items) {
   openModalById('doc56Modal');
 }
 
-function executePrintDoc56() {
+function buildDoc56Html(items, cfg, forWord = false, garudaSrc = GARUDA_URL) {
+  const isGroup = items.length > 1;
+  const leader = items.find(i => (i.role_note || '').includes('ประธาน')) || items[0];
+
+  if (forWord) {
+    const rowsWord = items.map((s, idx) => `
+      <tr>
+        <td style="border:1px solid #000; text-align:center; padding:3px 5px;">${idx + 1}</td>
+        <td style="border:1px solid #000; padding:3px 6px;">${esc(s.student_name)}</td>
+        <td style="border:1px solid #000; text-align:center; padding:3px 5px;">${esc(s.student_id)}</td>
+        <td style="border:1px solid #000; text-align:center; padding:3px 5px;">${esc(s.role_note || (idx === 0 && isGroup ? 'ประธาน' : ''))}</td>
+        <td style="border:1px solid #000; text-align:center; padding:3px 5px;">${esc(s.level || '')}</td>
+      </tr>`).join('');
+
+    const memo56Word = `
+      <div style="font-size:15.5pt; line-height:1.45;">
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+          <tr>
+            <td style="width:72px; vertical-align:bottom;"><img src="${esc(garudaSrc)}" width="58" style="width:58px; height:auto;" /></td>
+            <td style="text-align:center; vertical-align:bottom; font-size:24pt; font-weight:bold;">บันทึกข้อความ</td>
+            <td style="width:72px;"></td>
+          </tr>
+        </table>
+        <div style="margin-bottom:3px;"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp;&nbsp; <b>โทร.</b> 02 524 0645</div>
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin-bottom:3px;">
+          <tr>
+            <td style="width:55%;"><b>ที่</b> &nbsp; ${esc(cfg.docNo)}</td>
+            <td style="width:45%;"><b>วันที่</b> &nbsp; ${esc(cfg.docDate)}</td>
+          </tr>
+        </table>
+        <div style="margin-bottom:4px;"><b>เรื่อง</b> &nbsp; ขออนุมัติโครงการกิจกรรมพัฒนาคุณภาพชีวิต</div>
+        <div style="border-bottom:1.5px solid #000; margin:6px 0 12px 0;">&nbsp;</div>
+        <div style="margin-bottom:10px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
+        <p style="text-indent:2.5cm; margin:0 0 8px 0; text-align:justify;">ด้วยนักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(cfg.projName)} ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate} สถานที่ปฏิบัติกิจกรรม ณ ${esc(cfg.loc)}</p>
+        <p style="text-indent:2.5cm; margin:0 0 8px 0; text-align:justify;">ในการนี้ ข้าพเจ้า ได้ดำเนินการตรวจสอบแบบเสนอโครงการแล้ว ปรากฏว่ามีความครบถ้วน ถูกต้อง และเหมาะสมที่จะปฏิบัติได้</p>
+        <p style="text-indent:2.5cm; margin:0 0 18px 0;">จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ</p>
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse;">
+          <tr>
+            <td style="width:40%;"></td>
+            <td style="width:60%; text-align:center; line-height:1.45;">
+              ลงชื่อ..................................................<br>
+              (${esc(cfg.advisor)})<br>
+              ตำแหน่ง &nbsp;&nbsp; ${esc(cfg.advisorPos)}
+            </td>
+          </tr>
+          <tr>
+            <td style="width:35%;"></td>
+            <td style="width:65%; padding-top:20px; line-height:1.6;">
+              &#9744; อนุมัติ<br>
+              &#9744; มอบคณะกรรมการตรวจสอบและประเมินค่าหน่วยกิจกรรม
+            </td>
+          </tr>
+          <tr>
+            <td style="width:40%;"></td>
+            <td style="width:60%; text-align:center; padding-top:28px; line-height:1.45;">
+              (${esc(cfg.director)})<br>
+              ผู้อำนวยการ${SCHOOL_NAME}
+            </td>
+          </tr>
+        </table>
+      </div>`;
+
+    const k3Word = `
+      ${wordPageBreak()}
+      <div style="line-height:1.35; font-size:14.5pt;">
+        ${wordBoxTagHtml('กพช. 3')}
+        <div style="text-align:center; font-weight:bold; font-size:17pt; margin-bottom:6px;">แบบเสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต (สำหรับผู้เรียน)</div>
+        <div style="margin-top:4px;"><b>ส่วนที่ 1 สำหรับผู้เรียน</b> &nbsp;|&nbsp; เสนอต่อสถานศึกษา <b>${SCHOOL_NAME}</b></div>
+        <div><b>1. ชื่อโครงการ</b> &nbsp; ${esc(cfg.projName)}</div>
+        <div><b>2. หลักการและเหตุผล</b><div style="margin-left:1.5cm;">${esc(cfg.rationale).replace(/\n/g, '<br>')}</div></div>
+        <div><b>3. วัตถุประสงค์</b><div style="margin-left:1.5cm;">${esc(cfg.objectives).replace(/\n/g, '<br>')}</div></div>
+        <div><b>4. เป้าหมาย</b><div style="margin-left:1.5cm;">${esc(cfg.target).replace(/\n/g, '<br>')}</div></div>
+        <div><b>5. ขั้นตอน/แผนการปฏิบัติโครงการ</b><div style="margin-left:1.5cm;">${esc(cfg.steps).replace(/\n/g, '<br>')}</div></div>
+        <div><b>6. สถานที่ดำเนินการ</b> &nbsp; ${esc(cfg.loc)}</div>
+        <div><b>7. ระยะเวลาการดำเนินโครงการ</b> &nbsp; ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate}</div>
+        <div><b>8. ปัจจัยในการดำเนินโครงการ</b> &nbsp; 8.1 เงิน ${esc(cfg.budget)} &nbsp; 8.2 วัสดุ ${esc(cfg.material)} &nbsp; 8.3 แรงงาน ${esc(cfg.labor)}</div>
+        <div style="margin-bottom:4px;"><b>9. ผลที่คาดว่าจะได้รับ</b><div style="margin-left:1.5cm;">${esc(cfg.expected).replace(/\n/g, '<br>')}</div></div>
+        <div><b>10. ผู้รับผิดชอบโครงการ</b> ชื่อ ${isGroup ? '........................................' : esc(leader.student_name)} รหัส ${isGroup ? '........................' : esc(leader.student_id)} (กรณีเสนอเป็นรายบุคคล)</div>
+        <div><b>11. ผู้รับผิดชอบโครงการ</b> จำนวน ${isGroup ? items.length : '............'} คน ได้แก่ ${isGroup ? esc(leader.student_name) + ' และคณะ' : '........................................'} (กรณีเสนอเป็นกลุ่ม)</div>
+        <div style="text-align:center; font-weight:bold; margin-top:6px;">รายชื่อผู้เข้าร่วมทำ${esc(cfg.projName)}</div>
+        <table border="1" cellspacing="0" cellpadding="4" style="width:100%; border-collapse:collapse; margin-top:4px; font-size:14pt;">
+          <thead>
+            <tr>
+              <th style="border:1px solid #000; width:40px; text-align:center; padding:4px;">ที่</th>
+              <th style="border:1px solid #000; text-align:center; padding:4px;">ชื่อ - สกุล</th>
+              <th style="border:1px solid #000; width:125px; text-align:center; padding:4px;">รหัสนักศึกษา</th>
+              <th style="border:1px solid #000; width:105px; text-align:center; padding:4px;">หมายเหตุ</th>
+              <th style="border:1px solid #000; width:105px; text-align:center; padding:4px;">ระดับ</th>
+            </tr>
+          </thead>
+          <tbody>${rowsWord}</tbody>
+        </table>
+        <div style="margin-top:6px;"><b>12. ที่ปรึกษาโครงการ</b> &nbsp;&nbsp; 1. ${esc(cfg.advisor)}</div>
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin-top:10px;">
+          <tr><td style="width:40%;"></td><td style="width:60%; text-align:center;">ลงชื่อ..................................................ผู้เสนอ/ประธานโครงการ<br>(${esc(leader.student_name)})</td></tr>
+        </table>
+        <div style="font-size:13.5pt; margin-top:4px;"><b>หมายเหตุ</b> ผู้เสนอ/ประธานโครงการ คัดเลือกจากนักศึกษาที่เข้าร่วมโครงการ หากทำโครงการคนเดียว ก็ถือว่าเป็นผู้เสนอและประธาน ด้วย</div>
+        <div style="margin-top:6px;"><b>ส่วนที่ 2 สำหรับสถานศึกษา</b> &nbsp; ความเห็นครูผู้รับผิดชอบกลุ่มนักศึกษาที่จัดทำกิจกรรม กพช.<div style="margin-left:1.5cm;">${esc(cfg.tOpinion)}</div></div>
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin-top:10px;">
+          <tr><td style="width:36%;"></td><td style="width:64%; text-align:center;">ลงชื่อ..................................................ครูผู้รับผิดชอบกลุ่มนักศึกษาที่ทำกิจกรรม กพช.<br>(${esc(cfg.advisor)})</td></tr>
+        </table>
+      </div>
+      ${wordPageBreak()}
+      <div style="line-height:1.45; font-size:14.5pt;">
+        <div><b>ความเห็นชอบของคณะกรรมการพิจารณาและประเมินผลการปฏิบัติโครงการ กพช.</b></div>
+        <div style="margin-left:1.5cm; margin-top:4px;">
+          &#9744; เห็นควรดำเนินการได้ โดยประมาณค่าหน่วยกิจกรรมโครงการนี้ จำนวน ......<b>${esc(cfg.hours)}</b>...... ชั่วโมง<br>
+          &#9744; ควรปรับปรุงแก้ไข<br>
+          1. ..............................................................................................................<br>
+          2. ..............................................................................................................<br>
+          3. ..............................................................................................................
+        </div>
+        <div style="text-align:center; margin-top:18px; line-height:1.55;">
+          ลงชื่อ.................................................. ประธานคณะกรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(cfg.comm1)})<br><br>
+          ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(cfg.comm2)})<br><br>
+          ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการและเลขานุการ<br>(${esc(cfg.comm3)})
+        </div>
+        <table border="0" cellspacing="0" cellpadding="6" style="width:100%; border-collapse:collapse; margin-top:24px;">
+          <tr>
+            <td style="width:50%; vertical-align:top; text-align:left;">
+              <b>เสนอหัวหน้าสถานศึกษา</b><br>
+              ........................................................................<br>
+              ........................................................................<br><br>
+              <div style="text-align:center;">ลงชื่อ..........................................นายทะเบียน<br>(${registrarName ? esc(registrarName) : '..........................................'})</div>
+            </td>
+            <td style="width:50%; vertical-align:top; text-align:left;">
+              <b>ความเห็นของหัวหน้าสถานศึกษา</b><br>
+              ........................................................................<br>
+              ........................................................................<br><br>
+              <div style="text-align:center;">ลงชื่อ..........................................<br>(${esc(cfg.director)})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>วันที่............เดือน....................พ.ศ. .........</div>
+            </td>
+          </tr>
+        </table>
+      </div>`;
+
+    return memo56Word + k3Word;
+  }
+
+  const rowsHtml = items.map((s, idx) => `<tr><td style="text-align:center;">${idx + 1}</td><td>${esc(s.student_name)}</td><td style="text-align:center;">${esc(s.student_id)}</td><td style="text-align:center;">${esc(s.role_note || (idx === 0 && isGroup ? 'ประธาน' : ''))}</td><td style="text-align:center;">${esc(s.level || '')}</td></tr>`).join('');
+
+  const memo56Html = `
+    <div class="memo-page">
+      <div class="memo-header"><img src="${esc(garudaSrc)}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
+      <div class="memo-field"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp; <b>โทร.</b> 02 524 0645</div>
+      <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp; ${esc(cfg.docNo)}</span><span><b>วันที่</b> &nbsp; ${esc(cfg.docDate)} &nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      <div class="memo-field"><b>เรื่อง</b> &nbsp; ขออนุมัติโครงการกิจกรรมพัฒนาคุณภาพชีวิต</div>
+      <div class="memo-divider"></div>
+      <div class="memo-field" style="margin-bottom:10px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
+      <div class="memo-indent">ด้วยนักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(cfg.projName)} ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate} สถานที่ปฏิบัติกิจกรรม ณ ${esc(cfg.loc)}</div>
+      <div class="memo-indent">ในการนี้ ข้าพเจ้า ได้ดำเนินการตรวจสอบแบบเสนอโครงการแล้ว ปรากฏว่ามีความครบถ้วน ถูกต้อง และเหมาะสมที่จะปฏิบัติได้</div>
+      <div class="memo-indent">จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ</div>
+      <div class="sig-center" style="margin-left:38%; margin-top:24px;">ลงชื่อ..................................................<br>(${esc(cfg.advisor)})<br>ตำแหน่ง &nbsp;&nbsp; ${esc(cfg.advisorPos)}</div>
+      <div style="margin-left:32%; margin-top:24px; line-height:1.6;">&#9744; อนุมัติ<br>&#9744; มอบคณะกรรมการตรวจสอบและประเมินค่าหน่วยกิจกรรม</div>
+      <div class="sig-center" style="margin-left:38%; margin-top:34px;">(${esc(cfg.director)})<br>ผู้อำนวยการ${SCHOOL_NAME}</div>
+    </div>`;
+
+  const k3Html = `
+  <div style="line-height:1.28; font-size:14.5pt;">
+    <div class="kpch-box-tag">กพช. 3</div>
+    <div class="doc-title-center" style="font-size:17pt !important;">แบบเสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต (สำหรับผู้เรียน)</div>
+    <div style="margin-top:4px;"><b>ส่วนที่ 1 สำหรับผู้เรียน</b> &nbsp;|&nbsp; เสนอต่อสถานศึกษา <b>${SCHOOL_NAME}</b></div>
+    <div><b>1. ชื่อโครงการ</b> &nbsp; ${esc(cfg.projName)}</div>
+    <div><b>2. หลักการและเหตุผล</b><div class="doc-section-indent">${esc(cfg.rationale).replace(/\n/g, '<br>')}</div></div>
+    <div><b>3. วัตถุประสงค์</b><div class="doc-section-indent">${esc(cfg.objectives).replace(/\n/g, '<br>')}</div></div>
+    <div><b>4. เป้าหมาย</b><div class="doc-section-indent">${esc(cfg.target).replace(/\n/g, '<br>')}</div></div>
+    <div><b>5. ขั้นตอน/แผนการปฏิบัติโครงการ</b><div class="doc-section-indent">${esc(cfg.steps).replace(/\n/g, '<br>')}</div></div>
+    <div><b>6. สถานที่ดำเนินการ</b> &nbsp; ${esc(cfg.loc)}</div>
+    <div><b>7. ระยะเวลาการดำเนินโครงการ</b> &nbsp; ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate}</div>
+    <div><b>8. ปัจจัยในการดำเนินโครงการ</b> &nbsp; 8.1 เงิน ${esc(cfg.budget)} &nbsp; 8.2 วัสดุ ${esc(cfg.material)} &nbsp; 8.3 แรงงาน ${esc(cfg.labor)}</div>
+    <div style="margin-bottom:4px;"><b>9. ผลที่คาดว่าจะได้รับ</b><div class="doc-section-indent">${esc(cfg.expected).replace(/\n/g, '<br>')}</div></div>
+    <div><b>10. ผู้รับผิดชอบโครงการ</b> ชื่อ ${isGroup ? '........................................' : esc(leader.student_name)} รหัส ${isGroup ? '........................' : esc(leader.student_id)} (กรณีเสนอเป็นรายบุคคล)</div>
+    <div><b>11. ผู้รับผิดชอบโครงการ</b> จำนวน ${isGroup ? items.length : '............'} คน ได้แก่ ${isGroup ? esc(leader.student_name) + ' และคณะ' : '........................................'} (กรณีเสนอเป็นกลุ่ม)</div>
+    <div style="text-align:center; font-weight:bold; margin-top:4px;">รายชื่อผู้เข้าร่วมทำ${esc(cfg.projName)}</div>
+    <table class="doc-table" style="font-size:14pt !important;"><thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสนักศึกษา</th><th style="width:105px;">หมายเหตุ</th><th style="width:105px;">ระดับ</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+    <div style="margin-top:6px;"><b>12. ที่ปรึกษาโครงการ</b> &nbsp;&nbsp; 1. ${esc(cfg.advisor)}</div>
+    <div class="sig-center" style="margin-left:38%; margin-top:10px;">ลงชื่อ..................................................ผู้เสนอ/ประธานโครงการ<br>(${esc(leader.student_name)})</div>
+    <div style="font-size:13.5pt !important; margin-top:4px;"><b>หมายเหตุ</b> ผู้เสนอ/ประธานโครงการ คัดเลือกจากนักศึกษาที่เข้าร่วมโครงการ หากทำโครงการคนเดียว ก็ถือว่าเป็นผู้เสนอและประธาน ด้วย</div>
+    <div style="margin-top:6px;"><b>ส่วนที่ 2 สำหรับสถานศึกษา</b> &nbsp; ความเห็นครูผู้รับผิดชอบกลุ่มนักศึกษาที่จัดทำกิจกรรม กพช.<div class="doc-section-indent">${esc(cfg.tOpinion)}</div></div>
+    <div class="sig-center" style="margin-left:35%; margin-top:10px;">ลงชื่อ..................................................ครูผู้รับผิดชอบกลุ่มนักศึกษาที่ทำกิจกรรม กพช.<br>(${esc(cfg.advisor)})</div>
+
+    <div class="page-break-before" style="page-break-inside:avoid;">
+      <div><b>ความเห็นชอบของคณะกรรมการพิจารณาและประเมินผลการปฏิบัติโครงการ กพช.</b></div>
+      <div style="margin-left:1.5cm; margin-top:4px;">&#9744; เห็นควรดำเนินการได้ โดยประมาณค่าหน่วยกิจกรรมโครงการนี้ จำนวน ......<b>${esc(cfg.hours)}</b>...... ชั่วโมง<br>&#9744; ควรปรับปรุงแก้ไข<br>1. ..............................................................................................................<br>2. ..............................................................................................................<br>3. ..............................................................................................................</div>
+      <div class="sig-center" style="margin-top:16px;">
+        ลงชื่อ.................................................. ประธานคณะกรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(cfg.comm1)})<br><br>
+        ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(cfg.comm2)})<br><br>
+        ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการและเลขานุการ<br>(${esc(cfg.comm3)})
+      </div>
+      <div class="sig-row-2" style="margin-top:24px;">
+        <div class="sig-col" style="text-align:left;"><b>เสนอหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................นายทะเบียน<br>(${registrarName ? esc(registrarName) : '..........................................'})</div></div>
+        <div class="sig-col" style="text-align:left;"><b>ความเห็นของหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................<br>(${esc(cfg.director)})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>วันที่............เดือน....................พ.ศ. .........</div></div>
+      </div>
+    </div>
+  </div>`;
+
+  return memo56Html + k3Html;
+}
+
+async function executeOutputDoc56(mode = 'print') {
   const items = _doc56Items;
   if (!items || items.length === 0) return;
   const cfg = {
@@ -1310,79 +1859,130 @@ function executePrintDoc56() {
     comm3: document.getElementById('d56_comm3').value,
     director: document.getElementById('d56_director').value
   };
-  const isGroup = items.length > 1, leader = items.find(i => (i.role_note || '').includes('ประธาน')) || items[0];
-  const rowsHtml = items.map((s, idx) => `<tr><td style="text-align:center;">${idx + 1}</td><td>${esc(s.student_name)}</td><td style="text-align:center;">${esc(s.student_id)}</td><td style="text-align:center;">${esc(s.role_note || (idx === 0 && isGroup ? 'ประธาน' : ''))}</td><td style="text-align:center;">${esc(s.level || '')}</td></tr>`).join('');
 
-  const memo56Html = `
-    <div class="memo-page">
-      <div class="memo-header"><img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
-      <div class="memo-field"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp; <b>โทร.</b> 02 524 0645</div>
-      <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp; ${esc(cfg.docNo)}</span><span><b>วันที่</b> &nbsp; ${esc(cfg.docDate)} &nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-      <div class="memo-field"><b>เรื่อง</b> &nbsp; ขออนุมัติโครงการกิจกรรมพัฒนาคุณภาพชีวิต</div>
-      <div class="memo-divider"></div>
-      <div class="memo-field" style="margin-bottom:10px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
-      <div class="memo-indent">ด้วยนักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(cfg.projName)} ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate} สถานที่ปฏิบัติกิจกรรม ณ ${esc(cfg.loc)}</div>
-      <div class="memo-indent">ในการนี้ ข้าพเจ้า ได้ดำเนินการตรวจสอบแบบเสนอโครงการแล้ว ปรากฏว่ามีความครบถ้วน ถูกต้อง และเหมาะสมที่จะปฏิบัติได้</div>
-      <div class="memo-indent">จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ</div>
-      <div class="sig-center" style="margin-left:38%; margin-top:24px;">ลงชื่อ..................................................<br>(${esc(cfg.advisor)})<br>ตำแหน่ง &nbsp;&nbsp; ${esc(cfg.advisorPos)}</div>
-      <div style="margin-left:32%; margin-top:24px; line-height:1.6;">&#9744; อนุมัติ<br>&#9744; มอบคณะกรรมการตรวจสอบและประเมินค่าหน่วยกิจกรรม</div>
-      <div class="sig-center" style="margin-left:38%; margin-top:34px;">(${esc(cfg.director)})<br>ผู้อำนวยการ${SCHOOL_NAME}</div>
-    </div>`;
-
-  const k3Html = `
-  <div style="line-height:1.28; font-size:14.5pt;">
-    <div class="kpch-box-tag">กพช. 3</div>
-    <div class="doc-title-center" style="font-size:17pt !important;">แบบเสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต (สำหรับผู้เรียน)</div>
-    <div style="margin-top:4px;"><b>ส่วนที่ 1 สำหรับผู้เรียน</b> &nbsp;|&nbsp; เสนอต่อสถานศึกษา <b>${SCHOOL_NAME}</b></div>
-    <div><b>1. ชื่อโครงการ</b> &nbsp; ${esc(cfg.projName)}</div>
-    <div><b>2. หลักการและเหตุผล</b><div class="doc-section-indent">${esc(cfg.rationale).replace(/\n/g,'<br>')}</div></div>
-    <div><b>3. วัตถุประสงค์</b><div class="doc-section-indent">${esc(cfg.objectives).replace(/\n/g,'<br>')}</div></div>
-    <div><b>4. เป้าหมาย</b><div class="doc-section-indent">${esc(cfg.target).replace(/\n/g,'<br>')}</div></div>
-    <div><b>5. ขั้นตอน/แผนการปฏิบัติโครงการ</b><div class="doc-section-indent">${esc(cfg.steps).replace(/\n/g,'<br>')}</div></div>
-    <div><b>6. สถานที่ดำเนินการ</b> &nbsp; ${esc(cfg.loc)}</div>
-    <div><b>7. ระยะเวลาการดำเนินโครงการ</b> &nbsp; ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate}</div>
-    <div><b>8. ปัจจัยในการดำเนินโครงการ</b> &nbsp; 8.1 เงิน ${esc(cfg.budget)} &nbsp; 8.2 วัสดุ ${esc(cfg.material)} &nbsp; 8.3 แรงงาน ${esc(cfg.labor)}</div>
-    <div style="margin-bottom:4px;"><b>9. ผลที่คาดว่าจะได้รับ</b><div class="doc-section-indent">${esc(cfg.expected).replace(/\n/g,'<br>')}</div></div>
-    <div><b>10. ผู้รับผิดชอบโครงการ</b> ชื่อ ${isGroup ? '........................................' : esc(leader.student_name)} รหัส ${isGroup ? '........................' : esc(leader.student_id)} (กรณีเสนอเป็นรายบุคคล)</div>
-    <div><b>11. ผู้รับผิดชอบโครงการ</b> จำนวน ${isGroup ? items.length : '............'} คน ได้แก่ ${isGroup ? esc(leader.student_name) + ' และคณะ' : '........................................'} (กรณีเสนอเป็นกลุ่ม)</div>
-    <div style="text-align:center; font-weight:bold; margin-top:4px;">รายชื่อผู้เข้าร่วมทำ${esc(cfg.projName)}</div>
-    <table class="doc-table" style="font-size:14pt !important;"><thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสนักศึกษา</th><th style="width:105px;">หมายเหตุ</th><th style="width:105px;">ระดับ</th></tr></thead><tbody>${rowsHtml}</tbody></table>
-    <div style="margin-top:6px;"><b>12. ที่ปรึกษาโครงการ</b> &nbsp;&nbsp; 1. ${esc(cfg.advisor)}</div>
-    <div class="sig-center" style="margin-left:38%; margin-top:10px;">ลงชื่อ..................................................ผู้เสนอ/ประธานโครงการ<br>(${esc(leader.student_name)})</div>
-    <div style="font-size:13.5pt !important; margin-top:4px;"><b>หมายเหตุ</b> ผู้เสนอ/ประธานโครงการ คัดเลือกจากนักศึกษาที่เข้าร่วมโครงการ หากทำโครงการคนเดียว ก็ถือว่าเป็นผู้เสนอและประธาน ด้วย</div>
-    <div style="margin-top:6px;"><b>ส่วนที่ 2 สำหรับสถานศึกษา</b> &nbsp; ความเห็นครูผู้รับผิดชอบกลุ่มนักศึกษาที่จัดทำกิจกรรม กพช.<div class="doc-section-indent">${esc(cfg.tOpinion)}</div></div>
-    <div class="sig-center" style="margin-left:35%; margin-top:10px;">ลงชื่อ..................................................ครูผู้รับผิดชอบกลุ่มนักศึกษาที่ทำกิจกรรม กพช.<br>(${esc(cfg.advisor)})</div>
-
-    <div class="page-break-before" style="page-break-inside:avoid;">
-      <div><b>ความเห็นชอบของคณะกรรมการพิจารณาและประเมินผลการปฏิบัติโครงการ กพช.</b></div>
-      <div style="margin-left:1.5cm; margin-top:4px;">&#9744; เห็นควรดำเนินการได้ โดยประมาณค่าหน่วยกิจกรรมโครงการนี้ จำนวน ......<b>${esc(cfg.hours)}</b>...... ชั่วโมง<br>&#9744; ควรปรับปรุงแก้ไข<br>1. ..............................................................................................................<br>2. ..............................................................................................................<br>3. ..............................................................................................................</div>
-      <div class="sig-center" style="margin-top:16px;">
-        ลงชื่อ.................................................. ประธานคณะกรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(cfg.comm1)})<br><br>
-        ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(cfg.comm2)})<br><br>
-        ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการและเลขานุการ<br>(${esc(cfg.comm3)})
-      </div>
-      <div class="sig-row-2" style="margin-top:24px;">
-        <div class="sig-col" style="text-align:left;"><b>เสนอหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................นายทะเบียน<br>(${registrarName ? esc(registrarName) : '..........................................'})</div></div>
-        <div class="sig-col" style="text-align:left;"><b>ความเห็นของหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................<br>(${esc(cfg.director)})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>วันที่............เดือน....................พ.ศ. .........</div></div>
-      </div>
-    </div>
-  </div>`;
-
-  document.getElementById('printOnlyContainer').innerHTML = memo56Html + k3Html;
   closeModalById('doc56Modal');
   markPrintedClient('3', items.map(x => x.req12_id));
-  triggerPrint();
+
+  if (mode === 'word') {
+    showLoading('กำลังจัดเตรียมไฟล์ Word กพช. 3 + บันทึกข้อความ...');
+    const garudaSrc = await getGarudaForWord();
+    hideLoading();
+    const first = items[0];
+    const wordHtml = buildDoc56Html(items, cfg, true, garudaSrc);
+    exportHtmlToWord(`กพช3_บันทึกข้อความ_${first.student_id || 'group'}`, wordHtml);
+  } else {
+    document.getElementById('printOnlyContainer').innerHTML = buildDoc56Html(items, cfg, false, GARUDA_URL);
+    triggerPrint();
+  }
+}
+
+function executePrintDoc56() {
+  return executeOutputDoc56('print');
 }
 
 // ==================== แบบประเมิน กพช. 5 & กพช. 4 ====================
-function buildKPCH5Html(item, isLastInPrint, imagesBase64 = [], directorNameOverride = '') {
+function buildKPCH5Html(item, isLastInPrint, imagesBase64 = [], directorNameOverride = '', forWord = false) {
+  const startTxt = item.activity_date ? formatShortThaiDate(item.activity_date) : '', endTxt = item.activity_end_date ? formatShortThaiDate(item.activity_end_date) : '';
+  const dirDisplay = esc(directorNameOverride || DIRECTOR_NAME);
+
+  if (forWord) {
+    const phaseWord = (label) => `
+      <div style="margin-top:4px; line-height:1.45;">
+        ${label} &nbsp; เมื่อวันที่ ${wordLineFill('', '..........')} เดือน ${wordLineFill('', '....................')} พ.ศ. ${wordLineFill('', '............')}
+      </div>
+      <div style="padding-left:22px; margin-bottom:2px;">&#9744; ผ่าน &nbsp;&nbsp;&nbsp;&nbsp; &#9744; ปรับปรุง</div>
+      <div style="padding-left:22px; margin-bottom:5px;">เหตุผลประกอบการประเมิน &nbsp; ${wordLineFill('', '..............................................................................')}</div>`;
+
+    let photoPageWord = '';
+    if (imagesBase64.length > 0) {
+      const rows = [];
+      for (let i = 0; i < imagesBase64.length; i += 2) {
+        const c1 = `<td style="width:50%; text-align:center; padding:8px; vertical-align:top;"><img src="${imagesBase64[i]}" width="250" style="width:250px; max-width:100%; height:auto; border:1px solid #cbd5e1;" /></td>`;
+        const c2 = imagesBase64[i + 1]
+          ? `<td style="width:50%; text-align:center; padding:8px; vertical-align:top;"><img src="${imagesBase64[i + 1]}" width="250" style="width:250px; max-width:100%; height:auto; border:1px solid #cbd5e1;" /></td>`
+          : `<td style="width:50%;"></td>`;
+        rows.push(`<tr>${c1}${c2}</tr>`);
+      }
+      photoPageWord = `
+        ${wordPageBreak()}
+        <div>
+          <div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:6px;">ภาพถ่ายประกอบการดำเนินกิจกรรม (${esc(item.student_name)})</div>
+          <div style="text-align:center; font-size:14pt; margin-bottom:10px;">โครงการ: ${esc(item.activity_name)} | รหัสอ้างอิง: ${esc(item.req_id)}</div>
+          <table border="0" cellspacing="0" cellpadding="4" style="width:100%; border-collapse:collapse;">
+            <tbody>${rows.join('')}</tbody>
+          </table>
+        </div>`;
+    }
+
+    return `
+      <div style="font-size:14.5pt; line-height:1.38;">
+        <div style="text-align:right; font-size:14.5pt; font-weight:bold; margin-bottom:2px;">กพช. 5</div>
+        <div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:8px;">แบบประเมินผลการปฏิบัติโครงการกิจกรรมพัฒนาคุณภาพชีวิต</div>
+        <div>ชื่อโครงการที่ประเมิน &nbsp; ${wordLineFill(item.activity_name, '........................................................................')}</div>
+        <div>ชื่อประธานโครงการ &nbsp; ${wordLineFill(item.student_name, '............................................................................')}</div>
+        <div>ระยะเวลาที่เริ่มปฏิบัติตามโครงการ &nbsp; ${wordLineFill(startTxt, '............................')} &nbsp; วันสิ้นสุดโครงการ &nbsp; ${wordLineFill(endTxt, '............................')}</div>
+        <div style="margin-bottom:8px;">สถานที่ปฏิบัติโครงการ &nbsp; ${wordLineFill(item.location || '', '........................................................................')}</div>
+        <div style="font-weight:bold; margin-bottom:4px;">บันทึกความก้าวหน้าโครงการ</div>
+        ${phaseWord('ระยะที่ 1 ก่อนดำเนินโครงการ')}
+        ${phaseWord('ระยะที่ 2 ระหว่างดำเนินโครงการ')}
+        ${phaseWord('ระยะที่ 3 เสร็จสิ้นโครงการ')}
+        <div style="font-weight:bold; margin-top:8px; margin-bottom:6px;">สรุปรายละเอียดการประเมินผลโครงการ</div>
+        <table border="1" cellspacing="0" cellpadding="4" style="width:100%; border-collapse:collapse; font-size:13.5pt;">
+          <thead>
+            <tr>
+              <th rowspan="2" style="border:1px solid #000; width:7%; text-align:center; padding:4px;">ที่</th>
+              <th rowspan="2" style="border:1px solid #000; width:51%; text-align:center; padding:4px;">รายการ</th>
+              <th colspan="2" style="border:1px solid #000; width:22%; text-align:center; padding:4px;">คะแนน</th>
+              <th rowspan="2" style="border:1px solid #000; width:20%; text-align:center; padding:4px;">หมายเหตุ</th>
+            </tr>
+            <tr>
+              <th style="border:1px solid #000; text-align:center; padding:4px;">เต็ม</th>
+              <th style="border:1px solid #000; text-align:center; padding:4px;">ได้</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="border:1px solid #000; text-align:center; padding:3px 5px;">1</td><td style="border:1px solid #000; padding:3px 6px;">ประโยชน์ที่ผู้เรียน/ครอบครัว/ชุมชนได้รับ</td><td style="border:1px solid #000; text-align:center;">20</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; text-align:center; padding:3px 5px;">2</td><td style="border:1px solid #000; padding:3px 6px;">การใช้กระบวนการกลุ่ม</td><td style="border:1px solid #000; text-align:center;">20</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; text-align:center; padding:3px 5px;">3</td><td style="border:1px solid #000; padding:3px 6px;">ความยากง่ายในการดำเนินงาน</td><td style="border:1px solid #000; text-align:center;">20</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; text-align:center; padding:3px 5px;">4</td><td style="border:1px solid #000; padding:3px 6px;">การมีส่วนร่วมของตนเอง/ครอบครัว/ชุมชน</td><td style="border:1px solid #000; text-align:center;">10</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; text-align:center; padding:3px 5px;">5</td><td style="border:1px solid #000; padding:3px 6px;">ความเหมาะสมในการใช้เวลาปฏิบัติงาน</td><td style="border:1px solid #000; text-align:center;">10</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; text-align:center; padding:3px 5px;">6</td><td style="border:1px solid #000; padding:3px 6px;">ปัจจัยที่เอื้อต่อความสำเร็จ</td><td style="border:1px solid #000; text-align:center;">10</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; text-align:center; padding:3px 5px;">7</td><td style="border:1px solid #000; padding:3px 6px;">ความคิดริเริ่มสร้างสรรค์</td><td style="border:1px solid #000; text-align:center;">10</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td colspan="2" style="border:1px solid #000; text-align:center; font-weight:bold; padding:3px 5px;">รวม</td><td style="border:1px solid #000; text-align:center; font-weight:bold;">100</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+          </tbody>
+        </table>
+      </div>
+      ${wordPageBreak()}
+      <div style="font-size:15pt; line-height:1.5;">
+        <div style="text-align:center; margin-bottom:10px;">- 2 -</div>
+        <div style="font-weight:bold; margin-bottom:8px;">ความเห็นของคณะกรรมการ</div>
+        <div style="margin-bottom:8px;">................................................................................................................................................</div>
+        <div style="margin-bottom:8px;">................................................................................................................................................</div>
+        <div style="margin-bottom:22px;">................................................................................................................................................</div>
+        <div style="text-align:center; margin-bottom:22px;">ประเมินผลเมื่อวันที่................เดือน..........................พ.ศ. ................</div>
+        <div style="margin-left:18%; margin-bottom:18px;">ลงชื่อ........................................................ ประธานคณะกรรมการ<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(${COMM_1_NAME})</div>
+        <div style="margin-left:18%; margin-bottom:18px;">ลงชื่อ........................................................ คณะกรรมการ<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(${COMM_2_NAME})</div>
+        <div style="margin-left:18%; margin-bottom:24px;">ลงชื่อ........................................................ คณะกรรมการและเลขานุการ<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(${COMM_3_NAME})</div>
+        <div style="font-weight:bold; margin-bottom:4px;">ผลการพิจารณาอนุมัติของผู้บริหารสถานศึกษา</div>
+        <div style="margin-bottom:8px;">- อนุมัติ จำนวน..........................ชั่วโมง.</div>
+        <div style="margin-bottom:8px;">................................................................................................................................................</div>
+        <div style="margin-bottom:24px;">................................................................................................................................................</div>
+        <div style="text-align:center; line-height:1.5;">
+          ลงชื่อ........................................................ ผู้อนุมัติ<br>
+          (${dirDisplay})<br>
+          ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>
+          อนุมัติผลเมื่อวันที่................เดือน..........................พ.ศ. ................
+        </div>
+      </div>
+      ${photoPageWord}
+      ${!isLastInPrint ? wordPageBreak() : ''}`;
+  }
+
   const dotsStr = '.'.repeat(140), dotSpan = `<span style="flex:1; min-width:12px; overflow:hidden; white-space:nowrap; letter-spacing:1px;">${dotsStr}</span>`;
   const makeDotFlex = (val, extraStyle = '') => { const clean = esc(val); return !clean ? `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:flex; flex:1; min-width:0; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`; };
   const makeDotInline = (val, extraStyle = '') => { const clean = esc(val); return !clean ? `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}</span>` : `<span style="display:inline-flex; align-items:center; overflow:hidden; ${extraStyle}">${dotSpan}<span style="white-space:nowrap; padding:0 6px;">${clean}</span>${dotSpan}</span>`; };
   const chkBox = '<span style="display:inline-block; width:13px; height:13px; border:1px solid #000; vertical-align:-2px; margin-right:5px;"></span>', row5 = 'display:flex; align-items:center; gap:8px; margin-bottom:4px; line-height:1.3;';
   const phaseRow = (label) => `<div style="${row5} margin-top:4px;"><span style="white-space:nowrap;">${label}</span><span>เมื่อวันที่</span>${makeDotInline('', 'width:50px;')}<span>เดือน</span>${makeDotInline('', 'width:95px;')}<span>พ.ศ.</span>${makeDotFlex('', 'min-width:50px;')}</div><div style="padding-left:22px; margin-bottom:4px;">${chkBox}ผ่าน &nbsp;&nbsp;&nbsp;&nbsp; ${chkBox}ปรับปรุง</div><div style="${row5} padding-left:22px; margin-bottom:6px;"><span>เหตุผลประกอบการประเมิน</span>${makeDotFlex('')}</div>`;
-  const startTxt = item.activity_date ? formatShortThaiDate(item.activity_date) : '', endTxt = item.activity_end_date ? formatShortThaiDate(item.activity_end_date) : '';
-  const dirDisplay = esc(directorNameOverride || DIRECTOR_NAME);
   const photoPage = imagesBase64.length > 0 ? `<div class="${isLastInPrint ? '' : 'memo-page'}"><div style="text-align:center; font-weight:bold; font-size:16.5pt; margin-bottom:8px;">ภาพถ่ายประกอบการดำเนินกิจกรรม (${esc(item.student_name)})</div><div style="text-align:center; font-size:14pt; margin-bottom:10px;">โครงการ: ${esc(item.activity_name)} | รหัสอ้างอิง: ${esc(item.req_id)}</div><div class="photo-grid">${imagesBase64.map(b => `<img src="${b}">`).join('')}</div></div>` : '';
 
   return `
@@ -1426,10 +2026,77 @@ function buildKPCH5Html(item, isLastInPrint, imagesBase64 = [], directorNameOver
     ${photoPage}`;
 }
 
-function buildKPCH4Html(items, cfg) {
+function buildKPCH4Html(items, cfg, forWord = false) {
   const first = items[0], isGroup = items.length > 1;
   const termText = getItemTerm(first) || '-';
-  const groupTable = isGroup ? `<div style="margin-top:6px; font-weight:bold;">รายชื่อผู้ปฏิบัติโครงการ (กรณีรายกลุ่ม)</div><table class="doc-table"><thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสประจำตัว</th><th style="width:90px;">ระดับ</th><th style="width:125px;">ลายมือชื่อ</th></tr></thead><tbody>${items.map((x, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${esc(x.student_name)}</td><td style="text-align:center;">${esc(x.student_id)}</td><td style="text-align:center;">${esc(x.level||'')}</td><td></td></tr>`).join('')}</tbody></table>` : '';
+
+  if (forWord) {
+    const groupTableWord = isGroup ? `
+      <div style="margin-top:6px; font-weight:bold;">รายชื่อผู้ปฏิบัติโครงการ (กรณีรายกลุ่ม)</div>
+      <table border="1" cellspacing="0" cellpadding="4" style="width:100%; border-collapse:collapse; margin-top:4px; font-size:14pt;">
+        <thead>
+          <tr>
+            <th style="border:1px solid #000; width:40px; text-align:center; padding:4px;">ที่</th>
+            <th style="border:1px solid #000; text-align:center; padding:4px;">ชื่อ - สกุล</th>
+            <th style="border:1px solid #000; width:125px; text-align:center; padding:4px;">รหัสประจำตัว</th>
+            <th style="border:1px solid #000; width:90px; text-align:center; padding:4px;">ระดับ</th>
+            <th style="border:1px solid #000; width:125px; text-align:center; padding:4px;">ลายมือชื่อ</th>
+          </tr>
+        </thead>
+        <tbody>${items.map((x, i) => `
+          <tr>
+            <td style="border:1px solid #000; text-align:center; padding:3px 5px;">${i + 1}</td>
+            <td style="border:1px solid #000; padding:3px 6px;">${esc(x.student_name)}</td>
+            <td style="border:1px solid #000; text-align:center; padding:3px 5px;">${esc(x.student_id)}</td>
+            <td style="border:1px solid #000; text-align:center; padding:3px 5px;">${esc(x.level || '')}</td>
+            <td style="border:1px solid #000; padding:3px 5px;"></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : '';
+
+    return `
+      <div style="font-size:15pt; line-height:1.45;">
+        ${wordBoxTagHtml('กพช. 4')}
+        <div style="text-align:center; font-weight:bold; font-size:17pt; line-height:1.25; margin-bottom:10px;">แบบรายงานผลสำเร็จของโครงการกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับผู้เรียน)</div>
+        <div style="margin-top:8px;"><b>1. ชื่อโครงการที่ปฏิบัติ</b> &nbsp; ${esc(cfg.projName)}</div>
+        <div><b>2. ระยะเวลาที่ปฏิบัติโครงการ</b> ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate}<br>&nbsp;&nbsp;&nbsp;&nbsp;สถานที่ปฏิบัติกิจกรรม &nbsp; ${esc(cfg.loc)}</div>
+        <div><b>3. ผู้ปฏิบัติโครงการ</b>
+          <div style="margin-left:1.5cm;">
+            3.1 กรณีรายบุคคล &nbsp; ชื่อ-สกุล ${isGroup ? '............................' : esc(first.student_name)} &nbsp; รหัสประจำตัว ${isGroup ? '....................' : esc(first.student_id)}<br>
+            ระดับ ${isGroup ? '................' : esc(first.level || '')} &nbsp; กศน.ตำบล/กลุ่ม ${esc(first.group_name || '-')} &nbsp; ภาคเรียนที่ ${esc(termText)}<br>
+            3.2 กรณีรายกลุ่ม ให้แนบรายชื่อ-สกุล พร้อมลายมือชื่อ รหัสประจำตัว
+          </div>
+        </div>
+        ${groupTableWord}
+        <div><b>4. ผลการปฏิบัติโครงการ ประกอบด้วย</b>
+          <div style="margin-left:1.5cm;">
+            <b>4.1 การคิด/การวางแผน</b><br>${esc(first.k4_plan || '-').replace(/\n/g, '<br>')}<br>
+            <b>4.2 การดำเนินงาน/ขั้นตอนการดำเนินงาน</b><br>${esc(first.activity_detail || '-').replace(/\n/g, '<br>')}<br>
+            <b>4.3 การเรียนรู้และประสบการณ์ที่ได้รับ</b><br>${esc(first.k4_learning || '-').replace(/\n/g, '<br>')}<br>
+            <b>4.4 ปัญหาที่พบและการแก้ไข</b><br>${esc(first.k4_problem || 'ไม่พบปัญหาในการทำงาน').replace(/\n/g, '<br>')}
+          </div>
+        </div>
+        <div><b>5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><div style="margin-left:1.5cm;">${esc(first.k4_apply || '-').replace(/\n/g, '<br>')}</div></div>
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin-top:16px;">
+          <tr><td style="width:40%;"></td><td style="width:60%; text-align:center;">ลงชื่อ..................................................ผู้ดำเนินงาน/ประธานโครงการ<br>(${esc(first.student_name)})</td></tr>
+        </table>
+        <div style="margin-top:18px;">
+          <div><b>ขอรับรองว่า ได้ให้คำแนะนำ และให้คำปรึกษาตลอดระยะเวลาการดำเนินโครงการจริง</b></div>
+          <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin-top:14px;">
+            <tr>
+              <td style="width:36%;"></td>
+              <td style="width:64%; text-align:center; line-height:1.5;">
+                ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(${esc(cfg.tName)})<br><br>
+                ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(..................................................)<br><br>
+                ลงชื่อ..................................................ที่ปรึกษาโครงการ<br>(..................................................)
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  const groupTable = isGroup ? `<div style="margin-top:6px; font-weight:bold;">รายชื่อผู้ปฏิบัติโครงการ (กรณีรายกลุ่ม)</div><table class="doc-table"><thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสประจำตัว</th><th style="width:90px;">ระดับ</th><th style="width:125px;">ลายมือชื่อ</th></tr></thead><tbody>${items.map((x, i) => `<tr><td style="text-align:center;">${i + 1}</td><td>${esc(x.student_name)}</td><td style="text-align:center;">${esc(x.student_id)}</td><td style="text-align:center;">${esc(x.level || '')}</td><td></td></tr>`).join('')}</tbody></table>` : '';
 
   return `
     <div class="memo-page">
@@ -1440,20 +2107,20 @@ function buildKPCH4Html(items, cfg) {
       <div><b>3. ผู้ปฏิบัติโครงการ</b>
         <div class="doc-section-indent">
           3.1 กรณีรายบุคคล &nbsp; ชื่อ-สกุล ${isGroup ? '............................' : esc(first.student_name)} &nbsp; รหัสประจำตัว ${isGroup ? '....................' : esc(first.student_id)}<br>
-          ระดับ ${isGroup ? '................' : esc(first.level||'')} &nbsp; กศน.ตำบล/กลุ่ม ${esc(first.group_name||'-')} &nbsp; ภาคเรียนที่ ${esc(termText)}<br>
+          ระดับ ${isGroup ? '................' : esc(first.level || '')} &nbsp; กศน.ตำบล/กลุ่ม ${esc(first.group_name || '-')} &nbsp; ภาคเรียนที่ ${esc(termText)}<br>
           3.2 กรณีรายกลุ่ม ให้แนบรายชื่อ-สกุล พร้อมลายมือชื่อ รหัสประจำตัว
         </div>
       </div>
       ${groupTable}
       <div><b>4. ผลการปฏิบัติโครงการ ประกอบด้วย</b>
         <div class="doc-section-indent">
-          <b>4.1 การคิด/การวางแผน</b><br>${esc(first.k4_plan || '-').replace(/\n/g,'<br>')}<br>
-          <b>4.2 การดำเนินงาน/ขั้นตอนการดำเนินงาน</b><br>${esc(first.activity_detail || '-').replace(/\n/g,'<br>')}<br>
-          <b>4.3 การเรียนรู้และประสบการณ์ที่ได้รับ</b><br>${esc(first.k4_learning || '-').replace(/\n/g,'<br>')}<br>
-          <b>4.4 ปัญหาที่พบและการแก้ไข</b><br>${esc(first.k4_problem || 'ไม่พบปัญหาในการทำงาน')}
+          <b>4.1 การคิด/การวางแผน</b><br>${esc(first.k4_plan || '-').replace(/\n/g, '<br>')}<br>
+          <b>4.2 การดำเนินงาน/ขั้นตอนการดำเนินงาน</b><br>${esc(first.activity_detail || '-').replace(/\n/g, '<br>')}<br>
+          <b>4.3 การเรียนรู้และประสบการณ์ที่ได้รับ</b><br>${esc(first.k4_learning || '-').replace(/\n/g, '<br>')}<br>
+          <b>4.4 ปัญหาที่พบและการแก้ไข</b><br>${esc(first.k4_problem || 'ไม่พบปัญหาในการทำงาน').replace(/\n/g, '<br>')}
         </div>
       </div>
-      <div><b>5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><div class="doc-section-indent">${esc(first.k4_apply || '-').replace(/\n/g,'<br>')}</div></div>
+      <div><b>5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</b><div class="doc-section-indent">${esc(first.k4_apply || '-').replace(/\n/g, '<br>')}</div></div>
       <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................ผู้ดำเนินงาน/ประธานโครงการ<br>(${esc(first.student_name)})</div>
       <div style="page-break-inside:avoid; margin-top:18px;">
         <div><b>ขอรับรองว่า ได้ให้คำแนะนำ และให้คำปรึกษาตลอดระยะเวลาการดำเนินโครงการจริง</b></div>
@@ -1465,7 +2132,6 @@ function buildKPCH4Html(items, cfg) {
       </div>
     </div>`;
 }
-
 // ==================== ตารางรายงานผล กพช. 4-6 ====================
 function toggleAllChecks(master) {
   document.querySelectorAll('.reg-check').forEach(cb => cb.checked = master.checked);
@@ -1523,7 +2189,7 @@ function renderDashboardList() {
         <td><span class="badge step-badge ${st.cls}">${st.text}</span>${printBadge}</td>
         <td class="text-end text-nowrap">
           <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="openDetailModal('${escJs(item.req_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}</button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printSingle46('${escJs(item.req_id)}')"><i class="bi bi-printer"></i> กพช.4-6</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" title="พิมพ์หรือดาวน์โหลด Word กพช.4-6" onclick="printSingle46('${escJs(item.req_id)}')"><i class="bi bi-printer"></i> กพช.4-6</button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDeleteSubmissions(['${escJs(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
       </tr>`;
@@ -1597,7 +2263,7 @@ function confirmDeleteSubmissions(reqIds) {
   });
 }
 
-// ==================== พิมพ์ชุด กพช. 4-6 + บันทึกข้อความ ====================
+// ==================== พิมพ์ / โหลด Word ชุด กพช. 4-6 + บันทึกข้อความ ====================
 function printSingle46(reqId) {
   const item = dashItems.find(x => x.req_id === reqId);
   if (!item) return;
@@ -1607,7 +2273,7 @@ function printSingle46(reqId) {
 function openDoc57ConfigAndPrint() {
   const checkedIds = getCheckedUniqueIds('reg-check');
   if (checkedIds.length === 0) {
-    return safeAlert('กรุณาติ๊กเลือกรายชื่อ', 'กรุณาติ๊กถูกหน้ารายชื่อนักศึกษาที่ต้องการพิมพ์ กพช. 4-6 อย่างน้อย 1 คนก่อนครับ', 'warning');
+    return safeAlert('กรุณาติ๊กเลือกรายชื่อ', 'กรุณาติ๊กถูกหน้ารายชื่อนักศึกษาที่ต้องการออกเอกสาร กพช. 4-6 อย่างน้อย 1 คนก่อนครับ', 'warning');
   }
   openDoc57ModalWithItems(dashItems.filter(x => checkedIds.includes(x.req_id)));
 }
@@ -1630,84 +2296,209 @@ function openDoc57ModalWithItems(items) {
   openModalById('doc57Modal');
 }
 
-async function executePrintDoc57() {
-  if (_doc57TargetIds.length === 0) return;
-  closeModalById('doc57Modal');
-  showLoading(`กำลังจัดชุด กพช. 4-6 (${_doc57TargetIds.length} รายการ)...`);
-  try {
-    const batchData = await callApi('getSubmissionsBatchForPrint', { token: authToken, req_ids: _doc57TargetIds });
-    hideLoading();
-    if (!batchData || batchData.length === 0) return safeAlert('ไม่พบข้อมูล', 'ไม่สามารถดึงข้อมูลสำหรับพิมพ์ได้', 'warning');
-    const items = batchData.map(b => b.item), first = items[0];
-    const docNo = document.getElementById('d57_doc_no').value.trim(),
-          docDate = document.getElementById('d57_doc_date').value.trim(),
-          projName = document.getElementById('d57_project_name').value.trim(),
-          loc = document.getElementById('d57_location').value.trim(),
-          passCount = document.getElementById('d57_pass_count').value,
-          failCount = document.getElementById('d57_fail_count').value,
-          hours = document.getElementById('d57_hours').value,
-          tName = document.getElementById('d57_teacher_name').value.trim(),
-          tPos = document.getElementById('d57_teacher_pos').value.trim(),
-          filler = document.getElementById('d57_filler').value.trim(),
-          checker = document.getElementById('d57_checker').value.trim(),
-          regName = document.getElementById('d57_registrar').value.trim(),
-          director = document.getElementById('d57_director').value.trim();
-    const sDate = formatThaiDateWithLabel(first.activity_date), eDate = formatThaiDateWithLabel(first.activity_end_date);
+function buildDoc57Html(batchData, cfg, forWord = false, garudaSrc = GARUDA_URL) {
+  const items = batchData.map(b => b.item), first = items[0];
+  const uniqueImgs = Array.from(new Set(batchData.flatMap(b => b.imagesBase64 || [])));
 
-    const memoHtml = `
-      <div class="memo-page">
-        <div class="memo-header"><img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
-        <div class="memo-field"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp;&nbsp;&nbsp; <b>โทร.</b> 02 524 0645</div>
-        <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp; ${esc(docNo)}</span><span><b>วันที่</b> &nbsp; ${esc(docDate)} &nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-        <div class="memo-field"><b>เรื่อง</b> &nbsp; รายงานผลสำเร็จโครงการกิจกรรมพัฒนาคุณภาพชีวิตและขออนุมัติชั่วโมงกิจกรรม</div>
-        <div class="memo-divider"></div>
-        <div class="memo-field" style="margin-bottom:8px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
-        <div class="memo-indent">ตามที่นักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(projName)} ระหว่างวันที่ ${sDate} ถึงวันที่ ${eDate} สถานที่ปฏิบัติกิจกรรม ${esc(loc)} โดยได้รับอนุมัติชั่วโมงกิจกรรม จำนวน ${esc(hours)} ชั่วโมง นั้น</div>
-        <div class="memo-indent">ในการนี้ การปฏิบัติกิจกรรมตามโครงการได้เสร็จสิ้นเรียบร้อยแล้ว มีนักศึกษาเข้าร่วมโครงการและปฏิบัติกิจกรรมดังกล่าวโดยผ่านกิจกรรมจำนวน ${esc(passCount)} คน และไม่ผ่านกิจกรรมจำนวน ${esc(failCount)} คน และข้าพเจ้าได้ตรวจสอบเอกสารแล้ว มีความครบถ้วนถูกต้อง ทั้งนี้ได้แนบภาพถ่ายและใบลงชื่อมาด้วยแล้ว</div>
-        <div class="memo-indent">จึงเรียนมาเพื่อโปรดทราบ และอนุมัติชั่วโมงกิจกรรม</div>
-        <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................<br>(${esc(tName)})<br>ตำแหน่ง ${esc(tPos)}</div>
-        <div style="margin-left:35%; margin-top:14px; line-height:1.4;">&#9744; ทราบ<br>&#9744; อนุมัติ<br>&#9744; มอบงานทะเบียนบันทึกผลลงในระบบกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)</div>
-        <div class="sig-center" style="margin-left:38%; margin-top:24px;">(${esc(director)})<br>ผู้อำนวยการ${SCHOOL_NAME}</div>
-        <div style="margin-top:20px;"><b>สำหรับงานทะเบียน</b><br>&nbsp;&nbsp;&nbsp;&nbsp;บันทึกผลลงในระบบเมื่อวันที่........เดือน............พ.ศ. ............<br><br><div style="margin-left:18%;">(..................................................)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;เจ้าหน้าที่งานทะเบียน</div></div>
+  if (forWord) {
+    const memoWord = `
+      <div style="font-size:15.5pt; line-height:1.45;">
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+          <tr>
+            <td style="width:72px; vertical-align:bottom;"><img src="${esc(garudaSrc)}" width="58" style="width:58px; height:auto;" /></td>
+            <td style="text-align:center; vertical-align:bottom; font-size:24pt; font-weight:bold;">บันทึกข้อความ</td>
+            <td style="width:72px;"></td>
+          </tr>
+        </table>
+        <div style="margin-bottom:3px;"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp;&nbsp;&nbsp; <b>โทร.</b> 02 524 0645</div>
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin-bottom:3px;">
+          <tr>
+            <td style="width:55%;"><b>ที่</b> &nbsp; ${esc(cfg.docNo)}</td>
+            <td style="width:45%;"><b>วันที่</b> &nbsp; ${esc(cfg.docDate)}</td>
+          </tr>
+        </table>
+        <div style="margin-bottom:4px;"><b>เรื่อง</b> &nbsp; รายงานผลสำเร็จโครงการกิจกรรมพัฒนาคุณภาพชีวิตและขออนุมัติชั่วโมงกิจกรรม</div>
+        <div style="border-bottom:1.5px solid #000; margin:6px 0 12px 0;">&nbsp;</div>
+        <div style="margin-bottom:8px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
+        <p style="text-indent:2.5cm; margin:0 0 8px 0; text-align:justify;">ตามที่นักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(cfg.projName)} ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate} สถานที่ปฏิบัติกิจกรรม ${esc(cfg.loc)} โดยได้รับอนุมัติชั่วโมงกิจกรรม จำนวน ${esc(cfg.hours)} ชั่วโมง นั้น</p>
+        <p style="text-indent:2.5cm; margin:0 0 8px 0; text-align:justify;">ในการนี้ การปฏิบัติกิจกรรมตามโครงการได้เสร็จสิ้นเรียบร้อยแล้ว มีนักศึกษาเข้าร่วมโครงการและปฏิบัติกิจกรรมดังกล่าวโดยผ่านกิจกรรมจำนวน ${esc(cfg.passCount)} คน และไม่ผ่านกิจกรรมจำนวน ${esc(cfg.failCount)} คน และข้าพเจ้าได้ตรวจสอบเอกสารแล้ว มีความครบถ้วนถูกต้อง ทั้งนี้ได้แนบภาพถ่ายและใบลงชื่อมาด้วยแล้ว</p>
+        <p style="text-indent:2.5cm; margin:0 0 14px 0;">จึงเรียนมาเพื่อโปรดทราบ และอนุมัติชั่วโมงกิจกรรม</p>
+        <table border="0" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse;">
+          <tr>
+            <td style="width:38%;"></td>
+            <td style="width:62%; text-align:center; line-height:1.4;">
+              ลงชื่อ..................................................<br>
+              (${esc(cfg.tName)})<br>
+              ตำแหน่ง ${esc(cfg.tPos)}
+            </td>
+          </tr>
+          <tr>
+            <td style="width:35%;"></td>
+            <td style="width:65%; padding-top:14px; line-height:1.45;">
+              &#9744; ทราบ<br>
+              &#9744; อนุมัติ<br>
+              &#9744; มอบงานทะเบียนบันทึกผลลงในระบบกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)
+            </td>
+          </tr>
+          <tr>
+            <td style="width:38%;"></td>
+            <td style="width:62%; text-align:center; padding-top:22px; line-height:1.4;">
+              (${esc(cfg.director)})<br>
+              ผู้อำนวยการ${SCHOOL_NAME}
+            </td>
+          </tr>
+        </table>
+        <div style="margin-top:20px; line-height:1.45;">
+          <b>สำหรับงานทะเบียน</b><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;บันทึกผลลงในระบบเมื่อวันที่........เดือน............พ.ศ. ............<br><br>
+          <div style="margin-left:18%;">(..................................................)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;เจ้าหน้าที่งานทะเบียน</div>
+        </div>
       </div>`;
 
-    const uniqueImgs = Array.from(new Set(batchData.flatMap(b => b.imagesBase64 || [])));
-    const k4Html = buildKPCH4Html(items, { projName, sDate, eDate, loc, tName });
-    const k5Html = buildKPCH5Html(first, false, uniqueImgs, director);
-    const k6Html = items.map((s, idx) => `
-      <div class="${idx === items.length - 1 ? '' : 'memo-page'}">
-        <div class="kpch-box-tag">กพช. 6</div>
-        <div class="doc-title-center">ใบแจ้งผลกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับสถานศึกษา)</div>
+    const k4Word = buildKPCH4Html(items, { projName: cfg.projName, sDate: cfg.sDate, eDate: cfg.eDate, loc: cfg.loc, tName: cfg.tName }, true);
+    const k5Word = buildKPCH5Html(first, false, uniqueImgs, cfg.director, true);
+    const k6Word = items.map((s, idx) => `
+      <div style="font-size:15pt; line-height:1.5;">
+        ${wordBoxTagHtml('กพช. 6')}
+        <div style="text-align:center; font-weight:bold; font-size:17pt; line-height:1.25;">ใบแจ้งผลกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับสถานศึกษา)</div>
         <div style="margin-top:14px; line-height:1.6;">
           ชื่อสถานศึกษา &nbsp; <b>${SCHOOL_NAME}</b><br>
           รหัสประจำตัวนักศึกษา &nbsp; <b>${esc(s.student_id)}</b> &nbsp;&nbsp; ชื่อ-สกุล &nbsp; <b>${esc(s.student_name)}</b><br>
           ระดับการศึกษา &nbsp; <b>${esc(s.level || '')}</b> &nbsp;&nbsp; ศูนย์การเรียนรู้ระดับตำบล &nbsp; <b>${esc(s.group_name || '-')}</b><br>
-          ครูผู้รับผิดชอบ &nbsp; <b>${esc(tName)}</b>
+          ครูผู้รับผิดชอบ &nbsp; <b>${esc(cfg.tName)}</b>
         </div>
-        <table class="doc-table" style="margin-top:12px;">
-          <thead><tr><th>โครงการ/กิจกรรม</th><th style="width:90px;">ผ่าน</th><th style="width:120px;">จำนวนชั่วโมง</th></tr></thead>
+        <table border="1" cellspacing="0" cellpadding="4" style="width:100%; border-collapse:collapse; margin-top:12px; font-size:14.5pt;">
+          <thead>
+            <tr>
+              <th style="border:1px solid #000; text-align:center; padding:4px;">โครงการ/กิจกรรม</th>
+              <th style="border:1px solid #000; width:90px; text-align:center; padding:4px;">ผ่าน</th>
+              <th style="border:1px solid #000; width:120px; text-align:center; padding:4px;">จำนวนชั่วโมง</th>
+            </tr>
+          </thead>
           <tbody>
-            <tr><td>1. ${esc(s.activity_name || projName)}</td><td style="text-align:center;">&#10004;</td><td style="text-align:center;">${esc(s.hours || hours)}</td></tr>
-            <tr><td>2. ............................................................................</td><td></td><td></td></tr>
-            <tr><td>3. ............................................................................</td><td></td><td></td></tr>
-            <tr><td>4. ............................................................................</td><td></td><td></td></tr>
-            <tr><td>5. ............................................................................</td><td></td><td></td></tr>
-            <tr><td>6. ............................................................................</td><td></td><td></td></tr>
-            <tr><td style="text-align:center; font-weight:bold;">รวม</td><td></td><td style="text-align:center; font-weight:bold;">${esc(s.hours || hours)}</td></tr>
+            <tr><td style="border:1px solid #000; padding:3px 6px;">1. ${esc(s.activity_name || cfg.projName)}</td><td style="border:1px solid #000; text-align:center;">&#10004;</td><td style="border:1px solid #000; text-align:center;">${esc(s.hours || cfg.hours)}</td></tr>
+            <tr><td style="border:1px solid #000; padding:3px 6px;">2. ............................................................................</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; padding:3px 6px;">3. ............................................................................</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; padding:3px 6px;">4. ............................................................................</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; padding:3px 6px;">5. ............................................................................</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; padding:3px 6px;">6. ............................................................................</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td></tr>
+            <tr><td style="border:1px solid #000; text-align:center; font-weight:bold; padding:3px 6px;">รวม</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000; text-align:center; font-weight:bold;">${esc(s.hours || cfg.hours)}</td></tr>
           </tbody>
         </table>
         <div style="margin-top:16px;">อนุมัติการผ่านกิจกรรม เมื่อวันที่............เดือน..................พ.ศ. ............</div>
-        <div class="sig-row-2" style="margin-top:28px;">
-          <div class="sig-col">ลงชื่อ..........................................ผู้กรอก<br>(${esc(filler || '..........................................')})<br>ตำแหน่ง..........................................</div>
-          <div class="sig-col">ลงชื่อ..........................................ผู้ทาน<br>(${esc(checker || '..........................................')})<br>ตำแหน่ง..........................................</div>
-        </div>
-        <div class="sig-center" style="margin-top:26px;">ลงชื่อ..........................................นายทะเบียน<br>(${esc(regName || '..........................................')})</div>
-      </div>`).join('');
+        <table border="0" cellspacing="0" cellpadding="6" style="width:100%; border-collapse:collapse; margin-top:26px;">
+          <tr>
+            <td style="width:50%; text-align:center; vertical-align:top;">ลงชื่อ..........................................ผู้กรอก<br>(${esc(cfg.filler || '..........................................')})<br>ตำแหน่ง..........................................</td>
+            <td style="width:50%; text-align:center; vertical-align:top;">ลงชื่อ..........................................ผู้ทาน<br>(${esc(cfg.checker || '..........................................')})<br>ตำแหน่ง..........................................</td>
+          </tr>
+        </table>
+        <div style="text-align:center; margin-top:26px;">ลงชื่อ..........................................นายทะเบียน<br>(${esc(cfg.regName || '..........................................')})</div>
+      </div>
+      ${idx === items.length - 1 ? '' : wordPageBreak()}`).join('');
 
-    document.getElementById('printOnlyContainer').innerHTML = memoHtml + k4Html + k5Html + k6Html;
-    markPrintedClient('46', _doc57TargetIds);
-    triggerPrint();
+    return memoWord + wordPageBreak() + k4Word + wordPageBreak() + k5Word + k6Word;
+  }
+
+  const memoHtml = `
+    <div class="memo-page">
+      <div class="memo-header"><img src="${esc(garudaSrc)}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
+      <div class="memo-field"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp;&nbsp;&nbsp; <b>โทร.</b> 02 524 0645</div>
+      <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp; ${esc(cfg.docNo)}</span><span><b>วันที่</b> &nbsp; ${esc(cfg.docDate)} &nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+      <div class="memo-field"><b>เรื่อง</b> &nbsp; รายงานผลสำเร็จโครงการกิจกรรมพัฒนาคุณภาพชีวิตและขออนุมัติชั่วโมงกิจกรรม</div>
+      <div class="memo-divider"></div>
+      <div class="memo-field" style="margin-bottom:8px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
+      <div class="memo-indent">ตามที่นักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(cfg.projName)} ระหว่างวันที่ ${cfg.sDate} ถึงวันที่ ${cfg.eDate} สถานที่ปฏิบัติกิจกรรม ${esc(cfg.loc)} โดยได้รับอนุมัติชั่วโมงกิจกรรม จำนวน ${esc(cfg.hours)} ชั่วโมง นั้น</div>
+      <div class="memo-indent">ในการนี้ การปฏิบัติกิจกรรมตามโครงการได้เสร็จสิ้นเรียบร้อยแล้ว มีนักศึกษาเข้าร่วมโครงการและปฏิบัติกิจกรรมดังกล่าวโดยผ่านกิจกรรมจำนวน ${esc(cfg.passCount)} คน และไม่ผ่านกิจกรรมจำนวน ${esc(cfg.failCount)} คน และข้าพเจ้าได้ตรวจสอบเอกสารแล้ว มีความครบถ้วนถูกต้อง ทั้งนี้ได้แนบภาพถ่ายและใบลงชื่อมาด้วยแล้ว</div>
+      <div class="memo-indent">จึงเรียนมาเพื่อโปรดทราบ และอนุมัติชั่วโมงกิจกรรม</div>
+      <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................<br>(${esc(cfg.tName)})<br>ตำแหน่ง ${esc(cfg.tPos)}</div>
+      <div style="margin-left:35%; margin-top:14px; line-height:1.4;">&#9744; ทราบ<br>&#9744; อนุมัติ<br>&#9744; มอบงานทะเบียนบันทึกผลลงในระบบกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)</div>
+      <div class="sig-center" style="margin-left:38%; margin-top:24px;">(${esc(cfg.director)})<br>ผู้อำนวยการ${SCHOOL_NAME}</div>
+      <div style="margin-top:20px;"><b>สำหรับงานทะเบียน</b><br>&nbsp;&nbsp;&nbsp;&nbsp;บันทึกผลลงในระบบเมื่อวันที่........เดือน............พ.ศ. ............<br><br><div style="margin-left:18%;">(..................................................)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;เจ้าหน้าที่งานทะเบียน</div></div>
+    </div>`;
+
+  const k4Html = buildKPCH4Html(items, { projName: cfg.projName, sDate: cfg.sDate, eDate: cfg.eDate, loc: cfg.loc, tName: cfg.tName }, false);
+  const k5Html = buildKPCH5Html(first, false, uniqueImgs, cfg.director, false);
+  const k6Html = items.map((s, idx) => `
+    <div class="${idx === items.length - 1 ? '' : 'memo-page'}">
+      <div class="kpch-box-tag">กพช. 6</div>
+      <div class="doc-title-center">ใบแจ้งผลกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับสถานศึกษา)</div>
+      <div style="margin-top:14px; line-height:1.6;">
+        ชื่อสถานศึกษา &nbsp; <b>${SCHOOL_NAME}</b><br>
+        รหัสประจำตัวนักศึกษา &nbsp; <b>${esc(s.student_id)}</b> &nbsp;&nbsp; ชื่อ-สกุล &nbsp; <b>${esc(s.student_name)}</b><br>
+        ระดับการศึกษา &nbsp; <b>${esc(s.level || '')}</b> &nbsp;&nbsp; ศูนย์การเรียนรู้ระดับตำบล &nbsp; <b>${esc(s.group_name || '-')}</b><br>
+        ครูผู้รับผิดชอบ &nbsp; <b>${esc(cfg.tName)}</b>
+      </div>
+      <table class="doc-table" style="margin-top:12px;">
+        <thead><tr><th>โครงการ/กิจกรรม</th><th style="width:90px;">ผ่าน</th><th style="width:120px;">จำนวนชั่วโมง</th></tr></thead>
+        <tbody>
+          <tr><td>1. ${esc(s.activity_name || cfg.projName)}</td><td style="text-align:center;">&#10004;</td><td style="text-align:center;">${esc(s.hours || cfg.hours)}</td></tr>
+          <tr><td>2. ............................................................................</td><td></td><td></td></tr>
+          <tr><td>3. ............................................................................</td><td></td><td></td></tr>
+          <tr><td>4. ............................................................................</td><td></td><td></td></tr>
+          <tr><td>5. ............................................................................</td><td></td><td></td></tr>
+          <tr><td>6. ............................................................................</td><td></td><td></td></tr>
+          <tr><td style="text-align:center; font-weight:bold;">รวม</td><td></td><td style="text-align:center; font-weight:bold;">${esc(s.hours || cfg.hours)}</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:16px;">อนุมัติการผ่านกิจกรรม เมื่อวันที่............เดือน..................พ.ศ. ............</div>
+      <div class="sig-row-2" style="margin-top:28px;">
+        <div class="sig-col">ลงชื่อ..........................................ผู้กรอก<br>(${esc(cfg.filler || '..........................................')})<br>ตำแหน่ง..........................................</div>
+        <div class="sig-col">ลงชื่อ..........................................ผู้ทาน<br>(${esc(cfg.checker || '..........................................')})<br>ตำแหน่ง..........................................</div>
+      </div>
+      <div class="sig-center" style="margin-top:26px;">ลงชื่อ..........................................นายทะเบียน<br>(${esc(cfg.regName || '..........................................')})</div>
+    </div>`).join('');
+
+  return memoHtml + k4Html + k5Html + k6Html;
+}
+
+async function executeOutputDoc57(mode = 'print') {
+  if (_doc57TargetIds.length === 0) return;
+  closeModalById('doc57Modal');
+  showLoading(mode === 'word'
+    ? `กำลังเตรียมไฟล์ Word ชุด กพช. 4-6 (${_doc57TargetIds.length} รายการ)...`
+    : `กำลังจัดชุด กพช. 4-6 (${_doc57TargetIds.length} รายการ)...`);
+  try {
+    const batchData = await callApi('getSubmissionsBatchForPrint', { token: authToken, req_ids: _doc57TargetIds });
+    if (!batchData || batchData.length === 0) {
+      hideLoading();
+      return safeAlert('ไม่พบข้อมูล', 'ไม่สามารถดึงข้อมูลสำหรับออกเอกสารได้', 'warning');
+    }
+    const items = batchData.map(b => b.item), first = items[0];
+    const cfg = {
+      docNo: document.getElementById('d57_doc_no').value.trim(),
+      docDate: document.getElementById('d57_doc_date').value.trim(),
+      projName: document.getElementById('d57_project_name').value.trim(),
+      loc: document.getElementById('d57_location').value.trim(),
+      passCount: document.getElementById('d57_pass_count').value,
+      failCount: document.getElementById('d57_fail_count').value,
+      hours: document.getElementById('d57_hours').value,
+      tName: document.getElementById('d57_teacher_name').value.trim(),
+      tPos: document.getElementById('d57_teacher_pos').value.trim(),
+      filler: document.getElementById('d57_filler').value.trim(),
+      checker: document.getElementById('d57_checker').value.trim(),
+      regName: document.getElementById('d57_registrar').value.trim(),
+      director: document.getElementById('d57_director').value.trim(),
+      sDate: formatThaiDateWithLabel(first.activity_date),
+      eDate: formatThaiDateWithLabel(first.activity_end_date)
+    };
+
+    if (mode === 'word') {
+      const garudaSrc = await getGarudaForWord();
+      hideLoading();
+      markPrintedClient('46', _doc57TargetIds);
+      const wordHtml = buildDoc57Html(batchData, cfg, true, garudaSrc);
+      exportHtmlToWord(`กพช4-6_บันทึกข้อความ_${first.student_id || 'group'}`, wordHtml);
+    } else {
+      hideLoading();
+      document.getElementById('printOnlyContainer').innerHTML = buildDoc57Html(batchData, cfg, false, GARUDA_URL);
+      markPrintedClient('46', _doc57TargetIds);
+      triggerPrint();
+    }
   } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
+}
+
+function executePrintDoc57() {
+  return executeOutputDoc57('print');
 }
 
 function openDetailModal(reqId) {
@@ -1729,14 +2520,14 @@ function openDetailModal(reqId) {
     </div>
     <h6 class="fw-bold">ชื่อกิจกรรม/โครงการ:</h6><p>${esc(item.activity_name)}</p>
     <h6 class="fw-bold">รายละเอียดการปฏิบัติกิจกรรม (กพช.4):</h6>
-    <p style="white-space: pre-line;" class="border p-3 rounded-3 bg-white">${esc(item.activity_detail)}</p>
+    <p class="border p-3 rounded-3 bg-white detail-text-box">${esc(item.activity_detail)}</p>
     <h6 class="fw-bold mt-3">ภาพถ่ายกิจกรรม:</h6><div class="row g-2 mb-3">${imgsHtml}</div>
     ${item.reject_reason ? `<div class="alert alert-danger mt-2 mb-0 rounded-3"><b>เหตุผลที่ตีกลับ:</b> ${esc(item.reject_reason)}</div>` : ''}
   `;
   const canAct = item.current_step === 'WAIT_TEACHER' && ['TEACHER', 'ADMIN'].includes(currentUser.role), isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
     <div class="d-flex flex-wrap gap-2">
-      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="closeModalById('detailModal'); setTimeout(() => printSingle46('${escJs(item.req_id)}'), 220)"><i class="bi bi-printer me-1"></i>พิมพ์ กพช. 4-6</button>
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="closeModalById('detailModal'); setTimeout(() => printSingle46('${escJs(item.req_id)}'), 220)"><i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช. 4-6</button>
       ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${escJs(item.req_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -1772,7 +2563,7 @@ function exportRegistrarCSV() {
   const lines = [headers.map(csvEscape).join(',')];
   approved.forEach((r, idx) => { lines.push([idx + 1, r.req_id, r.ref_12_id || '-', getItemTerm(r) || '-', r.category || '-', r.student_id, r.student_name, r.level, r.teacher_name, r.activity_name, formatShortThaiDate(r.activity_date), formatShortThaiDate(r.activity_end_date), r.location, r.hours, r.teacher_approved_at || '-'].map(csvEscape).join(',')); });
   const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `รายชื่ออนุมัติ_กพช_${new Date().toISOString().slice(0,10)}.csv`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `รายชื่ออนุมัติ_กพช_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
@@ -1837,7 +2628,7 @@ function openUserModal(userId) {
     document.getElementById('u_group').value = u.group_name; document.getElementById('u_status').value = u.status;
     document.getElementById('u_password').value = '';
   } else {
-    ['u_id','u_username','u_fullname','u_group','u_password'].forEach(id => document.getElementById(id).value = '');
+    ['u_id', 'u_username', 'u_fullname', 'u_group', 'u_password'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('u_role').value = 'TEACHER'; document.getElementById('u_status').value = 'ACTIVE';
   }
   openModalById('userModal');
@@ -1869,7 +2660,7 @@ async function handleChangeMyPassword() {
   const oldPass = document.getElementById('cp_old').value, newPass = document.getElementById('cp_new').value, confirmPass = document.getElementById('cp_confirm').value;
   if (!oldPass || !newPass || newPass.length < 4 || newPass !== confirmPass) return safeAlert('แจ้งเตือน', 'กรุณากรอกรหัสผ่านให้ถูกต้องและตรงกัน (อย่างน้อย 4 ตัวอักษร)', 'warning');
   showLoading('กำลังเปลี่ยนรหัสผ่าน...');
-  try { await callApi('changePassword', { token: authToken, old_pass: oldPass, new_pass: newPass }); hideLoading(); ['cp_old','cp_new','cp_confirm'].forEach(id => document.getElementById(id).value = ''); closeModalById('changePassModal'); safeAlert('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว', 'success'); }
+  try { await callApi('changePassword', { token: authToken, old_pass: oldPass, new_pass: newPass }); hideLoading(); ['cp_old', 'cp_new', 'cp_confirm'].forEach(id => document.getElementById(id).value = ''); closeModalById('changePassModal'); safeAlert('สำเร็จ', 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว', 'success'); }
   catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
