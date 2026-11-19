@@ -39,6 +39,10 @@ let presentSubMode = 'WAIT';
 let currentEligibleList12 = [];
 let currentFilteredSubs = [];
 let currentFiltered12 = [];
+let lastStatus12List = [];
+let lastStatusSubList = [];
+let _doc56Items = [];
+let _doc57TargetIds = [];
 
 const STEP_LABELS = {
   'WAIT_TEACHER': { text: 'รอครูประจำกลุ่มอนุมัติ', cls: 'bg-warning text-dark' },
@@ -275,7 +279,7 @@ function renderNavbar() {
   }
 }
 
-// ==================== ประเภท กพช. (โหลด & จัดการสำหรับแอดมิน/ครู/นศ.) ====================
+// ==================== ประเภท กพช. ====================
 function populateCategorySelects() {
   const activeCats = kpchCategories.filter(c => c.status !== 'INACTIVE');
   const studentOpts = '<option value="">-- เลือกประเภท กพช. --</option>' +
@@ -483,7 +487,7 @@ async function loadPublicData() {
   const errEl = document.getElementById('teacherLoadError');
   try {
     const data = await callApi('getPublicData');
-    errEl.classList.add('d-none');
+    if (errEl) errEl.classList.add('d-none');
     renderAnnouncement(data.announcement);
 
     kpchCategories = data.categories || [];
@@ -502,8 +506,10 @@ async function loadPublicData() {
     const errOpt = '<option value="">-- โหลดรายชื่อครูไม่สำเร็จ --</option>';
     sel1.innerHTML = errOpt;
     sel2.innerHTML = errOpt;
-    errEl.innerText = err.message;
-    errEl.classList.remove('d-none');
+    if (errEl) {
+      errEl.innerText = err.message;
+      errEl.classList.remove('d-none');
+    }
   }
 }
 
@@ -789,10 +795,7 @@ async function handleStudentSubmit() {
   }
 }
 
-// ==================== เช็กสถานะ & ปุ่มปรับปรุงแก้ไขของนักศึกษา ====================
-let lastStatus12List = [];
-let lastStatusSubList = [];
-
+// ==================== เช็กสถานะ & ปุ่มแก้ไขของนักศึกษา ====================
 async function searchMyStatus() {
   const sid = document.getElementById('searchStudentId').value.trim();
   if (!sid) return safeAlert('แจ้งเตือน', 'กรุณากรอกรหัสนักศึกษา', 'warning');
@@ -1064,7 +1067,6 @@ function updateSubmissionsBarsVisibility() {
   document.getElementById('btnConfirmPresentReg')?.classList.toggle('d-none', isTeacherPresentTab && presentSubMode === 'SENT');
   document.getElementById('batchApproveSubBar').classList.toggle('d-none', !canBatchApproveSub);
   document.getElementById('batchMemoBar').classList.toggle('d-none', !canBatchMemo);
-  document.getElementById('registrar
   document.getElementById('registrarTools').classList.toggle('d-none', !isReg);
   document.getElementById('adminDeleteSubBar')?.classList.toggle('d-none', !isAdmin);
   document.getElementById('thCheckbox').classList.toggle('d-none', !canCheckSub);
@@ -1089,8 +1091,7 @@ function renderAdminAnnPdfBox(ann) {
           <input class="form-check-input" type="checkbox" id="ann_remove_pdf">
           <label class="form-check-label text-danger fw-semibold" for="ann_remove_pdf">ลบไฟล์ PDF นี้ออก</label>
         </div>
-      </div>
-    `;
+      </div>`;
   } else {
     box.classList.add('d-none');
     box.innerHTML = '';
@@ -1253,7 +1254,7 @@ function isMyPendingItem(item) {
   return true;
 }
 
-// ==================== ตาราง กพช.1-3 + พิมพ์เอกสาร 56 (กพช.3) ====================
+// ==================== ตาราง กพช.1-3 & เอกสาร 56 (กพช.3) ====================
 function toggleAll12Checks(master) {
   document.querySelectorAll('.chk-12').forEach(cb => cb.checked = master.checked);
 }
@@ -1293,34 +1294,17 @@ function render12List() {
     return `
       <tr>
         <td><input type="checkbox" class="chk-12" value="${esc(item.req12_id)}"></td>
-        <td>
-          <div class="fw-bold text-primary">${esc(item.req12_id)}</div>
-          <div class="small text-muted">${esc(item.created_at)}</div>
-        </td>
-        <td>
-          <div class="fw-semibold">${esc(item.student_name)}</div>
-          <div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div>
-        </td>
-        <td class="small">
-          ${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border mb-1">${esc(item.category)}</span><br>` : ''}
-          ภาค: ${esc(formatTermText(item.term))}
-        </td>
-        <td>
-          <div class="fw-semibold">${esc(item.activity_name)}</div>
-          <div class="small text-muted">${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} ${item.role_note ? `| <b>${esc(item.role_note)}</b>` : ''}</div>
-        </td>
+        <td><div class="fw-bold text-primary">${esc(item.req12_id)}</div><div class="small text-muted">${esc(item.created_at)}</div></td>
+        <td><div class="fw-semibold">${esc(item.student_name)}</div><div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div></td>
+        <td class="small">${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border mb-1">${esc(item.category)}</span><br>` : ''}ภาค: ${esc(formatTermText(item.term))}</td>
+        <td><div class="fw-semibold">${esc(item.activity_name)}</div><div class="small text-muted">${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)} ${item.role_note ? `| <b>${esc(item.role_note)}</b>` : ''}</div></td>
         <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
         <td class="text-end text-nowrap">
-          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="open12DetailModal('${esc(item.req12_id)}')">
-            <i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูแผน'}
-          </button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${esc(item.req12_id)}')">
-            <i class="bi bi-printer"></i> กพช.1-2
-          </button>
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="open12DetailModal('${esc(item.req12_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูแผน'}</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer"></i> กพช.1-2</button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
-      </tr>
-    `;
+      </tr>`;
   }).join('');
 
   mobileBox.innerHTML = filtered.map(item => {
@@ -1333,21 +1317,13 @@ function render12List() {
           <span class="badge step-badge ${st.cls}">${st.text}</span>
         </div>
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
-        <div class="small text-muted mb-2">
-          <b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ประเภท:</b> ${esc(item.category || '-')}<br>
-          <b>แผนวันที่:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)}
-        </div>
+        <div class="small text-muted mb-2"><b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ประเภท:</b> ${esc(item.category || '-')}<br><b>แผนวันที่:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)}</div>
         <div class="d-flex gap-2">
-          <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="open12DetailModal('${esc(item.req12_id)}')">
-            <i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}
-          </button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
-            <i class="bi bi-printer"></i> กพช.1-2
-          </button>
+          <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="open12DetailModal('${esc(item.req12_id)}')"><i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer"></i></button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 }
 
@@ -1363,8 +1339,7 @@ function confirmBatchApprove12() {
       showLoading(`กำลังอนุมัติ กพช.1-3 (${ids.length} รายการ)...`);
       try {
         const r = await callApi('batchApprove12', { token: authToken, req12_ids: ids });
-        hideLoading();
-        safeAlert('สำเร็จ 🎉', `อนุมัติเรียบร้อยแล้ว ${r.count} รายการ`, 'success');
+        hideLoading(); safeAlert('สำเร็จ 🎉', `อนุมัติเรียบร้อยแล้ว ${r.count} รายการ`, 'success');
         await loadDashboard();
       } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
@@ -1378,7 +1353,7 @@ function confirmBatchReject12() {
     title: `ตีกลับ กพช.1-3 (${ids.length} รายการ)`,
     input: 'textarea',
     inputLabel: 'ระบุเหตุผลในการตีกลับให้นักศึกษาทราบ',
-    inputPlaceholder: 'เช่น ชื่อกิจกรรมไม่ชัดเจน, ประเภท กพช. ไม่ถูกต้อง...',
+    inputPlaceholder: 'เช่น ชื่อกิจกรรมไม่ชัดเจน, เลือกประเภท กพช. ผิด...',
     showCancelButton: true, confirmButtonText: 'ยืนยันตีกลับ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#ef4444',
     inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลในการตีกลับด้วยครับ'; }
   }).then(async res => {
@@ -1386,8 +1361,7 @@ function confirmBatchReject12() {
       showLoading('กำลังบันทึกการตีกลับ...');
       try {
         const r = await callApi('batchReject12', { token: authToken, req12_ids: ids, reason: res.value.trim() });
-        hideLoading();
-        safeAlert('ตีกลับเรียบร้อย', `ส่งคืนให้นักศึกษาแก้ไข ${r.count} รายการแล้ว`, 'success');
+        hideLoading(); safeAlert('ตีกลับเรียบร้อย', `ส่งคืนให้นักศึกษาแก้ไข ${r.count} รายการแล้ว`, 'success');
         await loadDashboard();
       } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
     }
@@ -1422,20 +1396,13 @@ function confirmDelete12(req12Ids) {
 function open12DetailModal(req12Id) {
   const item = dash12Items.find(x => x.req12_id === req12Id);
   if (!item) return;
-
   let scores = [];
   try { scores = JSON.parse(item.eval_scores || '[]'); } catch (e) {}
-  const scorePreview = EVAL_QUESTIONS_12.map((q, i) => `
-    <tr><td class="text-center">${i + 1}</td><td>${q}</td><td class="text-center fw-bold text-primary">${esc(scores[i] || '-')}</td></tr>
-  `).join('');
-
+  const scorePreview = EVAL_QUESTIONS_12.map((q, i) => `<tr><td class="text-center">${i + 1}</td><td>${q}</td><td class="text-center fw-bold text-primary">${esc(scores[i] || '-')}</td></tr>`).join('');
   document.getElementById('mdReqId').innerText = item.req12_id;
   const st = STEP12_LABELS[item.status_12] || { text: item.status_12, cls: 'bg-secondary' };
   document.getElementById('detailModalBody').innerHTML = `
-    <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <span class="badge step-badge ${st.cls}">${st.text}</span>
-      <span class="text-muted small">ยื่นขอเมื่อ: ${esc(item.created_at)}</span>
-    </div>
+    <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2"><span class="badge step-badge ${st.cls}">${st.text}</span><span class="text-muted small">ยื่นขอเมื่อ: ${esc(item.created_at)}</span></div>
     <div class="row g-2 mb-3 bg-light p-3 rounded-3 small">
       <div class="col-12 col-md-6"><b>นักศึกษา:</b> ${esc(item.student_name)} (${esc(item.student_id)})</div>
       <div class="col-12 col-md-6"><b>ระดับชั้น:</b> ${esc(item.level)} | <b>ภาคเรียน:</b> ${esc(formatTermText(item.term))}</div>
@@ -1446,47 +1413,29 @@ function open12DetailModal(req12Id) {
       <div class="col-12 col-md-6"><b>ช่วงเวลา:</b> ${formatShortThaiDate(item.plan_start_date)} ถึง ${formatShortThaiDate(item.plan_end_date)}</div>
       <div class="col-12 col-md-6"><b>สถานที่:</b> ${esc(item.location || '-')}</div>
     </div>
-    <h6 class="fw-bold">ชื่อกิจกรรม / โครงการ (กพช.3):</h6>
-    <p>${esc(item.activity_name)}</p>
+    <h6 class="fw-bold">ชื่อกิจกรรม / โครงการ (กพช.3):</h6><p>${esc(item.activity_name)}</p>
     ${item.p3_rationale ? `<div class="small border p-2 rounded-3 bg-white mb-2"><b>หลักการและเหตุผล:</b> ${esc(item.p3_rationale)}</div>` : ''}
     ${item.p3_objectives ? `<div class="small border p-2 rounded-3 bg-white mb-2" style="white-space:pre-line;"><b>วัตถุประสงค์:</b>\n${esc(item.p3_objectives)}</div>` : ''}
     <h6 class="fw-bold mt-3">ผลประเมินตนเอง (กพช. 2) ทั้ง 10 ข้อ:</h6>
-    <div class="table-responsive mb-2">
-      <table class="table table-bordered table-sm small mb-0">
-        <thead class="table-light"><tr><th style="width:40px;">ที่</th><th>รายการ</th><th style="width:85px;" class="text-center">ระดับ</th></tr></thead>
-        <tbody>${scorePreview}</tbody>
-      </table>
-    </div>
+    <div class="table-responsive mb-2"><table class="table table-bordered table-sm small mb-0"><thead class="table-light"><tr><th style="width:40px;">ที่</th><th>รายการ</th><th style="width:85px;" class="text-center">ระดับ</th></tr></thead><tbody>${scorePreview}</tbody></table></div>
     ${item.approved_at_12 ? `<div class="small text-success fw-bold">✅ อนุมัติเมื่อ: ${esc(item.approved_at_12)}</div>` : ''}
     ${item.reject_reason_12 ? `<div class="alert alert-danger mt-2 mb-0 rounded-3"><b>เหตุผลที่ตีกลับ:</b> ${esc(item.reject_reason_12)}</div>` : ''}
   `;
-
   const canAct = item.status_12 === 'WAIT_TEACHER_12' && ['TEACHER', 'ADMIN'].includes(currentUser.role);
   const isAdmin = currentUser.role === 'ADMIN';
   document.getElementById('detailModalFooter').innerHTML = `
     <div class="d-flex flex-wrap gap-2">
-      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')">
-        <i class="bi bi-printer me-1"></i>พิมพ์ กพช.1 และ กพช.2
-      </button>
+      <button type="button" class="btn btn-dark btn-sm rounded-pill px-3" onclick="printForm12('${esc(item.req12_id)}')"><i class="bi bi-printer me-1"></i>พิมพ์ กพช.1 และ กพช.2</button>
       ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDelete12(['${esc(item.req12_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
     </div>
     <div class="d-flex flex-wrap gap-2">
-      ${canAct ? `
-        <button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'REJECT')">
-          <i class="bi bi-x-circle me-1"></i>ตีกลับ (ระบุเหตุผล)
-        </button>
-        <button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'APPROVE')">
-          <i class="bi bi-check-circle me-1"></i>อนุมัติให้ทำกิจกรรม
-        </button>
-      ` : ''}
+      ${canAct ? `<button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'REJECT')"><i class="bi bi-x-circle me-1"></i>ตีกลับ (ระบุเหตุผล)</button><button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision12('${esc(item.req12_id)}', 'APPROVE')"><i class="bi bi-check-circle me-1"></i>อนุมัติให้ทำกิจกรรม</button>` : ''}
       <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">ปิด</button>
-    </div>
-  `;
+    </div>`;
   openModalById('detailModal');
 }
 
 function submitDecision12(req12Id, decision) {
-  // ปิด Bootstrap Modal ก่อน เพื่อไม่ให้แย่ง Focus ช่องพิมพ์เหตุผลของ SweetAlert2
   closeModalById('detailModal');
   setTimeout(() => {
     if (decision === 'APPROVE') {
@@ -1512,23 +1461,17 @@ async function executeApproval12(req12Id, decision, reason) {
   showLoading('กำลังบันทึกผล กพช.1-3...');
   try {
     await callApi('processApproval12', { token: authToken, req12_id: req12Id, decision, reason });
-    hideLoading();
-    safeAlert('สำเร็จ', 'บันทึกผลการพิจารณา กพช.1-3 เรียบร้อยแล้ว', 'success');
+    hideLoading(); safeAlert('สำเร็จ', 'บันทึกผลการพิจารณา กพช.1-3 เรียบร้อยแล้ว', 'success');
     await loadDashboard();
   } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
-// ==================== จัดชุด & พิมพ์เอกสาร 56 (กพช. 3) 1 ชุด = 1 ไฟล์เอกสาร ====================
-let _doc56Items = [];
+// ==================== จัดชุด & พิมพ์เอกสาร 56 (กพช. 3) ====================
 function openDoc56PrintModal() {
   const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.chk-12:checked')).map(cb => cb.value)));
-  _doc56Items = checkedIds.length > 0
-    ? currentFiltered12.filter(x => checkedIds.includes(x.req12_id))
-    : currentFiltered12;
+  _doc56Items = checkedIds.length > 0 ? currentFiltered12.filter(x => checkedIds.includes(x.req12_id)) : currentFiltered12;
+  if (_doc56Items.length === 0) return safeAlert('ไม่พบรายชื่อ', 'กรุณาเลือกประเภท กพช. หรือติ๊กเลือกรายชื่อนักศึกษาอย่างน้อย 1 คนก่อนสั่งพิมพ์', 'warning');
 
-  if (_doc56Items.length === 0) {
-    return safeAlert('ไม่พบรายชื่อ', 'กรุณาเลือกประเภท กพช. หรือติ๊กเลือกรายชื่อนักศึกษาอย่างน้อย 1 คนก่อนสั่งพิมพ์', 'warning');
-  }
   const first = _doc56Items[0];
   document.getElementById('d56_count').innerText = _doc56Items.length;
   document.getElementById('d56_project_name').value = first.activity_name || '';
@@ -1582,18 +1525,10 @@ function executePrintDoc56() {
   const isGroup = items.length > 1;
   const leader = items.find(i => (i.role_note || '').includes('ประธาน')) || items[0];
   const rowsHtml = items.map((s, idx) => `
-    <tr>
-      <td style="text-align:center;">${idx + 1}</td>
-      <td>${esc(s.student_name)}</td>
-      <td style="text-align:center;">${esc(s.student_id)}</td>
-      <td style="text-align:center;">${esc(s.role_note || (idx === 0 && isGroup ? 'ประธาน' : ''))}</td>
-      <td style="text-align:center;">${esc(s.level || '')}</td>
-    </tr>
-  `).join('');
+    <tr><td style="text-align:center;">${idx + 1}</td><td>${esc(s.student_name)}</td><td style="text-align:center;">${esc(s.student_id)}</td><td style="text-align:center;">${esc(s.role_note || (idx === 0 && isGroup ? 'ประธาน' : ''))}</td><td style="text-align:center;">${esc(s.level || '')}</td></tr>`).join('');
 
   document.getElementById('printOnlyContainer').innerHTML = `
   <div style="line-height:1.4; font-size:15.5pt;">
-    <!-- หน้า 1: หัวข้อ 1-9 -->
     <div class="memo-page">
       <div class="kpch-box-tag">กพช. 3</div>
       <div class="doc-title-center">แบบเสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับผู้เรียน)</div>
@@ -1606,76 +1541,40 @@ function executePrintDoc56() {
       <div><b>5. ขั้นตอน/แผนการปฏิบัติโครงการ</b><div class="doc-section-indent">${esc(steps).replace(/\n/g,'<br>')}</div></div>
       <div><b>6. สถานที่ดำเนินการ</b><div class="doc-section-indent">${esc(loc)}</div></div>
       <div><b>7. ระยะเวลาการดำเนินโครงการ</b><div class="doc-section-indent">ระหว่างวันที่ ${sDate} ถึงวันที่ ${eDate}</div></div>
-      <div><b>8. ปัจจัยในการดำเนินโครงการ</b>
-        <div class="doc-section-indent">8.1 เงิน ${esc(budget)}<br>8.2 วัสดุ ${esc(material)}<br>8.3 แรงงาน ${esc(labor)}</div>
-      </div>
+      <div><b>8. ปัจจัยในการดำเนินโครงการ</b><div class="doc-section-indent">8.1 เงิน ${esc(budget)}<br>8.2 วัสดุ ${esc(material)}<br>8.3 แรงงาน ${esc(labor)}</div></div>
       <div><b>9. ผลที่คาดว่าจะได้รับ</b><div class="doc-section-indent">${esc(expected).replace(/\n/g,'<br>')}</div></div>
     </div>
-
-    <!-- หน้า 2: หัวข้อ 10-12 + ตารางรายชื่อ + ส่วนที่ 2 ความเห็นครู -->
     <div class="memo-page">
       <div style="text-align:center; margin-bottom:6px;">-2-</div>
       <div><b>10. ผู้รับผิดชอบโครงการ</b> ชื่อ ${isGroup ? '........................................' : esc(leader.student_name)} รหัส ${isGroup ? '........................' : esc(leader.student_id)} (กรณีเสนอเป็นรายบุคคล)</div>
       <div><b>11. ผู้รับผิดชอบโครงการ</b> จำนวน ${isGroup ? items.length : '............'} คน ได้แก่ ${isGroup ? esc(leader.student_name) + ' และคณะ' : '........................................'} (กรณีเสนอเป็นกลุ่ม)</div>
       <div style="text-align:center; font-weight:bold; margin-top:8px;">รายชื่อผู้เข้าร่วมทำ${esc(projName)}</div>
-      <table class="doc-table">
-        <thead><tr><th style="width:45px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:130px;">รหัสนักศึกษา</th><th style="width:110px;">หมายเหตุ</th><th style="width:110px;">ระดับ</th></tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+      <table class="doc-table"><thead><tr><th style="width:45px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:130px;">รหัสนักศึกษา</th><th style="width:110px;">หมายเหตุ</th><th style="width:110px;">ระดับ</th></tr></thead><tbody>${rowsHtml}</tbody></table>
       <div style="margin-top:10px;"><b>12. ที่ปรึกษาโครงการ</b><br>&nbsp;&nbsp;&nbsp;&nbsp;1. ${esc(advisor)}</div>
-      <div class="sig-center" style="margin-left:38%;">
-        ลงชื่อ..................................................ผู้เสนอ/ประธานโครงการ<br>
-        (${esc(leader.student_name)})
-      </div>
+      <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................ผู้เสนอ/ประธานโครงการ<br>(${esc(leader.student_name)})</div>
       <div style="font-size:14pt !important; margin-top:8px;"><b>หมายเหตุ</b> ผู้เสนอ/ประธานโครงการ คัดเลือกจากนักศึกษาที่เข้าร่วมโครงการ หากทำโครงการคนเดียว ก็ถือว่าเป็นผู้เสนอและประธาน ด้วย</div>
-      <div style="margin-top:10px;">
-        <b>ส่วนที่ 2 สำหรับสถานศึกษา</b><br>
-        ความเห็นครูผู้รับผิดชอบกลุ่มนักศึกษาที่จัดทำกิจกรรม กพช.<br>
-        <div class="doc-section-indent">${esc(tOpinion)}</div>
-      </div>
-      <div class="sig-center" style="margin-left:35%;">
-        ลงชื่อ..................................................ครูผู้รับผิดชอบกลุ่มนักศึกษาที่ทำกิจกรรม กพช.<br>
-        (${esc(advisor)})
-      </div>
+      <div style="margin-top:10px;"><b>ส่วนที่ 2 สำหรับสถานศึกษา</b><br>ความเห็นครูผู้รับผิดชอบกลุ่มนักศึกษาที่จัดทำกิจกรรม กพช.<br><div class="doc-section-indent">${esc(tOpinion)}</div></div>
+      <div class="sig-center" style="margin-left:35%;">ลงชื่อ..................................................ครูผู้รับผิดชอบกลุ่มนักศึกษาที่ทำกิจกรรม กพช.<br>(${esc(advisor)})</div>
     </div>
-
-    <!-- หน้า 3: คณะกรรมการ 3 ท่าน + นายทะเบียน + ผอ. -->
     <div>
       <div><b>ความเห็นชอบของคณะกรรมการพิจารณาและประเมินผลการปฏิบัติโครงการ กพช.</b></div>
-      <div style="margin-left:1.5cm; margin-top:4px;">
-        &#9744; เห็นควรดำเนินการได้ โดยประมาณค่าหน่วยกิจกรรมโครงการนี้ จำนวน ......<b>${esc(hours)}</b>...... ชั่วโมง<br>
-        &#9744; ควรปรับปรุงแก้ไข<br>
-        1. ..............................................................................................................<br>
-        2. ..............................................................................................................<br>
-        3. ..............................................................................................................
-      </div>
+      <div style="margin-left:1.5cm; margin-top:4px;">&#9744; เห็นควรดำเนินการได้ โดยประมาณค่าหน่วยกิจกรรมโครงการนี้ จำนวน ......<b>${esc(hours)}</b>...... ชั่วโมง<br>&#9744; ควรปรับปรุงแก้ไข<br>1. ..............................................................................................................<br>2. ..............................................................................................................<br>3. ..............................................................................................................</div>
       <div class="sig-center" style="margin-top:18px;">
         ลงชื่อ.................................................. ประธานคณะกรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(comm1)})<br><br>
         ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการ<br>(${esc(comm2)})<br><br>
         ลงชื่อ.................................................. กรรมการการพิจารณาและประเมินผลการปฏิบัติโครงการและเลขานุการ<br>(${esc(comm3)})
       </div>
       <div class="sig-row-2" style="margin-top:26px;">
-        <div class="sig-col" style="text-align:left;">
-          <b>เสนอหัวหน้าสถานศึกษา</b><br>
-          ........................................................................<br>
-          ........................................................................<br><br>
-          <div style="text-align:center;">ลงชื่อ..........................................นายทะเบียน<br>(${registrarName ? esc(registrarName) : '..........................................'})</div>
-        </div>
-        <div class="sig-col" style="text-align:left;">
-          <b>ความเห็นของหัวหน้าสถานศึกษา</b><br>
-          ........................................................................<br>
-          ........................................................................<br><br>
-          <div style="text-align:center;">ลงชื่อ..........................................<br>(${esc(director)})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>วันที่............เดือน....................พ.ศ. .........</div>
-        </div>
+        <div class="sig-col" style="text-align:left;"><b>เสนอหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................นายทะเบียน<br>(${registrarName ? esc(registrarName) : '..........................................'})</div></div>
+        <div class="sig-col" style="text-align:left;"><b>ความเห็นของหัวหน้าสถานศึกษา</b><br>........................................................................<br>........................................................................<br><br><div style="text-align:center;">ลงชื่อ..........................................<br>(${esc(director)})<br>ผู้อำนวยการ สกร.ระดับอำเภอคลองหลวง<br>วันที่............เดือน....................พ.ศ. .........</div></div>
       </div>
     </div>
   </div>`;
-
   closeModalById('doc56Modal');
   setTimeout(() => window.print(), 350);
 }
 
-// ==================== พิมพ์ กพช.1 และ กพช.2 (คงรูปแบบเดิม) ====================
+// ==================== พิมพ์ กพช.1 และ กพช.2 ====================
 function printForm12(req12Id) {
   const item = dash12Items.find(x => x.req12_id === req12Id);
   if (!item) return;
@@ -1834,7 +1733,7 @@ function buildKPCH5Html(item, isLastInPrint, imagesBase64 = []) {
   `;
 }
 
-// ==================== ตารางส่งผลงาน กพช.4 + พิมพ์เอกสาร 57 (บันทึกข้อความ -> กพช.4 -> กพช.5 -> กพช.6) ====================
+// ==================== ตารางส่งผลงาน กพช.4 & เอกสาร 57 ====================
 function toggleAllChecks(master) {
   document.querySelectorAll('.reg-check').forEach(cb => cb.checked = master.checked);
 }
@@ -1896,34 +1795,17 @@ function renderDashboardList() {
     return `
       <tr>
         ${canCheck ? `<td><input type="checkbox" class="reg-check" value="${esc(item.req_id)}"></td>` : ''}
-        <td>
-          <div class="fw-bold text-primary">${esc(item.req_id)}</div>
-          <div class="small text-muted">${esc(item.created_at)} ${termTxt ? `<span class="badge bg-light text-dark border ms-1">ภาค ${esc(termTxt)}</span>` : ''}</div>
-        </td>
-        <td>
-          <div class="fw-semibold">${esc(item.student_name)}</div>
-          <div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div>
-        </td>
-        <td class="small">
-          <div>${esc(item.teacher_name)}</div>
-          ${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border">${esc(item.category)}</span>` : ''}
-        </td>
-        <td>
-          <div class="fw-semibold">${esc(item.activity_name)}</div>
-          <div class="small text-muted">${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)} | <b>${esc(item.hours)} ชม.</b></div>
-        </td>
+        <td><div class="fw-bold text-primary">${esc(item.req_id)}</div><div class="small text-muted">${esc(item.created_at)} ${termTxt ? `<span class="badge bg-light text-dark border ms-1">ภาค ${esc(termTxt)}</span>` : ''}</div></td>
+        <td><div class="fw-semibold">${esc(item.student_name)}</div><div class="small text-muted">${esc(item.student_id)} (${esc(item.level)})</div></td>
+        <td class="small"><div>${esc(item.teacher_name)}</div>${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border">${esc(item.category)}</span>` : ''}</td>
+        <td><div class="fw-semibold">${esc(item.activity_name)}</div><div class="small text-muted">${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)} | <b>${esc(item.hours)} ชม.</b></div></td>
         <td><span class="badge step-badge ${st.cls}">${st.text}</span></td>
         <td class="text-end text-nowrap">
-          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="openDetailModal('${esc(item.req_id)}')">
-            <i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}
-          </button>
-          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printProjectPDF('${esc(item.req_id)}')">
-            <i class="bi bi-printer"></i> โครงการ
-          </button>
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="openDetailModal('${esc(item.req_id)}')"><i class="bi bi-eye"></i> ${canAct ? 'ตรวจ/อนุมัติ' : 'ดูข้อมูล'}</button>
+          <button type="button" class="btn btn-outline-dark btn-sm rounded-pill ms-1" onclick="printProjectPDF('${esc(item.req_id)}')"><i class="bi bi-printer"></i> โครงการ</button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill ms-1" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </td>
-      </tr>
-    `;
+      </tr>`;
   }).join('');
 
   mobileBox.innerHTML = filtered.map(item => {
@@ -1936,17 +1818,13 @@ function renderDashboardList() {
           <span class="badge step-badge ${st.cls}">${st.text}</span>
         </div>
         <div class="fw-bold mb-1">${esc(item.activity_name)}</div>
-        <div class="small text-muted mb-2">
-          <b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ประเภท:</b> ${esc(item.category || '-')}<br>
-          <b>ชั่วโมง:</b> ${esc(item.hours)} ชม. | <b>วันที่:</b> ${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)}
-        </div>
+        <div class="small text-muted mb-2"><b>นศ.:</b> ${esc(item.student_name)} (${esc(item.student_id)}) | <b>ประเภท:</b> ${esc(item.category || '-')}<br><b>ชั่วโมง:</b> ${esc(item.hours)} ชม. | <b>วันที่:</b> ${formatShortThaiDate(item.activity_date)} ถึง ${formatShortThaiDate(item.activity_end_date)}</div>
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-primary btn-sm rounded-pill flex-fill fw-bold" onclick="openDetailModal('${esc(item.req_id)}')"><i class="bi bi-eye me-1"></i>${canAct ? 'ตรวจ / อนุมัติ' : 'ดูรายละเอียด'}</button>
           <button type="button" class="btn btn-outline-dark btn-sm rounded-pill px-3" onclick="printProjectPDF('${esc(item.req_id)}')"><i class="bi bi-printer"></i></button>
           ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash"></i></button>` : ''}
         </div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 }
 
@@ -1974,12 +1852,11 @@ function confirmBatchRejectSub() {
   const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
   const validIds = checkedIds.filter(id => { const it = dashItems.find(x => x.req_id === id); return it && (isMyPendingItem(it) || currentUser.role === 'ADMIN'); });
   if (validIds.length === 0) return safeAlert('แจ้งเตือน', 'กรุณาติ๊กเลือกรายการที่ต้องการตีกลับอย่างน้อย 1 รายการ', 'warning');
-
   Swal.fire({
     title: `ตีกลับผลงาน (${validIds.length} รายการ)`,
     input: 'textarea',
     inputLabel: 'ระบุเหตุผลในการตีกลับให้นักศึกษาแก้ไข',
-    inputPlaceholder: 'เช่น รูปภาพไม่ชัดเจน, ชั่วโมงไม่ถูกต้อง, เนื้อหากพช.4 ไม่ครบ...',
+    inputPlaceholder: 'เช่น รูปภาพไม่ชัดเจน, ชั่วโมงไม่ถูกต้อง, เนื้อหา กพช.4 ไม่ครบ...',
     showCancelButton: true, confirmButtonText: 'ยืนยันตีกลับ', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#ef4444',
     inputValidator: val => { if (!val || !val.trim()) return 'กรุณาระบุเหตุผลด้วยครับ'; }
   }).then(async res => {
@@ -2020,19 +1897,13 @@ function confirmDeleteSubmissions(reqIds) {
 }
 
 // ==================== จัดชุด & พิมพ์เอกสาร 57 (บันทึกข้อความ -> กพช.4 -> กพช.5 -> กพช.6) ====================
-let _doc57TargetIds = [];
 function openDoc57ConfigAndPrint() {
   const checkedIds = Array.from(new Set(Array.from(document.querySelectorAll('.reg-check:checked')).map(cb => cb.value)));
-  const items = checkedIds.length > 0
-    ? currentFilteredSubs.filter(x => checkedIds.includes(x.req_id))
-    : currentFilteredSubs;
+  const items = checkedIds.length > 0 ? currentFilteredSubs.filter(x => checkedIds.includes(x.req_id)) : currentFilteredSubs;
+  if (items.length === 0) return safeAlert('ไม่พบรายการ', 'กรุณาเลือกประเภท กพช. หรือติ๊กเลือกรายการอย่างน้อย 1 รายการก่อนสั่งพิมพ์', 'warning');
 
-  if (items.length === 0) {
-    return safeAlert('ไม่พบรายการ', 'กรุณาเลือกประเภท กพช. หรือติ๊กเลือกรายการอย่างน้อย 1 รายการก่อนสั่งพิมพ์', 'warning');
-  }
   _doc57TargetIds = items.map(x => x.req_id);
   const first = items[0];
-
   document.getElementById('d57_count').innerText = items.length;
   document.getElementById('d57_doc_no').value = 'ศธ 07058.02/';
   document.getElementById('d57_doc_date').value = formatThaiDate();
@@ -2054,7 +1925,6 @@ async function executePrintDoc57() {
   try {
     const batchData = await callApi('getSubmissionsBatchForPrint', { token: authToken, req_ids: _doc57TargetIds });
     hideLoading();
-
     const items = batchData.map(b => b.item);
     const first = items[0];
     const docNo = document.getElementById('d57_doc_no').value.trim();
@@ -2070,66 +1940,38 @@ async function executePrintDoc57() {
     const checker = document.getElementById('d57_checker').value.trim();
     const regName = document.getElementById('d57_registrar').value.trim();
     const director = document.getElementById('d57_director').value.trim();
-
     const sDate = formatThaiDateWithLabel(first.activity_date);
     const eDate = formatThaiDateWithLabel(first.activity_end_date);
     const isGroup = items.length > 1;
 
-    // 1. บันทึกข้อความ
     const memoHtml = `
       <div class="memo-page">
-        <div class="memo-header">
-          <img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'">
-          <div class="memo-title">บันทึกข้อความ</div>
-        </div>
+        <div class="memo-header"><img src="${GARUDA_URL}" class="memo-garuda" onerror="this.style.display='none'"><div class="memo-title">บันทึกข้อความ</div></div>
         <div class="memo-field"><b>ส่วนราชการ</b> &nbsp; ${SCHOOL_NAME} &nbsp;&nbsp;&nbsp; <b>โทร.</b> 02 524 0645</div>
-        <div class="memo-field" style="display:flex; justify-content:space-between;">
-          <span><b>ที่</b> &nbsp; ${esc(docNo)}</span>
-          <span><b>วันที่</b> &nbsp; ${esc(docDate)} &nbsp;&nbsp;&nbsp;&nbsp;</span>
-        </div>
+        <div class="memo-field" style="display:flex; justify-content:space-between;"><span><b>ที่</b> &nbsp; ${esc(docNo)}</span><span><b>วันที่</b> &nbsp; ${esc(docDate)} &nbsp;&nbsp;&nbsp;&nbsp;</span></div>
         <div class="memo-field"><b>เรื่อง</b> &nbsp; รายงานผลสำเร็จโครงการกิจกรรมพัฒนาคุณภาพชีวิตและขออนุมัติชั่วโมงกิจกรรม</div>
         <div class="memo-divider"></div>
         <div class="memo-field" style="margin-bottom:8px;"><b>เรียน</b> &nbsp; ผู้อำนวยการ${SCHOOL_NAME}</div>
-        <div class="memo-indent">
-          ตามที่นักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(projName)} ระหว่างวันที่ ${sDate} ถึงวันที่ ${eDate} สถานที่ปฏิบัติกิจกรรม ${esc(loc)} โดยได้รับอนุมัติชั่วโมงกิจกรรม จำนวน ${esc(hours)} ชั่วโมง นั้น
-        </div>
-        <div class="memo-indent">
-          ในการนี้ การปฏิบัติกิจกรรมตามโครงการได้เสร็จสิ้นเรียบร้อยแล้ว มีนักศึกษาเข้าร่วมโครงการและปฏิบัติกิจกรรมดังกล่าวโดยผ่านกิจกรรมจำนวน ${esc(passCount)} คน และไม่ผ่านกิจกรรมจำนวน ${esc(failCount)} คน และข้าพเจ้าได้ตรวจสอบเอกสารแล้ว มีความครบถ้วนถูกต้อง ทั้งนี้ได้แนบภาพถ่ายและใบลงชื่อมาด้วยแล้ว
-        </div>
+        <div class="memo-indent">ตามที่นักศึกษา ${SCHOOL_NAME} ระดับประถมศึกษา มัธยมศึกษาตอนต้น และมัธยมศึกษาตอนปลาย จำนวน ${items.length} คน ได้เสนอโครงการกิจกรรมพัฒนาคุณภาพชีวิต โครงการ/กิจกรรม ${esc(projName)} ระหว่างวันที่ ${sDate} ถึงวันที่ ${eDate} สถานที่ปฏิบัติกิจกรรม ${esc(loc)} โดยได้รับอนุมัติชั่วโมงกิจกรรม จำนวน ${esc(hours)} ชั่วโมง นั้น</div>
+        <div class="memo-indent">ในการนี้ การปฏิบัติกิจกรรมตามโครงการได้เสร็จสิ้นเรียบร้อยแล้ว มีนักศึกษาเข้าร่วมโครงการและปฏิบัติกิจกรรมดังกล่าวโดยผ่านกิจกรรมจำนวน ${esc(passCount)} คน และไม่ผ่านกิจกรรมจำนวน ${esc(failCount)} คน และข้าพเจ้าได้ตรวจสอบเอกสารแล้ว มีความครบถ้วนถูกต้อง ทั้งนี้ได้แนบภาพถ่ายและใบลงชื่อมาด้วยแล้ว</div>
         <div class="memo-indent">จึงเรียนมาเพื่อโปรดทราบ และอนุมัติชั่วโมงกิจกรรม</div>
-        <div class="sig-center" style="margin-left:38%;">
-          ลงชื่อ..................................................<br>
-          (${esc(tName)})<br>
-          ตำแหน่ง ${esc(tPos)}
-        </div>
-        <div style="margin-left:35%; margin-top:14px; line-height:1.4;">
-          &#9744; ทราบ<br>&#9744; อนุมัติ<br>&#9744; มอบงานทะเบียนบันทึกผลลงในระบบ ชั่วโมงกิจกรรม
-        </div>
-        <div class="sig-center" style="margin-left:38%; margin-top:24px;">
-          (${esc(director)})<br>ผู้อำนวยการ${SCHOOL_NAME}
-        </div>
-        <div style="margin-top:20px;">
-          <b>สำหรับงานทะเบียน</b><br>
-          &nbsp;&nbsp;&nbsp;&nbsp;บันทึกผลลงในระบบเมื่อวันที่........เดือน............พ.ศ. ............<br><br>
-          <div style="margin-left:18%;">(..................................................)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;เจ้าหน้าที่งานทะเบียน</div>
-        </div>
+        <div class="sig-center" style="margin-left:38%;">ลงชื่อ..................................................<br>(${esc(tName)})<br>ตำแหน่ง ${esc(tPos)}</div>
+        <div style="margin-left:35%; margin-top:14px; line-height:1.4;">&#9744; ทราบ<br>&#9744; อนุมัติ<br>&#9744; มอบงานทะเบียนบันทึกผลลงในระบบ ชั่วโมงกิจกรรม</div>
+        <div class="sig-center" style="margin-left:38%; margin-top:24px;">(${esc(director)})<br>ผู้อำนวยการ${SCHOOL_NAME}</div>
+        <div style="margin-top:20px;"><b>สำหรับงานทะเบียน</b><br>&nbsp;&nbsp;&nbsp;&nbsp;บันทึกผลลงในระบบเมื่อวันที่........เดือน............พ.ศ. ............<br><br><div style="margin-left:18%;">(..................................................)<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;เจ้าหน้าที่งานทะเบียน</div></div>
       </div>`;
 
-    // 2. กพช. 4 (แบบรายงานผลสำเร็จ + ตารางลงชื่อกรณีกลุ่ม + หน้าคำรับรองที่ปรึกษา)
     const groupTable = isGroup ? `
       <div style="margin-top:6px; font-weight:bold;">รายชื่อผู้ปฏิบัติโครงการ (กรณีรายกลุ่ม)</div>
-      <table class="doc-table">
-        <thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสประจำตัว</th><th style="width:90px;">ระดับ</th><th style="width:125px;">ลายมือชื่อ</th></tr></thead>
-        <tbody>${items.map((x, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${esc(x.student_name)}</td><td style="text-align:center;">${esc(x.student_id)}</td><td style="text-align:center;">${esc(x.level||'')}</td><td></td></tr>`).join('')}</tbody>
-      </table>` : '';
+      <table class="doc-table"><thead><tr><th style="width:40px;">ที่</th><th>ชื่อ - สกุล</th><th style="width:125px;">รหัสประจำตัว</th><th style="width:90px;">ระดับ</th><th style="width:125px;">ลายมือชื่อ</th></tr></thead>
+      <tbody>${items.map((x, i) => `<tr><td style="text-align:center;">${i+1}</td><td>${esc(x.student_name)}</td><td style="text-align:center;">${esc(x.student_id)}</td><td style="text-align:center;">${esc(x.level||'')}</td><td></td></tr>`).join('')}</tbody></table>` : '';
 
     const k4Html = `
       <div class="memo-page">
         <div class="kpch-box-tag">กพช. 4</div>
         <div class="doc-title-center">แบบรายงานผลสำเร็จของโครงการกิจกรรมพัฒนาคุณภาพชีวิต<br>(สำหรับผู้เรียน)</div>
         <div style="margin-top:8px;"><b>1. ชื่อโครงการที่ปฏิบัติ</b> &nbsp; ${esc(projName)}</div>
-        <div><b>2. ระยะเวลาที่ปฏิบัติโครงการ</b> ระหว่างวันที่ ${sDate} ถึงวันที่ ${eDate}<br>
-          &nbsp;&nbsp;&nbsp;&nbsp;สถานที่ปฏิบัติกิจกรรม &nbsp; ${esc(loc)}</div>
+        <div><b>2. ระยะเวลาที่ปฏิบัติโครงการ</b> ระหว่างวันที่ ${sDate} ถึงวันที่ ${eDate}<br>&nbsp;&nbsp;&nbsp;&nbsp;สถานที่ปฏิบัติกิจกรรม &nbsp; ${esc(loc)}</div>
         <div><b>3. ผู้ปฏิบัติโครงการ</b>
           <div class="doc-section-indent">
             3.1 กรณีรายบุคคล &nbsp; ชื่อ-สกุล ${isGroup ? '............................' : esc(first.student_name)} &nbsp; รหัสประจำตัว ${isGroup ? '....................' : esc(first.student_id)}<br>
@@ -2159,10 +2001,8 @@ async function executePrintDoc57() {
         </div>
       </div>`;
 
-    // 3. กพช. 5 (แบบประเมิน + ภาพถ่ายประกอบ)
     const k5Html = buildKPCH5Html(first, false, batchData[0].imagesBase64 || []);
 
-    // 4. กพช. 6 (ใบแจ้งผลกิจกรรมพัฒนาคุณภาพชีวิต รายคน)
     const k6Html = items.map((s, idx) => `
       <div class="${idx === items.length - 1 ? '' : 'memo-page'}">
         <div class="kpch-box-tag">กพช. 6</div>
@@ -2190,17 +2030,12 @@ async function executePrintDoc57() {
           <div class="sig-col">ลงชื่อ..........................................ผู้กรอก<br>(${esc(filler || '..........................................')})<br>ตำแหน่ง..........................................</div>
           <div class="sig-col">ลงชื่อ..........................................ผู้ทาน<br>(${esc(checker || '..........................................')})<br>ตำแหน่ง..........................................</div>
         </div>
-        <div class="sig-center" style="margin-top:26px;">
-          ลงชื่อ..........................................นายทะเบียน<br>(${esc(regName || '..........................................')})
-        </div>
+        <div class="sig-center" style="margin-top:26px;">ลงชื่อ..........................................นายทะเบียน<br>(${esc(regName || '..........................................')})</div>
       </div>`).join('');
 
     document.getElementById('printOnlyContainer').innerHTML = memoHtml + k4Html + k5Html + k6Html;
     setTimeout(() => window.print(), 450);
-  } catch (err) {
-    hideLoading();
-    safeAlert('ผิดพลาด', err.message, 'error');
-  }
+  } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
 
 // ==================== พิมพ์ชุดปะหน้าเดิม + รายละเอียด + กพช.5 ====================
@@ -2219,15 +2054,7 @@ async function printTeacherPresentPackage() {
   const defaultTerm = termFilterVal.startsWith('TERM:') ? termFilterVal.slice(5) : '2/2569';
   const { value: formValues } = await Swal.fire({
     title: `พิมพ์ชุดเอกสารส่งทะเบียน (${targetIds.length} รายการ)`,
-    html: `
-      <div class="text-start small">
-        <label class="form-label fw-bold mb-1">ส่วนราชการ / กลุ่ม</label>
-        <input id="swal_dept" class="form-control mb-2" value="${esc(currentUser.group_name ? SCHOOL_NAME + ' (' + currentUser.group_name + ')' : SCHOOL_NAME)}">
-        <label class="form-label fw-bold mb-1">เลขที่หนังสือ</label>
-        <input id="swal_docno" class="form-control mb-2" value="ศธ. 07058.02/......">
-        <label class="form-label fw-bold mb-1">ภาคเรียน / ปีการศึกษา</label>
-        <input id="swal_term" class="form-control" value="${esc(defaultTerm)}">
-      </div>`,
+    html: `<div class="text-start small"><label class="form-label fw-bold mb-1">ส่วนราชการ / กลุ่ม</label><input id="swal_dept" class="form-control mb-2" value="${esc(currentUser.group_name ? SCHOOL_NAME + ' (' + currentUser.group_name + ')' : SCHOOL_NAME)}"><label class="form-label fw-bold mb-1">เลขที่หนังสือ</label><input id="swal_docno" class="form-control mb-2" value="ศธ. 07058.02/......"><label class="form-label fw-bold mb-1">ภาคเรียน / ปีการศึกษา</label><input id="swal_term" class="form-control" value="${esc(defaultTerm)}"></div>`,
     showCancelButton: true, confirmButtonText: '🖨️ จัดเตรียมชุดพิมพ์', cancelButtonText: 'ยกเลิก',
     preConfirm: () => ({
       dept: document.getElementById('swal_dept').value.trim() || SCHOOL_NAME,
@@ -2244,13 +2071,7 @@ async function printTeacherPresentPackage() {
     const targetItems = batchData.map(b => b.item);
     const totalHours = targetItems.reduce((sum, r) => sum + (Number(r.hours) || 0), 0);
     const todayThai = formatThaiDate();
-    const tableRowsHtml = targetItems.map((r, idx) => `
-      <tr>
-        <td style="text-align:center;">${idx + 1}</td><td>${esc(r.req_id)}</td><td>${esc(r.student_id)}</td>
-        <td>${esc(r.student_name)}</td><td style="text-align:center;">${esc(r.level)}</td><td>${esc(r.activity_name)}</td>
-        <td style="text-align:center;">${formatShortThaiDate(r.activity_date)} - ${formatShortThaiDate(r.activity_end_date)}</td>
-        <td style="text-align:center;"><b>${esc(r.hours)}</b></td><td>${esc(r.teacher_name)}</td>
-      </tr>`).join('');
+    const tableRowsHtml = targetItems.map((r, idx) => `<tr><td style="text-align:center;">${idx + 1}</td><td>${esc(r.req_id)}</td><td>${esc(r.student_id)}</td><td>${esc(r.student_name)}</td><td style="text-align:center;">${esc(r.level)}</td><td>${esc(r.activity_name)}</td><td style="text-align:center;">${formatShortThaiDate(r.activity_date)} - ${formatShortThaiDate(r.activity_end_date)}</td><td style="text-align:center;"><b>${esc(r.hours)}</b></td><td>${esc(r.teacher_name)}</td></tr>`).join('');
 
     const renderCompactDetailCard = (entry, idx, isTopOfPair) => {
       const item = entry.item;
@@ -2260,10 +2081,7 @@ async function printTeacherPresentPackage() {
       const sepStyle = isTopOfPair ? 'border-bottom:1.5px dashed #666; margin-bottom:0.45cm;' : '';
       return `
         <div style="height:12.6cm; overflow:hidden; box-sizing:border-box; padding-bottom:6px; ${sepStyle}">
-          <div style="text-align:center; border-bottom:1.5px solid #000; padding-bottom:3px; margin-bottom:6px;">
-            <div style="font-size:15pt; font-weight:bold;">รายละเอียดกิจกรรม กพช. และหลักฐานภาพถ่าย (รายการที่ ${idx + 1})</div>
-            <div style="font-size:12.5pt;">${SCHOOL_NAME} | รหัส: ${esc(item.req_id)}</div>
-          </div>
+          <div style="text-align:center; border-bottom:1.5px solid #000; padding-bottom:3px; margin-bottom:6px;"><div style="font-size:15pt; font-weight:bold;">รายละเอียดกิจกรรม กพช. และหลักฐานภาพถ่าย (รายการที่ ${idx + 1})</div><div style="font-size:12.5pt;">${SCHOOL_NAME} | รหัส: ${esc(item.req_id)}</div></div>
           <table style="width:100%; border-collapse:collapse; margin-bottom:5px; font-size:13pt;" border="1" cellpadding="3">
             <tr><td><b>ชื่อ-สกุล:</b> ${esc(item.student_name)}</td><td><b>รหัส:</b> ${esc(item.student_id)} (${esc(item.level)})</td></tr>
             <tr><td><b>ครูประจำกลุ่ม:</b> ${esc(item.teacher_name)}</td><td><b>ชั่วโมง:</b> ${esc(item.hours)} ชม.</td></tr>
@@ -2327,15 +2145,10 @@ function openDetailModal(reqId) {
   if (!item) return;
   document.getElementById('mdReqId').innerText = item.req_id;
   const imgs = [item.img_1, item.img_2, item.img_3].filter(Boolean);
-  const imgsHtml = imgs.map((url, idx) => `
-    <div class="col-6 col-md-4"><a href="${esc(url)}" target="_blank"><img src="${getDriveThumb(url)}" class="img-fluid rounded-3 border" style="height:140px; width:100%; object-fit:cover;"></a><div class="text-center small text-muted mt-1">ภาพที่ ${idx + 1}</div></div>
-  `).join('');
+  const imgsHtml = imgs.map((url, idx) => `<div class="col-6 col-md-4"><a href="${esc(url)}" target="_blank"><img src="${getDriveThumb(url)}" class="img-fluid rounded-3 border" style="height:140px; width:100%; object-fit:cover;"></a><div class="text-center small text-muted mt-1">ภาพที่ ${idx + 1}</div></div>`).join('');
   const st = STEP_LABELS[item.current_step] || { text: item.current_step, cls: 'bg-secondary' };
   document.getElementById('detailModalBody').innerHTML = `
-    <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <div><span class="badge step-badge ${st.cls}">${st.text}</span> ${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border ms-1">${esc(item.category)}</span>` : ''}</div>
-      <span class="text-muted small">ส่งเมื่อ: ${esc(item.created_at)}</span>
-    </div>
+    <div class="mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2"><div><span class="badge step-badge ${st.cls}">${st.text}</span> ${item.category ? `<span class="badge bg-info bg-opacity-10 text-dark border ms-1">${esc(item.category)}</span>` : ''}</div><span class="text-muted small">ส่งเมื่อ: ${esc(item.created_at)}</span></div>
     <div class="row g-2 mb-3 bg-light p-3 rounded-3 small">
       <div class="col-12 col-md-6"><b>นักศึกษา:</b> ${esc(item.student_name)} (${esc(item.student_id)})</div>
       <div class="col-12 col-md-6"><b>ระดับชั้น:</b> ${esc(item.level)} | <b>กลุ่ม:</b> ${esc(item.group_name || '-')}</div>
@@ -2358,18 +2171,13 @@ function openDetailModal(reqId) {
       ${isAdmin ? `<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="confirmDeleteSubmissions(['${esc(item.req_id)}'])"><i class="bi bi-trash me-1"></i>ย้ายลงถังขยะ</button>` : ''}
     </div>
     <div class="d-flex flex-wrap gap-2">
-      ${canAct ? `
-        <button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision('${esc(item.req_id)}', 'REJECT')"><i class="bi bi-x-circle me-1"></i>ตีกลับ (ระบุเหตุผล)</button>
-        <button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision('${esc(item.req_id)}', 'APPROVE')"><i class="bi bi-check-circle me-1"></i>อนุมัติส่งต่อ</button>
-      ` : ''}
+      ${canAct ? `<button type="button" class="btn btn-danger rounded-pill px-3 fw-bold" onclick="submitDecision('${esc(item.req_id)}', 'REJECT')"><i class="bi bi-x-circle me-1"></i>ตีกลับ (ระบุเหตุผล)</button><button type="button" class="btn btn-success rounded-pill px-3 fw-bold" onclick="submitDecision('${esc(item.req_id)}', 'APPROVE')"><i class="bi bi-check-circle me-1"></i>อนุมัติส่งต่อ</button>` : ''}
       <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">ปิด</button>
-    </div>
-  `;
+    </div>`;
   openModalById('detailModal');
 }
 
 function submitDecision(reqId, decision) {
-  // ปิด Modal ก่อนเพื่อไม่ให้แย่ง Focus จากช่องพิมพ์เหตุผล
   closeModalById('detailModal');
   setTimeout(() => {
     if (decision === 'APPROVE') {
@@ -2395,8 +2203,7 @@ async function executeApproval(reqId, decision, reason) {
   showLoading('กำลังบันทึกผลการพิจารณา...');
   try {
     await callApi('processApproval', { token: authToken, req_id: reqId, decision, reason });
-    hideLoading();
-    safeAlert('สำเร็จ', 'บันทึกผลเรียบร้อยแล้ว', 'success');
+    hideLoading(); safeAlert('สำเร็จ', 'บันทึกผลเรียบร้อยแล้ว', 'success');
     await loadDashboard();
   } catch (err) { hideLoading(); safeAlert('ผิดพลาด', err.message, 'error'); }
 }
@@ -2466,8 +2273,7 @@ async function printBatchMemo() {
 
   const totalHours = targetItems.reduce((sum, r) => sum + (Number(r.hours) || 0), 0);
   const todayThai = formatThaiDate();
-  const tableRowsHtml = targetItems.map((r, idx) => `
-    <tr><td style="text-align:center;">${idx + 1}</td><td>${esc(r.req_id)}</td><td>${esc(r.student_id)}</td><td>${esc(r.student_name)}</td><td style="text-align:center;">${esc(r.level)}</td><td>${esc(r.activity_name)}</td><td style="text-align:center;">${formatShortThaiDate(r.activity_date)} - ${formatShortThaiDate(r.activity_end_date)}</td><td style="text-align:center;"><b>${esc(r.hours)}</b></td><td>${esc(r.teacher_name)}</td></tr>`).join('');
+  const tableRowsHtml = targetItems.map((r, idx) => `<tr><td style="text-align:center;">${idx + 1}</td><td>${esc(r.req_id)}</td><td>${esc(r.student_id)}</td><td>${esc(r.student_name)}</td><td style="text-align:center;">${esc(r.level)}</td><td>${esc(r.activity_name)}</td><td style="text-align:center;">${formatShortThaiDate(r.activity_date)} - ${formatShortThaiDate(r.activity_end_date)}</td><td style="text-align:center;"><b>${esc(r.hours)}</b></td><td>${esc(r.teacher_name)}</td></tr>`).join('');
 
   document.getElementById('printOnlyContainer').innerHTML = `
     <div class="memo-page">
