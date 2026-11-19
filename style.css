@@ -1,4 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@400;600;700&display=swap');
+
+:root {
+  --cute-primary: #6366f1;
+  --cute-primary-dark: #4f46e5;
+  --cute-pink: #ec4899;
+  --cute-mint: #10b981;
+  --cute-bg: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 50%, #ecfdf5 100%);
+}
+
+body {
+  font-family: 'Prompt', sans-serif;
+  background: var(--cute-bg);
+  background-attachment: fixed;
+  color: #334155;
+  min-height: 100vh;
+  padding-bottom: 60px;
+  line-height: 1.6;
+}
+
+input, select, textarea {
+  font-size: 15.5px !important;
+  line-height: 1.5 !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #dbe2ea !important;
+  padding: 10px 14px !important;
+  background-color: #ffffff;
+}
+
+select.form-select {
+  padding-right: 2.4rem !important;
+  height: auto !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--cute-primary) !important;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.14) !important;
+}
+
+.cute-navbar {
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  border-bottom-left-radius: 22px;
+  border-bottom-right-radius: 22px;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25);
+}
+
+.cute-card {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border: 2px solid #ffffff;
+  border-radius: 22px;
+  box-shadow: 0 10px 30px rgba(99, 102, 241, 0.08);
+}
+
+/* กล่องแบ่งหัวข้อย่อยให้อ่านง่าย สบายตา ไม่สับสน */
+.section-box {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+.section-box-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 1.02rem;
+  color: #4338ca;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1.5px dashed #cbd5e1;
+}
+
+.step-number-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.eval-radio {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #6366f1;
+}
+
+.cute-pill {
+  border-radius: 50px !important;
+  padding: 10px 18px !important;
+  font-weight: 500;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: 2px solid transparent;
+  background: #ffffff;
+  color: #475569;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+}
+
+.cute-pill:hover { transform: translateY(-2px); }
+
+.cute-pill.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 15px rgba(99, 102, 241, 0.35);
+}
+
+.cute-pill-staff {
+  background: linear-gradient(135deg, #334155, #1e293b) !important;
+  color: #fff !important;
+}
+
+.btn-cute-submit {
+  background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+  border: none;
+  border-radius: 16px;
+  color: #fff;
+  font-weight: 600;
+  padding: 14px;
+  box-shadow: 0 8px 20px rgba(236, 72, 153, 0.28);
+  transition: transform 0.15s ease;
+}
+
+.btn-cute-submit:hover {
+  transform: translateY(-2px);
+  color: #fff;
+}
+
+.thumb-preview {
+  width: 96px; height: 96px; object-fit: cover;
+  border-radius: 14px; border: 3px solid #e0e7ff;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.mobile-item-card {
+  background: #ffffff;
+  border: 1.5px solid #e0e7ff;
+  border-radius: 18px;
+  padding: 15px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.06);
+}
+
+.step-badge {
+  font-size: 0.78rem;
+  padding: 0.45em 0.85em;
+  border-radius: 50px;
+  font-weight: 500;
+}
+
+.cute-progress-bar {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 0.72rem;
+  text-align: center;
+  gap: 4px;
+}
+
+.prog-step { flex: 1; color: #94a3b8; }
+.prog-step.done { color: #10b981; font-weight: 600; }
+.prog-step.rejected { color: #ef4444; font-weight: 600; }
+
+#loadingOverlay {
+  position: fixed; inset: 0; background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(4px); z-index: 9999;
+  display: none; align-items: center; justify-content: center; flex-direction: column;
+}
+
+#printOnlyContainer { display: none; }
+
+@page {
+  size: A4;
+  margin: 1.5cm 2cm;
+}
+
 @media print {
+  .no-print, .modal-backdrop { display: none !important; }
+  body { background: #fff !important; padding: 0; margin: 0; }
+  #printOnlyContainer, #printOnlyContainer * {
+    font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important;
+  }
+  #printOnlyContainer {
+    display: block !important;
+    width: 100%;
+    padding: 0;
+    font-size: 16pt !important;
+    line-height: 1.35;
+    color: #000;
+  }
+  .memo-page { page-break-after: always; }
+  .memo-header { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 8px; }
+  .memo-garuda { width: 56px; height: auto; }
+  .memo-title { font-size: 28pt !important; font-weight: 700; line-height: 1; flex: 1; text-align: center; padding-right: 56px; }
+  .memo-field { margin-bottom: 3px; font-size: 16pt !important; }
+  .memo-divider { border-top: 1.5px solid #000; margin: 6px 0 10px 0; }
+  .memo-indent { text-indent: 2.5cm; text-align: justify; margin-bottom: 8px; font-size: 16pt !important; }
+  .print-img-box img {
+    max-height: 195px; max-width: 100%; object-fit: contain; border: 1px solid #999; padding: 3px;
+  }
+  .sig-grid { display: flex; flex-wrap: wrap; justify-content: space-between; margin-top: 18px; }
+  .sig-box { width: 48%; text-align: center; margin-bottom: 18px; page-break-inside: avoid; font-size: 15pt !important; }
+  .batch-table { width: 100%; border-collapse: collapse; font-size: 14pt !important; margin-top: 8px; }
+  .batch-table th, .batch-table td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
+  .batch-table th { background-color: #f1f5f9 !important; text-align: center; font-weight: 700; }
   .kpch-box-tag {
     float: right;
     border: 1.5px solid #000;
