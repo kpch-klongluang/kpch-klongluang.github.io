@@ -90,11 +90,11 @@
           <div class="row g-3">
             <div class="col-12 col-md-4">
               <label class="form-label fw-semibold small">รหัสประจำตัวนักศึกษา <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="p12_student_id" placeholder="เช่น 6912345678">
+              <input type="text" class="form-control" id="p12_student_id"maxlength="10" inputmode="numeric" placeholder="เช่น 6912345678">
             </div>
             <div class="col-12 col-md-5">
               <label class="form-label fw-semibold small">ชื่อ - นามสกุล (เว้นวรรคระหว่างชื่อ-สกุล) <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="p12_student_name" placeholder="เช่น นายสมชาย ใจดี">
+              <input type="text" class="form-control" id="p12_student_name"maxlength="10" inputmode="numeric" placeholder="เช่น นายสมชาย ใจดี">
             </div>
             <div class="col-12 col-md-3">
               <label class="form-label fw-semibold small">ระดับการศึกษา <span class="text-danger">*</span></label>
@@ -269,7 +269,7 @@
         <div class="p-3 rounded-4 border bg-light mb-3">
           <label class="form-label fw-bold small">1. ตรวจสอบสิทธิ์จากรหัสนักศึกษา <span class="text-danger">*</span></label>
           <div class="input-group">
-            <input type="text" class="form-control" id="f_student_id" placeholder="กรอกรหัสนักศึกษา แล้วกดตรวจสอบสิทธิ์..." onkeydown="if(event.key==='Enter') checkEligibilityUI()">
+            <input type="text" class="form-control" id="f_student_id"maxlength="10" inputmode="numeric" placeholder="กรอกรหัสนักศึกษา แล้วกดตรวจสอบสิทธิ์..." onkeydown="if(event.key==='Enter') checkEligibilityUI()">
             <button type="button" class="btn btn-primary fw-bold px-3" style="border-radius: 0 12px 12px 0;" onclick="checkEligibilityUI()">
               <i class="bi bi-shield-check me-1"></i>ตรวจสอบสิทธิ์
             </button>
@@ -390,7 +390,7 @@
         <h4 class="fw-bold text-primary mb-2">🔍 ตรวจสอบสถานะ กพช. และปรับปรุงแก้ไขข้อมูล</h4>
         <p class="small text-muted mb-3">หากกรอกข้อมูลผิดหรือถูกครูตีกลับ สามารถกดปุ่ม <b>"แก้ไขข้อมูล"</b> ในรายการนั้นได้ทันที (ไม่ต้องส่งซ้ำ)</p>
         <div class="input-group mb-4">
-          <input type="text" id="searchStudentId" class="form-control" placeholder="กรอกรหัสนักศึกษาของท่าน..." onkeydown="if(event.key==='Enter') searchMyStatus()">
+          <input type="text" id="searchStudentId" class="form-control"maxlength="10" inputmode="numeric" placeholder="กรอกรหัสนักศึกษาของท่าน..." onkeydown="if(event.key==='Enter') searchMyStatus()">
           <button type="button" class="btn btn-primary px-4 fw-bold" style="border-radius: 0 12px 12px 0;" onclick="searchMyStatus()">ค้นหา</button>
         </div>
         <div id="statusResultArea"></div>
@@ -879,6 +879,18 @@
         <div class="modal-body">
           <div class="alert alert-info small py-2">รวมรายชื่อนักศึกษาจำนวน <strong id="d56_count">0</strong> คน ใน 1 ชุดเอกสาร กพช. 3</div>
           <div class="row g-2">
+            <div class="col-12 col-md-4">
+           <label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label>
+           <input type="text" class="form-control" id="d56_doc_no" value="ศธ 07058.02/">
+         </div>
+         <div class="col-12 col-md-4">
+           <label class="form-label fw-semibold small">วันที่ (บันทึกข้อความ)</label>
+           <input type="text" class="form-control" id="d56_doc_date" placeholder="เช่น 9 กันยายน 2569">
+         </div>
+         <div class="col-12 col-md-4">
+           <label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label>
+           <input type="text" class="form-control" id="d56_advisor_pos" value="บรรณารักษ์ / ครูประจำกลุ่ม">
+         </div>
             <div class="col-12 col-md-8"><label class="form-label fw-semibold small">1. ชื่อโครงการ</label><input type="text" class="form-control" id="d56_project_name"></div>
             <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประมาณค่าหน่วยกิจกรรม (ชม.)</label><input type="number" class="form-control" id="d56_hours" value="25"></div>
             <div class="col-12"><label class="form-label fw-semibold small">2. หลักการและเหตุผล</label><textarea class="form-control" id="d56_rationale" rows="2"></textarea></div>
