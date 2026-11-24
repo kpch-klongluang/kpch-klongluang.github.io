@@ -15,7 +15,8 @@ let DASHBOARD_DATA = {
   trash12: [],
   trashSubs: [],
   maintenance: null,
-  doc_templates_admin: null
+  doc_templates_admin: null,
+  announcement: null
 };
 let CURRENT_STATUS_DATA = { approvals12: [], submissions: [] };
 let ACTIVE_PUBLIC_TAB = 'pre12';
@@ -29,7 +30,7 @@ let DOC_TEMPLATES_READY = { memo56: false, memo46: false };
 let MAINT_POLL_TIMER = null;
 const SIGNATURE_PADS = {};
 
-// ==================== API & UI Helpers ====================
+// ==================== API & Normalizers ====================
 function showLoading(show, msg = 'กำลังดำเนินการ...') {
   const el = document.getElementById('loadingOverlay');
   const txt = document.getElementById('loadingText');
@@ -45,17 +46,63 @@ async function callApi(action, body = {}, showLoader = true, loaderMsg = 'กำ
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, ...body })
     });
-    const data = await resp.json();
-    if (data && data.maintenance_blocked) {
-      applyMaintenanceState(data.maintenance);
+    const raw = await resp.json();
+
+    if (raw && 'ok' in raw) {
+      if (!raw.ok) {
+        const msg = raw.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
+        const maintBlocked = /ปรับปรุง/.test(msg);
+        const authErr = /Session|เข้าสู่ระบบใหม่/.test(msg);
+        if (raw.maintenance) applyMaintenanceState(raw.maintenance);
+        return { success: false, message: msg, maintenance_blocked: maintBlocked, auth_error: authErr };
+      }
+      const d = raw.data;
+      if (d && typeof d === 'object' && !Array.isArray(d)) {
+        return { success: true, ...d };
+      }
+      return { success: true, data: d };
     }
-    return data;
+
+    if (raw && raw.maintenance_blocked) {
+      applyMaintenanceState(raw.maintenance);
+    }
+    return raw;
   } catch (err) {
     console.error('API Error:', err);
     return { success: false, message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง' };
   } finally {
     if (showLoader) showLoading(false);
   }
+}
+
+function norm12(r) {
+  if (!r) return r;
+  return {
+    ...r,
+    id: r.req12_id || r.id || '',
+    status: r.status_12 || r.status || 'WAIT_TEACHER_12',
+    start_date: r.plan_start_date || r.start_date || '',
+    end_date: r.plan_end_date || r.end_date || '',
+    teacher_comment: r.reject_reason_12 || r.teacher_comment || ''
+  };
+}
+
+function normSub(r) {
+  if (!r) return r;
+  const imgs = Array.isArray(r.images) && r.images.length
+    ? r.images
+    : [r.img_1, r.img_2, r.img_3, r.img_4].filter(Boolean);
+  return {
+    ...r,
+    id: r.req_id || r.id || '',
+    status: r.current_step || r.status || 'WAIT_TEACHER',
+    start_date: r.activity_date || r.start_date || '',
+    end_date: r.activity_end_date || r.end_date || '',
+    detail: r.activity_detail || r.detail || '',
+    term_year: r.term || r.term_year || '',
+    teacher_comment: r.reject_reason || r.teacher_comment || '',
+    images: imgs
+  };
 }
 
 function escHtml(str) {
@@ -132,8 +179,11 @@ function getDriveDirectImgUrl(url) {
 
 function statusBadge12(st) {
   const map = {
+    WAIT_TEACHER_12: '<span class="badge bg-warning text-dark">รอครูที่ปรึกษาอนุมัติ</span>',
     PENDING_TEACHER: '<span class="badge bg-warning text-dark">รอครูที่ปรึกษาอนุมัติ</span>',
+    APPROVED_12: '<span class="badge bg-success">อนุมัติแล้ว (ทำกิจกรรมได้)</span>',
     APPROVED: '<span class="badge bg-success">อนุมัติแล้ว (ทำกิจกรรมได้)</span>',
+    REJECTED_12: '<span class="badge bg-danger">ไม่อนุมัติ / ส่งแก้ไข</span>',
     REJECTED: '<span class="badge bg-danger">ไม่อนุมัติ / ส่งแก้ไข</span>'
   };
   return map[st] || `<span class="badge bg-secondary">${escHtml(st)}</span>`;
@@ -141,7 +191,9 @@ function statusBadge12(st) {
 
 function statusBadgeSub(st) {
   const map = {
+    WAIT_TEACHER: '<span class="badge bg-warning text-dark">รอครูตรวจหลักฐาน</span>',
     PENDING_TEACHER: '<span class="badge bg-warning text-dark">รอครูตรวจหลักฐาน</span>',
+    APPROVED_FOR_REGISTRAR: '<span class="badge bg-primary">ครูอนุมัติแล้ว / รอทะเบียน</span>',
     PENDING_REGISTRAR: '<span class="badge bg-primary">ครูอนุมัติแล้ว / รอทะเบียน</span>',
     COMPLETED: '<span class="badge bg-success">บันทึกชั่วโมงแล้ว</span>',
     REJECTED: '<span class="badge bg-danger">ไม่ผ่าน / ส่งแก้ไข</span>'
@@ -149,7 +201,7 @@ function statusBadgeSub(st) {
   return map[st] || `<span class="badge bg-secondary">${escHtml(st)}</span>`;
 }
 
-function resizeImageToDataUrl(file, maxW = 1000, quality = 0.72) {
+function resizeImageToObj(file, maxW = 1000, quality = 0.72) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
@@ -170,7 +222,12 @@ function resizeImageToDataUrl(file, maxW = 1000, quality = 0.72) {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve({
+          dataUrl,
+          base64Data: dataUrl.split(',')[1] || '',
+          mimeType: 'image/jpeg'
+        });
       };
       img.src = ev.target.result;
     };
@@ -179,15 +236,15 @@ function resizeImageToDataUrl(file, maxW = 1000, quality = 0.72) {
 }
 
 async function handleImagesSelect(input, previewId, mode) {
-  const files = Array.from(input.files || []).slice(0, 4);
-  if ((input.files || []).length > 4) {
-    Swal.fire('แจ้งเตือน', 'แนบภาพถ่ายได้สูงสุด 4 รูปต่อรายการ (ระบบจะเลือก 4 รูปแรก)', 'info');
+  const files = Array.from(input.files || []).slice(0, 3);
+  if ((input.files || []).length > 3) {
+    Swal.fire('แจ้งเตือน', 'แนบภาพถ่ายได้สูงสุด 3 รูปต่อรายการ (ระบบจะเลือก 3 รูปแรก)', 'info');
   }
   const list = [];
   for (const f of files) {
     try {
-      const dataUrl = await resizeImageToDataUrl(f, 960, 0.72);
-      list.push(dataUrl);
+      const obj = await resizeImageToObj(f, 960, 0.72);
+      list.push(obj);
     } catch (_) {}
   }
   if (mode === 'submit') SELECTED_SUBMIT_IMAGES = list;
@@ -195,7 +252,7 @@ async function handleImagesSelect(input, previewId, mode) {
 
   const box = document.getElementById(previewId);
   if (box) {
-    box.innerHTML = list.map(u => `<img src="${u}" class="thumb-preview" alt="preview">`).join('');
+    box.innerHTML = list.map(o => `<img src="${o.dataUrl}" class="thumb-preview" alt="preview">`).join('');
   }
 }
 
@@ -318,7 +375,7 @@ function applyMaintenanceState(m) {
     }
   }
 
- const banner = document.getElementById('adminMaintenanceBanner');
+  const banner = document.getElementById('adminMaintenanceBanner');
   if (banner) {
     const showBanner = enabled && isAdmin;
     banner.classList.toggle('d-none', !showBanner);
@@ -522,9 +579,7 @@ function loadSignatureToPad(canvasId, dataUrl) {
     const padRatio = Math.min((state.width - 24) / img.width, (state.height - 20) / img.height);
     const dw = img.width * padRatio;
     const dh = img.height * padRatio;
-    const dx = (state.width - dw) / 2;
-    const dy = (state.height - dh) / 2;
-    state.ctx.drawImage(img, dx, dy, dw, dh);
+    state.ctx.drawImage(img, (state.width - dw) / 2, (state.height - dh) / 2, dw, dh);
     state.hasData = true;
     updateSigPadStatus(canvasId);
   };
@@ -624,8 +679,17 @@ function renderStudentSigHtml(sigDataUrl, heightPx = 38, wordCid = '') {
   const src = wordCid ? `cid:${wordCid}` : sigDataUrl;
   return `<div style="line-height:1; margin: 2px 0 -4px 0;"><img src="${src}" alt="ลายเซ็นนักศึกษา" style="height:${heightPx}px; max-width:165px; object-fit:contain; display:inline-block;"></div>`;
 }
-
 // ==================== Navigation & Public Data ====================
+function extractAnnouncementText(ann) {
+  if (!ann) return '';
+  if (typeof ann === 'string') return ann.trim();
+  if (typeof ann === 'object') {
+    if (ann.visible === false) return '';
+    return String(ann.content || '').trim();
+  }
+  return '';
+}
+
 function renderNavbar() {
   const isStaff = !!CURRENT_USER;
   const role = CURRENT_USER ? CURRENT_USER.role : 'PUBLIC';
@@ -711,27 +775,30 @@ function populateSelectOptions() {
     if (!sel) return;
     const oldVal = sel.value;
     sel.innerHTML = '<option value="">-- เลือกประเภทกิจกรรม --</option>' +
-      PUBLIC_CATEGORIES.map(c => `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`).join('');
+      PUBLIC_CATEGORIES.map(c => {
+        const cname = c.cat_name || c.name || '';
+        return `<option value="${escHtml(cname)}">${escHtml(cname)}</option>`;
+      }).join('');
     if (oldVal) sel.value = oldVal;
   });
 }
 
 async function loadPublicData() {
-  const res = await callApi('getPublicInit', {}, false);
+  const res = await callApi('getPublicData', {}, false);
   if (!res || !res.success) return;
   PUBLIC_TEACHERS = res.teachers || [];
-  PUBLIC_CATEGORIES = res.categories || [];
+  PUBLIC_CATEGORIES = (res.categories || []).filter(c => (c.status ? c.status === 'ACTIVE' : c.is_active !== false));
   DOC_TEMPLATES_READY = res.doc_templates || { memo56: false, memo46: false };
   populateSelectOptions();
 
-  const ann = String(res.announcement || '').trim();
+  const ann = extractAnnouncementText(res.announcement);
   const box = document.getElementById('annPublicBox');
   const txt = document.getElementById('annPublicText');
   if (box && txt) {
     txt.textContent = ann;
     box.style.display = ann ? 'block' : 'none';
   }
-  applyMaintenanceState(res.maintenance);
+  if (res.maintenance) applyMaintenanceState(res.maintenance);
 }
 
 // ==================== Public Form Submissions ====================
@@ -757,15 +824,20 @@ async function handlePre12Submit(e) {
     level: document.getElementById('p12_level').value,
     teacher_id: document.getElementById('p12_teacher_id').value,
     group_name: document.getElementById('p12_group_name').value.trim(),
+    term: '2/2569',
     category: document.getElementById('p12_category').value,
     activity_name: document.getElementById('p12_activity_name').value.trim(),
     hours: Number(document.getElementById('p12_hours').value || 0),
     role_note: document.getElementById('p12_role_note').value.trim() || 'ผู้เรียน',
+    plan_start_date: sd,
+    plan_end_date: ed,
     start_date: sd,
     end_date: ed,
     location: document.getElementById('p12_location').value.trim(),
     plan_detail: document.getElementById('p12_plan_detail').value.trim(),
     expected_outcome: document.getElementById('p12_expected_outcome').value.trim(),
+    self_eval_ok: true,
+    eval_scores: [],
     student_signature: sigDataUrl
   };
 
@@ -774,12 +846,13 @@ async function handlePre12Submit(e) {
     return Swal.fire('ยื่นคำขอไม่สำเร็จ', res.message || 'เกิดข้อผิดพลาด', 'error');
   }
 
+  const newId = res.req12_id || res.id || '-';
   document.getElementById('pre12Form').reset();
   clearSignaturePad('p12_sig_canvas');
   Swal.fire({
     icon: 'success',
     title: 'ยื่นคำขอ กพช. 1-2 สำเร็จ!',
-    html: `<p class="mb-2">เลขที่คำขอของคุณคือ <strong class="text-primary">${escHtml(res.id)}</strong></p>
+    html: `<p class="mb-2">เลขที่คำขอของคุณคือ <strong class="text-primary">${escHtml(newId)}</strong></p>
            <p class="small text-muted mb-0">กรุณารอครูที่ปรึกษาอนุมัติก่อนเริ่มปฏิบัติกิจกรรม</p>`
   });
 }
@@ -789,20 +862,27 @@ async function checkEligibilityUI() {
   if (!/^6\d{9}$/.test(sid)) {
     return Swal.fire('รหัสนักศึกษาไม่ถูกต้อง', 'กรุณากรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วยเลข 6)', 'warning');
   }
-  const res = await callApi('checkStudentEligibility', { student_id: sid }, true, 'กำลังตรวจสอบสิทธิ์...');
+  const res = await callApi('checkEligibility', { student_id: sid }, true, 'กำลังตรวจสอบสิทธิ์...');
   const box = document.getElementById('eligibilityResultBox');
   const bodyFs = document.getElementById('submitFormBody');
 
-  if (!res.success || !res.eligible) {
+  const rawApproved = res.availableApproved12 || res.approved_12 || [];
+  const approvedList = rawApproved.map(norm12);
+
+  if (!res.success || !approvedList.length) {
     bodyFs.disabled = true;
     box.style.display = 'block';
+    const anyList = (res.approvals12 || []).map(norm12);
+    const waitMsg = anyList.length
+      ? `พบคำขอ (${escHtml(anyList[0].id)}) แต่ยังรอครูที่ปรึกษาอนุมัติ`
+      : 'ยังไม่พบคำขอ กพช. 1-2 ที่ได้รับอนุมัติ กรุณายื่น กพช. 1-2 ก่อน';
     box.innerHTML = `<div class="alert alert-warning mb-0 small rounded-3">
-      <i class="bi bi-exclamation-circle me-1"></i>${escHtml(res.message || 'ยังไม่พบคำขอ กพช. 1-2 ที่ได้รับอนุมัติ')}
+      <i class="bi bi-exclamation-circle me-1"></i>${escHtml(res.message || waitMsg)}
     </div>`;
     return;
   }
 
-  const latest = (res.approved_12 || [])[0];
+  const latest = approvedList[0];
   bodyFs.disabled = false;
   box.style.display = 'block';
   box.innerHTML = `<div class="alert alert-success mb-0 small rounded-3">
@@ -828,9 +908,13 @@ async function handleSubmitKPCH(e) {
   if (!/^6\d{9}$/.test(sid)) {
     return Swal.fire('รหัสนักศึกษาไม่ถูกต้อง', 'กรุณากรอกรหัสนักศึกษา 10 หลัก', 'warning');
   }
-  if (!SELECTED_SUBMIT_IMAGES.length) {
-    return Swal.fire('กรุณาแนบภาพถ่าย', 'กรุณาแนบภาพถ่ายขณะทำกิจกรรมอย่างน้อย 1 รูป (สูงสุด 4 รูป)', 'warning');
+  if (SELECTED_SUBMIT_IMAGES.length < 2) {
+    return Swal.fire('กรุณาแนบภาพถ่าย', 'กรุณาแนบภาพถ่ายขณะทำกิจกรรม 2 - 3 รูป', 'warning');
   }
+
+  const sd = document.getElementById('f_start_date').value;
+  const ed = document.getElementById('f_end_date').value;
+  const detailTxt = document.getElementById('f_detail').value.trim();
 
   const payload = {
     student_id: sid,
@@ -842,15 +926,18 @@ async function handleSubmitKPCH(e) {
     category: document.getElementById('f_category').value,
     activity_name: document.getElementById('f_activity_name').value.trim(),
     hours: Number(document.getElementById('f_hours').value || 0),
-    start_date: document.getElementById('f_start_date').value,
-    end_date: document.getElementById('f_end_date').value,
+    activity_date: sd,
+    activity_end_date: ed,
+    start_date: sd,
+    end_date: ed,
     location: document.getElementById('f_location').value.trim(),
     k4_plan: document.getElementById('f_k4_plan').value.trim(),
-    detail: document.getElementById('f_detail').value.trim(),
+    activity_detail: detailTxt,
+    detail: detailTxt,
     k4_learning: document.getElementById('f_k4_learning').value.trim(),
     k4_problem: document.getElementById('f_k4_problem').value.trim(),
     k4_apply: document.getElementById('f_k4_apply').value.trim(),
-    images: SELECTED_SUBMIT_IMAGES
+    images: SELECTED_SUBMIT_IMAGES.map(x => ({ base64Data: x.base64Data, mimeType: x.mimeType }))
   };
 
   const res = await callApi('submitKPCH', { payload }, true, 'กำลังอัปโหลดภาพถ่ายและส่งหลักฐาน...');
@@ -858,6 +945,7 @@ async function handleSubmitKPCH(e) {
     return Swal.fire('ส่งหลักฐานไม่สำเร็จ', res.message || 'เกิดข้อผิดพลาด', 'error');
   }
 
+  const newId = res.req_id || res.id || '-';
   document.getElementById('submitForm').reset();
   document.getElementById('submitFormBody').disabled = true;
   document.getElementById('eligibilityResultBox').style.display = 'none';
@@ -867,10 +955,11 @@ async function handleSubmitKPCH(e) {
   Swal.fire({
     icon: 'success',
     title: 'ส่งหลักฐาน กพช. 4 สำเร็จ!',
-    html: `<p class="mb-1">รหัสรายการ: <strong class="text-primary">${escHtml(res.id)}</strong></p>
+    html: `<p class="mb-1">รหัสรายการ: <strong class="text-primary">${escHtml(newId)}</strong></p>
            <p class="small text-muted mb-0">สามารถติดตามสถานะได้ที่เมนู "เช็คสถานะ / แก้ไขข้อมูล"</p>`
   });
 }
+
 // ==================== Student Status Search & Self-Edit ====================
 async function searchMyStatus() {
   const q = document.getElementById('searchStudentId').value.trim();
@@ -884,8 +973,8 @@ async function searchMyStatus() {
     return;
   }
 
-  const list12 = res.approvals12 || [];
-  const listSubs = res.submissions || [];
+  const list12 = (res.approvals12 || []).map(norm12);
+  const listSubs = (res.submissions || []).map(normSub);
   CURRENT_STATUS_DATA = { approvals12: list12, submissions: listSubs };
 
   if (!list12.length && !listSubs.length) {
@@ -900,7 +989,7 @@ async function searchMyStatus() {
   if (list12.length) {
     html += `<h6 class="fw-bold mb-2 text-primary"><i class="bi bi-file-earmark-text me-1"></i>คำขออนุมัติล่วงหน้า (กพช. 1-2) (${list12.length} รายการ)</h6>`;
     html += list12.map((it, idx) => {
-      const canEdit = it.status === 'PENDING_TEACHER' || it.status === 'REJECTED';
+      const canEdit = ['WAIT_TEACHER_12', 'REJECTED_12', 'PENDING_TEACHER', 'REJECTED'].includes(it.status);
       const hasSig = it.student_signature && String(it.student_signature).startsWith('data:image/');
       return `<div class="cute-card p-3 mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
@@ -931,7 +1020,7 @@ async function searchMyStatus() {
   if (listSubs.length) {
     html += `<h6 class="fw-bold mt-4 mb-2 text-success"><i class="bi bi-journal-check me-1"></i>หลักฐานผลการทำกิจกรรม (กพช. 4) (${listSubs.length} รายการ)</h6>`;
     html += listSubs.map((it, idx) => {
-      const canEdit = it.status === 'PENDING_TEACHER' || it.status === 'REJECTED';
+      const canEdit = ['WAIT_TEACHER', 'REJECTED', 'PENDING_TEACHER'].includes(it.status);
       return `<div class="cute-card p-3 mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
           <div>
@@ -1069,6 +1158,8 @@ async function saveStudentEdit(e) {
     return Swal.fire('รหัสนักศึกษาไม่ถูกต้อง', 'กรุณากรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วยเลข 6)', 'warning');
   }
 
+  const sd = document.getElementById('se_start_date').value;
+  const ed = document.getElementById('se_end_date').value;
   const payload = {
     item_type: type,
     id: document.getElementById('se_id').value,
@@ -1082,24 +1173,28 @@ async function saveStudentEdit(e) {
     hours: Number(document.getElementById('se_hours').value || 0),
     role_note: document.getElementById('se_role_note').value.trim(),
     activity_name: document.getElementById('se_activity_name').value.trim(),
-    start_date: document.getElementById('se_start_date').value,
-    end_date: document.getElementById('se_end_date').value,
+    start_date: sd,
+    end_date: ed,
     location: document.getElementById('se_location').value.trim()
   };
 
   if (type === '12') {
+    payload.plan_start_date = sd;
+    payload.plan_end_date = ed;
     payload.plan_detail = document.getElementById('se_plan_detail').value.trim();
     payload.expected_outcome = document.getElementById('se_expected_outcome').value.trim();
     const sig = exportSignatureDataUrl('se_sig_canvas');
     if (sig) payload.student_signature = sig;
   } else {
+    const det = document.getElementById('se_detail').value.trim();
     payload.k4_plan = document.getElementById('se_k4_plan').value.trim();
-    payload.detail = document.getElementById('se_detail').value.trim();
+    payload.activity_detail = det;
+    payload.detail = det;
     payload.k4_learning = document.getElementById('se_k4_learning').value.trim();
     payload.k4_problem = document.getElementById('se_k4_problem').value.trim();
     payload.k4_apply = document.getElementById('se_k4_apply').value.trim();
     if (SELECTED_STUDENT_EDIT_IMAGES.length) {
-      payload.images = SELECTED_STUDENT_EDIT_IMAGES;
+      payload.images = SELECTED_STUDENT_EDIT_IMAGES.map(x => ({ base64Data: x.base64Data, mimeType: x.mimeType }));
     }
   }
 
@@ -1120,7 +1215,8 @@ function buildKPCH12Html(items, forWord = false) {
     const teacherName = it.teacher_name || '............................................';
     const sigHtml = renderStudentSigHtml(it.student_signature, 38, forWord ? `sig_stu_${idx}` : '');
     const sigFallback = sigHtml || '<div style="height:34px;"></div>';
-    const approveMark = it.status === 'APPROVED' ? '☑ อนุมัติ   ☐ ไม่อนุมัติ' : '☐ อนุมัติ   ☐ ไม่อนุมัติ';
+    const isApproved = it.status === 'APPROVED_12' || it.status === 'APPROVED';
+    const approveMark = isApproved ? '☑ อนุมัติ   ☐ ไม่อนุมัติ' : '☐ อนุมัติ   ☐ ไม่อนุมัติ';
 
     return `
       <div class="doc-page" style="padding: 10mm 14mm; font-family: 'TH SarabunPSK', 'Prompt', sans-serif; color: #000; font-size: 15pt; line-height: 1.35;">
@@ -1243,7 +1339,7 @@ async function handleLogin(e) {
   const username = document.getElementById('login_username').value.trim();
   const password = document.getElementById('login_password').value;
   const res = await callApi('login', { username, password }, true, 'กำลังเข้าสู่ระบบ...');
-  if (!res.success) {
+  if (!res.success || !res.token) {
     return Swal.fire('เข้าสู่ระบบไม่สำเร็จ', res.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 'error');
   }
   CURRENT_TOKEN = res.token;
@@ -1275,13 +1371,13 @@ function openChangePassModal() {
 
 async function handleChangePass(e) {
   e.preventDefault();
-  const old_password = document.getElementById('cp_old').value;
-  const new_password = document.getElementById('cp_new').value;
+  const old_pass = document.getElementById('cp_old').value;
+  const new_pass = document.getElementById('cp_new').value;
   const confirm = document.getElementById('cp_confirm').value;
-  if (new_password !== confirm) {
+  if (new_pass !== confirm) {
     return Swal.fire('รหัสผ่านไม่ตรงกัน', 'กรุณากรอกรหัสผ่านใหม่ทั้งสองช่องให้ตรงกัน', 'warning');
   }
-  const res = await callApi('changePassword', { token: CURRENT_TOKEN, old_password, new_password }, true, 'กำลังเปลี่ยนรหัสผ่าน...');
+  const res = await callApi('changePassword', { token: CURRENT_TOKEN, old_pass, new_pass }, true, 'กำลังเปลี่ยนรหัสผ่าน...');
   if (!res.success) {
     return Swal.fire('ไม่สำเร็จ', res.message || 'รหัสผ่านเดิมไม่ถูกต้อง', 'error');
   }
@@ -1331,13 +1427,9 @@ function switchTeacherTab(tab) {
 
 async function loadDashboardData(silent = false) {
   if (!CURRENT_TOKEN) return;
-  const res = await callApi('getDashboardData', { token: CURRENT_TOKEN }, !silent, 'กำลังโหลดข้อมูล...');
+  const res = await callApi('getDashboard', { token: CURRENT_TOKEN }, !silent, 'กำลังโหลดข้อมูล...');
   if (!res.success) {
-    if (res.maintenance_blocked) {
-      logout();
-      return;
-    }
-    if (res.auth_error) {
+    if (res.maintenance_blocked || res.auth_error) {
       logout();
       return;
     }
@@ -1346,22 +1438,23 @@ async function loadDashboardData(silent = false) {
 
   CURRENT_USER = res.user;
   DASHBOARD_DATA = {
-    submissions: res.submissions || [],
-    requests12: res.requests12 || [],
+    submissions: (res.items || res.submissions || []).map(normSub),
+    requests12: (res.items12 || res.requests12 || []).map(norm12),
     users: res.users || [],
     categories: res.categories || [],
     logs: res.logs || [],
-    trash12: res.trash12 || [],
-    trashSubs: res.trashSubs || [],
+    trash12: (res.trash_approvals12 || res.trash12 || []).map(norm12),
+    trashSubs: (res.trash_submissions || res.trashSubs || []).map(normSub),
     maintenance: res.maintenance || null,
-    doc_templates_admin: res.doc_templates_admin || null
+    doc_templates_admin: res.doc_templates_admin || null,
+    announcement: res.announcement || null
   };
   DOC_TEMPLATES_READY = res.doc_templates || DOC_TEMPLATES_READY;
 
-  applyMaintenanceState(res.maintenance);
+  if (res.maintenance) applyMaintenanceState(res.maintenance);
   renderNavbar();
 
-  const ann = String(res.announcement || '').trim();
+  const ann = extractAnnouncementText(res.announcement);
   const dashAnn = document.getElementById('annDashBox');
   if (dashAnn) {
     document.getElementById('annDashText').textContent = ann;
@@ -1390,8 +1483,8 @@ async function loadDashboardData(silent = false) {
     if (prev && terms.includes(prev)) termSel.value = prev;
   }
 
-  const waitSub = DASHBOARD_DATA.submissions.filter(s => s.status === 'PENDING_TEACHER').length;
-  const wait12 = DASHBOARD_DATA.requests12.filter(r => r.status === 'PENDING_TEACHER').length;
+  const waitSub = DASHBOARD_DATA.submissions.filter(s => s.status === 'WAIT_TEACHER' || s.status === 'PENDING_TEACHER').length;
+  const wait12 = DASHBOARD_DATA.requests12.filter(r => r.status === 'WAIT_TEACHER_12' || r.status === 'PENDING_TEACHER').length;
   const trashTotal = DASHBOARD_DATA.trash12.length + DASHBOARD_DATA.trashSubs.length;
 
   ['sbBadgeWaitSub', 'badgeWaitSub'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = waitSub; });
@@ -1400,7 +1493,7 @@ async function loadDashboardData(silent = false) {
 
   document.getElementById('statTotal').textContent = DASHBOARD_DATA.submissions.length;
   document.getElementById('statWait').textContent = waitSub;
-  document.getElementById('statApproved').textContent = DASHBOARD_DATA.submissions.filter(s => s.status === 'PENDING_REGISTRAR').length;
+  document.getElementById('statApproved').textContent = DASHBOARD_DATA.submissions.filter(s => s.status === 'APPROVED_FOR_REGISTRAR' || s.status === 'PENDING_REGISTRAR').length;
   document.getElementById('statCompleted').textContent = DASHBOARD_DATA.submissions.filter(s => s.status === 'COMPLETED').length;
 
   renderSubmissionsTable();
@@ -1408,13 +1501,28 @@ async function loadDashboardData(silent = false) {
   if (CURRENT_USER.role === 'ADMIN') renderAdminPanels();
 }
 // ==================== KPCH 1-2 Management ====================
+function match12Status(actual, filterVal) {
+  if (filterVal === 'ALL') return true;
+  if (filterVal === 'PENDING_TEACHER') return actual === 'WAIT_TEACHER_12' || actual === 'PENDING_TEACHER';
+  if (filterVal === 'APPROVED') return actual === 'APPROVED_12' || actual === 'APPROVED';
+  if (filterVal === 'REJECTED') return actual === 'REJECTED_12' || actual === 'REJECTED';
+  return actual === filterVal;
+}
+
+function matchSubStatus(actual, filterVal) {
+  if (filterVal === 'ALL') return true;
+  if (filterVal === 'PENDING_TEACHER') return actual === 'WAIT_TEACHER' || actual === 'PENDING_TEACHER';
+  if (filterVal === 'PENDING_REGISTRAR') return actual === 'APPROVED_FOR_REGISTRAR' || actual === 'PENDING_REGISTRAR';
+  return actual === filterVal;
+}
+
 function getFiltered12() {
   const kw = (document.getElementById('filter12Keyword')?.value || '').trim().toLowerCase();
   const st = document.getElementById('filter12Status')?.value || 'ALL';
   const tc = document.getElementById('filter12Teacher')?.value || 'ALL';
 
   return DASHBOARD_DATA.requests12.filter(r => {
-    if (st !== 'ALL' && r.status !== st) return false;
+    if (!match12Status(r.status, st)) return false;
     if (tc !== 'ALL' && r.teacher_id !== tc) return false;
     if (kw) {
       const hay = `${r.id} ${r.student_id} ${r.student_name} ${r.activity_name} ${r.category}`.toLowerCase();
@@ -1526,6 +1634,7 @@ function open12DetailModal(id) {
   if (!it) return;
   const isAdmin = CURRENT_USER && CURRENT_USER.role === 'ADMIN';
   const canApprove = CURRENT_USER && (CURRENT_USER.role === 'TEACHER' || isAdmin);
+  const isWaiting = it.status === 'WAIT_TEACHER_12' || it.status === 'PENDING_TEACHER';
   const sigImg = it.student_signature && String(it.student_signature).startsWith('data:image/')
     ? `<img src="${it.student_signature}" alt="ลายเซ็น" style="max-height:64px; border:1px dashed #cbd5e1; padding:4px; border-radius:8px; background:#fff;">`
     : '<span class="text-muted small">ไม่มีลายเซ็นแนบ</span>';
@@ -1572,12 +1681,12 @@ function open12DetailModal(id) {
       <i class="bi bi-file-earmark-richtext me-1"></i>บันทึก กพช. 3
     </button>
   `;
-  if (canApprove && it.status === 'PENDING_TEACHER') {
+  if (canApprove && isWaiting) {
     footer += `
-      <button type="button" class="btn btn-success btn-sm rounded-3" onclick="process12Single('${escHtml(it.id)}', 'APPROVED')">
+      <button type="button" class="btn btn-success btn-sm rounded-3" onclick="process12Single('${escHtml(it.id)}', 'APPROVE')">
         <i class="bi bi-check-lg me-1"></i>อนุมัติ
       </button>
-      <button type="button" class="btn btn-danger btn-sm rounded-3" onclick="process12Single('${escHtml(it.id)}', 'REJECTED')">
+      <button type="button" class="btn btn-danger btn-sm rounded-3" onclick="process12Single('${escHtml(it.id)}', 'REJECT')">
         <i class="bi bi-x-lg me-1"></i>ไม่อนุมัติ
       </button>
     `;
@@ -1628,22 +1737,25 @@ async function printBatch12UI() {
 }
 
 async function process12Single(id, decision) {
-  const { value: comment, isConfirmed } = await Swal.fire({
-    title: decision === 'APPROVED' ? 'ยืนยันอนุมัติคำขอ กพช. 1-2' : 'ยืนยันไม่อนุมัติคำขอ',
+  const { value: reason, isConfirmed } = await Swal.fire({
+    title: decision === 'APPROVE' ? 'ยืนยันอนุมัติคำขอ กพช. 1-2' : 'ยืนยันไม่อนุมัติคำขอ',
     input: 'text',
-    inputLabel: decision === 'APPROVED' ? 'ความเห็นเพิ่มเติม (ถ้ามี)' : 'ระบุเหตุผลที่ไม่อนุมัติ / สิ่งที่ต้องแก้ไข',
+    inputLabel: decision === 'APPROVE' ? 'ความเห็นเพิ่มเติม (ถ้ามี)' : 'ระบุเหตุผลที่ไม่อนุมัติ / สิ่งที่ต้องแก้ไข',
     inputPlaceholder: 'ระบุข้อความ...',
     showCancelButton: true,
     confirmButtonText: 'ยืนยัน',
     cancelButtonText: 'ยกเลิก'
   });
   if (!isConfirmed) return;
+  if (decision === 'REJECT' && !String(reason || '').trim()) {
+    return Swal.fire('กรุณาระบุเหตุผล', 'กรุณาระบุเหตุผลในการตีกลับ/ไม่อนุมัติ', 'warning');
+  }
 
   const res = await callApi('processApproval12', {
     token: CURRENT_TOKEN,
-    id,
+    req12_id: id,
     decision,
-    comment: comment || ''
+    reason: reason || ''
   }, true, 'กำลังบันทึกผลการพิจารณา...');
 
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
@@ -1657,16 +1769,16 @@ async function batchApprove12UI() {
   if (!ids.length) return Swal.fire('กรุณาเลือกรายการ', 'ติ๊กเลือกคำขอที่ต้องการอนุมัติ', 'warning');
   const ok = await Swal.fire({ title: `อนุมัติคำขอ ${ids.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'อนุมัติทั้งหมด', cancelButtonText: 'ยกเลิก' });
   if (!ok.isConfirmed) return;
-  const res = await callApi('batchApprove12', { token: CURRENT_TOKEN, ids }, true, 'กำลังอนุมัติแบบกลุ่ม...');
+  const res = await callApi('batchApprove12', { token: CURRENT_TOKEN, req12_ids: ids }, true, 'กำลังอนุมัติแบบกลุ่ม...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   await loadDashboardData(true);
-  Swal.fire('สำเร็จ', `อนุมัติคำขอเรียบร้อย ${res.updated || ids.length} รายการ`, 'success');
+  Swal.fire('สำเร็จ', `อนุมัติคำขอเรียบร้อย ${res.count || res.updated || ids.length} รายการ`, 'success');
 }
 
 async function batchReject12UI() {
   const ids = getSelected12Ids();
   if (!ids.length) return Swal.fire('กรุณาเลือกรายการ', 'ติ๊กเลือกคำขอที่ต้องการไม่อนุมัติ', 'warning');
-  const { value: comment, isConfirmed } = await Swal.fire({
+  const { value: reason, isConfirmed } = await Swal.fire({
     title: `ไม่อนุมัติ ${ids.length} รายการ`,
     input: 'text',
     inputLabel: 'เหตุผลที่ไม่อนุมัติ',
@@ -1675,7 +1787,8 @@ async function batchReject12UI() {
     cancelButtonText: 'ยกเลิก'
   });
   if (!isConfirmed) return;
-  const res = await callApi('batchReject12', { token: CURRENT_TOKEN, ids, comment: comment || '' }, true, 'กำลังบันทึกผล...');
+  if (!String(reason || '').trim()) return Swal.fire('กรุณาระบุเหตุผล', '', 'warning');
+  const res = await callApi('batchReject12', { token: CURRENT_TOKEN, req12_ids: ids, reason: reason.trim() }, true, 'กำลังบันทึกผล...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   await loadDashboardData(true);
   Swal.fire('สำเร็จ', 'บันทึกผลเรียบร้อยแล้ว', 'success');
@@ -1966,6 +2079,7 @@ function buildKPCH4Html(it, forWord = false, itemIdx = 0) {
     ` : ''}
   `;
 }
+
 // ==================== KPCH 4 Submissions Management ====================
 function getFilteredSubs() {
   const kw = (document.getElementById('filterKeyword')?.value || '').trim().toLowerCase();
@@ -1975,7 +2089,7 @@ function getFilteredSubs() {
   const lv = document.getElementById('filterLevel')?.value || 'ALL';
 
   return DASHBOARD_DATA.submissions.filter(s => {
-    if (st !== 'ALL' && s.status !== st) return false;
+    if (!matchSubStatus(s.status, st)) return false;
     if (tc !== 'ALL' && s.teacher_id !== tc) return false;
     if (tm !== 'ALL' && s.term_year !== tm) return false;
     if (lv !== 'ALL' && s.level !== lv) return false;
@@ -2106,6 +2220,8 @@ function openDetailModal(id) {
   const isAdmin = role === 'ADMIN';
   const canApprove = role === 'TEACHER' || isAdmin;
   const canRegistrar = role === 'REGISTRAR' || isAdmin;
+  const isWaiting = it.status === 'WAIT_TEACHER' || it.status === 'PENDING_TEACHER';
+  const isWaitReg = it.status === 'APPROVED_FOR_REGISTRAR' || it.status === 'PENDING_REGISTRAR';
 
   const imgsHtml = (it.images || []).length
     ? (it.images || []).map(u => `<a href="${escHtml(getDriveDirectImgUrl(u))}" target="_blank" rel="noopener noreferrer"><img src="${escHtml(getDriveDirectImgUrl(u))}" class="thumb-preview" alt="photo"></a>`).join('')
@@ -2175,17 +2291,17 @@ function openDetailModal(id) {
       <i class="bi bi-file-earmark-check me-1"></i>บันทึก กพช. 4-6
     </button>
   `;
-  if (canApprove && it.status === 'PENDING_TEACHER') {
+  if (canApprove && isWaiting) {
     footer += `
-      <button type="button" class="btn btn-success btn-sm rounded-3" onclick="processSubSingle('${escHtml(it.id)}', 'APPROVED')">
+      <button type="button" class="btn btn-success btn-sm rounded-3" onclick="processSubSingle('${escHtml(it.id)}', 'APPROVE')">
         <i class="bi bi-check-lg me-1"></i>อนุมัติ
       </button>
-      <button type="button" class="btn btn-danger btn-sm rounded-3" onclick="processSubSingle('${escHtml(it.id)}', 'REJECTED')">
+      <button type="button" class="btn btn-danger btn-sm rounded-3" onclick="processSubSingle('${escHtml(it.id)}', 'REJECT')">
         <i class="bi bi-x-lg me-1"></i>ไม่ผ่าน
       </button>
     `;
   }
-  if (canRegistrar && it.status === 'PENDING_REGISTRAR') {
+  if (canRegistrar && isWaitReg) {
     footer += `<button type="button" class="btn btn-success btn-sm rounded-3" onclick="completeRegistrarSingle('${escHtml(it.id)}')">
       <i class="bi bi-award me-1"></i>บันทึกชั่วโมงลงทะเบียน
     </button>`;
@@ -2267,21 +2383,24 @@ async function printBatchKPCH4() {
 }
 
 async function processSubSingle(id, decision) {
-  const { value: comment, isConfirmed } = await Swal.fire({
-    title: decision === 'APPROVED' ? 'อนุมัติหลักฐาน กพช. 4' : 'ไม่ผ่าน / ส่งแก้ไข',
+  const { value: reason, isConfirmed } = await Swal.fire({
+    title: decision === 'APPROVE' ? 'อนุมัติหลักฐาน กพช. 4' : 'ไม่ผ่าน / ส่งแก้ไข',
     input: 'text',
-    inputLabel: decision === 'APPROVED' ? 'ความเห็นเพิ่มเติม (ถ้ามี)' : 'ระบุเหตุผล / สิ่งที่ต้องแก้ไข',
+    inputLabel: decision === 'APPROVE' ? 'ความเห็นเพิ่มเติม (ถ้ามี)' : 'ระบุเหตุผล / สิ่งที่ต้องแก้ไข',
     showCancelButton: true,
     confirmButtonText: 'ยืนยัน',
     cancelButtonText: 'ยกเลิก'
   });
   if (!isConfirmed) return;
+  if (decision === 'REJECT' && !String(reason || '').trim()) {
+    return Swal.fire('กรุณาระบุเหตุผล', 'กรุณาระบุเหตุผลในการตีกลับ/ส่งแก้ไข', 'warning');
+  }
 
   const res = await callApi('processApproval', {
     token: CURRENT_TOKEN,
-    id,
+    req_id: id,
     decision,
-    comment: comment || ''
+    reason: reason || ''
   }, true, 'กำลังบันทึกผลการตรวจ...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   bootstrap.Modal.getOrCreateInstance(document.getElementById('detailModal')).hide();
@@ -2294,16 +2413,16 @@ async function batchApproveSubsUI() {
   if (!ids.length) return Swal.fire('กรุณาเลือกรายการ', 'ติ๊กเลือกรายการที่ต้องการอนุมัติ', 'warning');
   const ok = await Swal.fire({ title: `อนุมัติหลักฐาน ${ids.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'อนุมัติทั้งหมด', cancelButtonText: 'ยกเลิก' });
   if (!ok.isConfirmed) return;
-  const res = await callApi('batchApproveSubmissions', { token: CURRENT_TOKEN, ids }, true, 'กำลังอนุมัติ...');
+  const res = await callApi('batchApproveSubmissions', { token: CURRENT_TOKEN, req_ids: ids }, true, 'กำลังอนุมัติ...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   await loadDashboardData(true);
-  Swal.fire('สำเร็จ', `อนุมัติเรียบร้อย ${res.updated || ids.length} รายการ`, 'success');
+  Swal.fire('สำเร็จ', `อนุมัติเรียบร้อย ${res.count || res.updated || ids.length} รายการ`, 'success');
 }
 
 async function batchRejectSubsUI() {
   const ids = getSelectedSubIds();
   if (!ids.length) return Swal.fire('กรุณาเลือกรายการ', 'ติ๊กเลือกรายการที่ต้องการส่งกลับแก้ไข', 'warning');
-  const { value: comment, isConfirmed } = await Swal.fire({
+  const { value: reason, isConfirmed } = await Swal.fire({
     title: `ไม่ผ่าน ${ids.length} รายการ`,
     input: 'text',
     inputLabel: 'ระบุเหตุผล',
@@ -2312,7 +2431,8 @@ async function batchRejectSubsUI() {
     cancelButtonText: 'ยกเลิก'
   });
   if (!isConfirmed) return;
-  const res = await callApi('batchRejectSubmissions', { token: CURRENT_TOKEN, ids, comment: comment || '' }, true, 'กำลังบันทึก...');
+  if (!String(reason || '').trim()) return Swal.fire('กรุณาระบุเหตุผล', '', 'warning');
+  const res = await callApi('batchRejectSubmissions', { token: CURRENT_TOKEN, req_ids: ids, reason: reason.trim() }, true, 'กำลังบันทึก...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   await loadDashboardData(true);
   Swal.fire('สำเร็จ', 'บันทึกผลเรียบร้อยแล้ว', 'success');
@@ -2321,7 +2441,7 @@ async function batchRejectSubsUI() {
 async function completeRegistrarSingle(id) {
   const ok = await Swal.fire({ title: 'ยืนยันบันทึกชั่วโมงลงทะเบียน?', icon: 'question', showCancelButton: true, confirmButtonText: 'บันทึกทะเบียน', cancelButtonText: 'ยกเลิก' });
   if (!ok.isConfirmed) return;
-  const res = await callApi('markRegistrarCompleted', { token: CURRENT_TOKEN, ids: [id] }, true, 'กำลังบันทึกทะเบียน...');
+  const res = await callApi('markRegistrarCompleted', { token: CURRENT_TOKEN, req_ids: [id] }, true, 'กำลังบันทึกทะเบียน...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   bootstrap.Modal.getOrCreateInstance(document.getElementById('detailModal')).hide();
   await loadDashboardData(true);
@@ -2333,10 +2453,10 @@ async function batchCompleteRegistrarUI() {
   if (!ids.length) return Swal.fire('กรุณาเลือกรายการ', 'ติ๊กเลือกรายการที่ต้องการบันทึกทะเบียน', 'warning');
   const ok = await Swal.fire({ title: `บันทึกทะเบียน ${ids.length} รายการ?`, icon: 'question', showCancelButton: true, confirmButtonText: 'บันทึกทั้งหมด', cancelButtonText: 'ยกเลิก' });
   if (!ok.isConfirmed) return;
-  const res = await callApi('markRegistrarCompleted', { token: CURRENT_TOKEN, ids }, true, 'กำลังบันทึกทะเบียน...');
+  const res = await callApi('markRegistrarCompleted', { token: CURRENT_TOKEN, req_ids: ids }, true, 'กำลังบันทึกทะเบียน...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   await loadDashboardData(true);
-  Swal.fire('สำเร็จ', `บันทึกทะเบียนเรียบร้อย ${res.updated || ids.length} รายการ`, 'success');
+  Swal.fire('สำเร็จ', `บันทึกทะเบียนเรียบร้อย ${res.count || res.updated || ids.length} รายการ`, 'success');
 }
 
 function exportRegistrarCSV() {
@@ -2531,39 +2651,43 @@ function renderAdminPanels() {
   // Categories
   const catBody = document.getElementById('catTableBody');
   if (catBody) {
-    catBody.innerHTML = (DASHBOARD_DATA.categories || []).map(c => `
-      <tr>
-        <td class="fw-semibold">${escHtml(c.name)}</td>
-        <td>${c.is_active !== false ? '<span class="badge bg-success">เปิดใช้</span>' : '<span class="badge bg-secondary">ปิด</span>'}</td>
+    catBody.innerHTML = (DASHBOARD_DATA.categories || []).map(c => {
+      const cid = c.cat_id || c.id || '';
+      const cname = c.cat_name || c.name || '';
+      const active = c.status ? c.status === 'ACTIVE' : c.is_active !== false;
+      return `<tr>
+        <td class="fw-semibold">${escHtml(cname)}</td>
+        <td>${active ? '<span class="badge bg-success">เปิดใช้</span>' : '<span class="badge bg-secondary">ปิด</span>'}</td>
         <td class="text-end text-nowrap">
-          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleCategoryUI('${escHtml(c.id)}', ${c.is_active === false})">สลับสถานะ</button>
-          <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteCategoryUI('${escHtml(c.id)}')">ลบ</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleCategoryUI('${escHtml(cid)}', ${!active})">สลับสถานะ</button>
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteCategoryUI('${escHtml(cid)}')">ลบ</button>
         </td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
   }
 
   // Users
   const uBody = document.getElementById('usersTableBody');
   if (uBody) {
-    uBody.innerHTML = (DASHBOARD_DATA.users || []).map(u => `
-      <tr>
+    uBody.innerHTML = (DASHBOARD_DATA.users || []).map(u => {
+      const active = u.status ? u.status === 'ACTIVE' : u.is_active !== false;
+      return `<tr>
         <td class="fw-semibold">${escHtml(u.username)}</td>
         <td>${escHtml(u.full_name)}</td>
         <td><span class="badge bg-indigo-soft">${escHtml(u.role)}</span></td>
         <td>${escHtml(u.group_name || '-')}</td>
-        <td>${u.is_active !== false ? '<span class="badge bg-success">ใช้งาน</span>' : '<span class="badge bg-secondary">ปิด</span>'}</td>
+        <td>${active ? '<span class="badge bg-success">ใช้งาน</span>' : '<span class="badge bg-secondary">ปิด</span>'}</td>
         <td class="text-end">
           <button type="button" class="btn btn-outline-primary btn-sm" onclick="openUserModal('${escHtml(u.user_id)}')">แก้ไข</button>
         </td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
   }
 
   // Announcement & Google Docs
   const annInput = document.getElementById('annEditInput');
   if (annInput && !annInput.matches(':focus')) {
-    annInput.value = document.getElementById('annDashText')?.textContent || '';
+    annInput.value = extractAnnouncementText(DASHBOARD_DATA.announcement) || document.getElementById('annDashText')?.textContent || '';
   }
   const tpl = DASHBOARD_DATA.doc_templates_admin;
   if (tpl) {
@@ -2592,10 +2716,10 @@ function renderAdminPanels() {
   if (lBody) {
     lBody.innerHTML = (DASHBOARD_DATA.logs || []).slice(0, 120).map(l => `
       <tr>
-        <td class="text-nowrap">${escHtml(l.timestamp)}</td>
-        <td>${escHtml(l.actor)}</td>
-        <td><span class="badge bg-light text-dark border">${escHtml(l.action)}</span></td>
-        <td>${escHtml(l.detail)}</td>
+        <td class="text-nowrap">${escHtml(l.timestamp || l.created_at || '-')}</td>
+        <td>${escHtml(l.actor || l.actor_name || '-')}</td>
+        <td><span class="badge bg-light text-dark border">${escHtml(l.action || '-')}</span></td>
+        <td>${escHtml(l.detail || '-')}</td>
       </tr>
     `).join('');
   }
@@ -2625,8 +2749,8 @@ function renderAdminPanels() {
         <td>${escHtml(x.activity_name)}</td>
         <td>${escHtml(x.deleted_by || '-')}</td>
         <td class="text-end text-nowrap">
-          <button type="button" class="btn btn-outline-success btn-sm" onclick="restoreTrashUI('sub', '${escHtml(x.id)}')">กู้คืน</button>
-          <button type="button" class="btn btn-outline-danger btn-sm" onclick="permDeleteTrashUI('sub', '${escHtml(x.id)}')">ลบถาวร</button>
+          <button type="button" class="btn btn-outline-success btn-sm" onclick="restoreTrashUI('SUB', '${escHtml(x.id)}')">กู้คืน</button>
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="permDeleteTrashUI('SUB', '${escHtml(x.id)}')">ลบถาวร</button>
         </td>
       </tr>
     `).join('') || '<tr><td colspan="5" class="text-center text-muted py-3">ถังขยะว่างเปล่า</td></tr>';
@@ -2636,7 +2760,7 @@ function renderAdminPanels() {
 async function addCategoryUI() {
   const name = document.getElementById('newCatName').value.trim();
   if (!name) return;
-  const res = await callApi('saveCategory', { token: CURRENT_TOKEN, category: { name, is_active: true } }, true);
+  const res = await callApi('saveCategoryAdmin', { token: CURRENT_TOKEN, category_data: { cat_name: name, status: 'ACTIVE' } }, true);
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   document.getElementById('newCatName').value = '';
   await loadDashboardData(true);
@@ -2644,9 +2768,19 @@ async function addCategoryUI() {
 }
 
 async function toggleCategoryUI(id, active) {
-  const cat = (DASHBOARD_DATA.categories || []).find(c => c.id === id);
+  const cat = (DASHBOARD_DATA.categories || []).find(c => (c.cat_id || c.id) === id);
   if (!cat) return;
-  const res = await callApi('saveCategory', { token: CURRENT_TOKEN, category: { id, name: cat.name, is_active: active } }, true);
+  const res = await callApi('saveCategoryAdmin', {
+    token: CURRENT_TOKEN,
+    category_data: {
+      cat_id: id,
+      cat_name: cat.cat_name || cat.name,
+      default_project: cat.default_project || '',
+      default_hours: cat.default_hours || 25,
+      default_rationale: cat.default_rationale || '',
+      status: active ? 'ACTIVE' : 'INACTIVE'
+    }
+  }, true);
   if (res.success) {
     await loadDashboardData(true);
     loadPublicData();
@@ -2656,7 +2790,7 @@ async function toggleCategoryUI(id, active) {
 async function deleteCategoryUI(id) {
   const ok = await Swal.fire({ title: 'ยืนยันลบประเภทกิจกรรม?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ลบ', cancelButtonText: 'ยกเลิก' });
   if (!ok.isConfirmed) return;
-  const res = await callApi('deleteCategory', { token: CURRENT_TOKEN, id }, true);
+  const res = await callApi('deleteCategoryAdmin', { token: CURRENT_TOKEN, cat_id: id }, true);
   if (res.success) {
     await loadDashboardData(true);
     loadPublicData();
@@ -2672,7 +2806,7 @@ function openUserModal(userId = '') {
   document.getElementById('u_fullname').value = u ? u.full_name : '';
   document.getElementById('u_role').value = u ? u.role : 'TEACHER';
   document.getElementById('u_group').value = u ? (u.group_name || '') : '';
-  document.getElementById('u_active').checked = u ? u.is_active !== false : true;
+  document.getElementById('u_active').checked = u ? (u.status ? u.status === 'ACTIVE' : u.is_active !== false) : true;
   bootstrap.Modal.getOrCreateInstance(document.getElementById('userModal')).show();
 }
 
@@ -2681,13 +2815,13 @@ async function handleSaveUser(e) {
   const payload = {
     user_id: document.getElementById('u_id').value,
     username: document.getElementById('u_username').value.trim(),
-    password: document.getElementById('u_password').value,
+    new_password: document.getElementById('u_password').value,
     full_name: document.getElementById('u_fullname').value.trim(),
     role: document.getElementById('u_role').value,
     group_name: document.getElementById('u_group').value.trim(),
-    is_active: document.getElementById('u_active').checked
+    status: document.getElementById('u_active').checked ? 'ACTIVE' : 'INACTIVE'
   };
-  const res = await callApi('saveUser', { token: CURRENT_TOKEN, user: payload }, true, 'กำลังบันทึกผู้ใช้...');
+  const res = await callApi('saveUserAdmin', { token: CURRENT_TOKEN, user_data: payload }, true, 'กำลังบันทึกผู้ใช้...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   bootstrap.Modal.getOrCreateInstance(document.getElementById('userModal')).hide();
   await loadDashboardData(true);
@@ -2697,7 +2831,10 @@ async function handleSaveUser(e) {
 
 async function saveAnnouncementUI() {
   const text = document.getElementById('annEditInput').value.trim();
-  const res = await callApi('saveAnnouncement', { token: CURRENT_TOKEN, announcement: text }, true, 'กำลังบันทึกประกาศ...');
+  const res = await callApi('saveAnnouncement', {
+    token: CURRENT_TOKEN,
+    announcement: { visible: !!text, badge: '', content: text }
+  }, true, 'กำลังบันทึกประกาศ...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   await loadDashboardData(true);
   Swal.fire('สำเร็จ', 'อัปเดตข้อความประกาศเรียบร้อยแล้ว', 'success');
@@ -2730,7 +2867,7 @@ async function saveMaintenanceUI() {
 async function softDelete12UI(id) {
   const ok = await Swal.fire({ title: 'ย้ายคำขอ กพช. 1-2 ลงถังขยะ?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ย้ายลงถังขยะ', cancelButtonText: 'ยกเลิก' });
   if (!ok.isConfirmed) return;
-  const res = await callApi('softDelete12', { token: CURRENT_TOKEN, id }, true);
+  const res = await callApi('deleteApprovals12', { token: CURRENT_TOKEN, req12_ids: [id] }, true);
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   bootstrap.Modal.getOrCreateInstance(document.getElementById('detail12Modal')).hide();
   await loadDashboardData(true);
@@ -2739,15 +2876,14 @@ async function softDelete12UI(id) {
 async function softDeleteSubUI(id) {
   const ok = await Swal.fire({ title: 'ย้ายหลักฐาน กพช. 4 ลงถังขยะ?', icon: 'warning', showCancelButton: true, confirmButtonText: 'ย้ายลงถังขยะ', cancelButtonText: 'ยกเลิก' });
   if (!ok.isConfirmed) return;
-  const res = await callApi('softDeleteSubmission', { token: CURRENT_TOKEN, id }, true);
+  const res = await callApi('deleteSubmissions', { token: CURRENT_TOKEN, req_ids: [id] }, true);
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   bootstrap.Modal.getOrCreateInstance(document.getElementById('detailModal')).hide();
   await loadDashboardData(true);
 }
 
 async function restoreTrashUI(type, id) {
-  const action = type === '12' ? 'restoreTrash12' : 'restoreTrashSubmission';
-  const res = await callApi(action, { token: CURRENT_TOKEN, id }, true, 'กำลังกู้คืนข้อมูล...');
+  const res = await callApi('restoreTrash', { token: CURRENT_TOKEN, trash_type: type === '12' ? '12' : 'SUB', item_id: id }, true, 'กำลังกู้คืนข้อมูล...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   await loadDashboardData(true);
   Swal.fire('สำเร็จ', 'กู้คืนข้อมูลเรียบร้อยแล้ว', 'success');
@@ -2756,8 +2892,7 @@ async function restoreTrashUI(type, id) {
 async function permDeleteTrashUI(type, id) {
   const ok = await Swal.fire({ title: 'ลบข้อมูลถาวร?', text: 'ไม่สามารถกู้คืนได้อีก', icon: 'error', showCancelButton: true, confirmButtonText: 'ลบถาวร', cancelButtonText: 'ยกเลิก' });
   if (!ok.isConfirmed) return;
-  const action = type === '12' ? 'permanentDelete12' : 'permanentDeleteSubmission';
-  const res = await callApi(action, { token: CURRENT_TOKEN, id }, true, 'กำลังลบถาวร...');
+  const res = await callApi('purgeTrash', { token: CURRENT_TOKEN, trash_type: type === '12' ? '12' : 'SUB', item_id: id }, true, 'กำลังลบถาวร...');
   if (!res.success) return Swal.fire('ไม่สำเร็จ', res.message || '', 'error');
   await loadDashboardData(true);
 }
@@ -2770,7 +2905,7 @@ async function initApp() {
   await loadPublicData();
 
   if (CURRENT_TOKEN) {
-    const res = await callApi('getDashboardData', { token: CURRENT_TOKEN }, false);
+    const res = await callApi('getDashboard', { token: CURRENT_TOKEN }, false);
     if (res && res.success) {
       CURRENT_USER = res.user;
       await enterDashboardMode();
