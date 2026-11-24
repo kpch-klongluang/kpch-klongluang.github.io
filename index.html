@@ -2,1044 +2,1349 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>ระบบ กพช. ออนไลน์ สกร.คลองหลวง</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ระบบ กพช. ออนไลน์ | สกร.ระดับอำเภอคลองหลวง</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20261123">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="stylesheet" href="style.css?v=20261124">
 </head>
 <body>
 
   <!-- Loading Overlay -->
   <div id="loadingOverlay" class="no-print">
-    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
-    <div class="mt-3 fw-bold text-primary" id="loadingText">กำลังดำเนินการ...</div>
+    <div class="bg-white rounded-4 p-4 text-center shadow-lg" style="min-width: 240px;">
+      <div class="spinner-border text-primary mb-2" role="status"></div>
+      <div id="loadingText" class="fw-semibold text-dark small">กำลังโหลดข้อมูล...</div>
+    </div>
   </div>
 
-  <!-- Maintenance Mode Overlay (แสดงพร้อมกันทุกหน้าจอยกเว้น Admin) -->
+  <!-- Maintenance Overlay -->
   <div id="maintenanceOverlay" class="no-print" style="display: none;">
     <div class="maint-card">
       <div class="maint-icon-wrap">
         <i class="bi bi-tools"></i>
       </div>
-      <span class="badge bg-warning bg-opacity-25 text-dark rounded-pill px-3 py-2 mb-2 fw-semibold">
-        ระบบ กพช. ออนไลน์ สกร.คลองหลวง
-      </span>
-      <h4 class="fw-bold text-dark mb-2" id="maintTitle">ระบบกำลังปิดปรับปรุงชั่วคราว</h4>
-      <p class="text-muted small mb-3" id="maintMessage" style="white-space: pre-line;">
-        ขออภัยในความไม่สะดวก ขณะนี้ผู้ดูแลระบบกำลังปรับปรุงข้อมูลและระบบ กรุณากลับมาใช้งานใหม่ภายหลัง
+      <h4 id="maintOverlayTitle" class="fw-bold text-dark mb-2">ระบบอยู่ระหว่างการปรับปรุงชั่วคราว</h4>
+      <p id="maintOverlayMessage" class="text-muted mb-3">
+        ขออภัยในความไม่สะดวก ระบบกำลังอัปเดตข้อมูลและประสิทธิภาพ กรุณากลับมาใช้งานใหม่อีกครั้ง
       </p>
-      <div id="maintEtaWrap" class="alert alert-info py-2 px-3 rounded-3 small fw-semibold mb-3 d-none">
-        <i class="bi bi-clock-history me-1"></i>คาดว่าจะเปิดใช้งาน: <span id="maintEtaText"></span>
+      <div class="bg-light border rounded-3 px-3 py-2 small text-secondary mb-4">
+        <i class="bi bi-clock me-1"></i>คาดว่าจะเปิดให้บริการ: <strong id="maintOverlayEta">เร็วๆ นี้</strong>
       </div>
-      <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
-        <button type="button" class="btn btn-primary rounded-pill px-4 fw-semibold" onclick="checkSystemStatusNow(true)">
+      <div class="d-flex flex-wrap gap-2 justify-content-center">
+        <button type="button" class="btn btn-outline-primary rounded-3 px-3" onclick="checkSystemStatusNow(true)">
           <i class="bi bi-arrow-clockwise me-1"></i>ตรวจสอบสถานะอีกครั้ง
         </button>
-        <button type="button" class="btn btn-outline-secondary rounded-pill px-3" onclick="openModalById('loginModal')">
-          <i class="bi bi-shield-lock me-1"></i>เข้าสู่ระบบ Admin
+        <button type="button" class="btn btn-dark rounded-3 px-3" onclick="openLoginModal()">
+          <i class="bi bi-shield-lock me-1"></i>ผู้ดูแลระบบเข้าสู่ระบบ
         </button>
       </div>
-      <div class="small text-muted mt-3" id="maintUpdatedText"></div>
     </div>
   </div>
 
-  <!-- App Shell: Left Sidebar (Desktop) + Main Content -->
-  <div class="app-shell">
+  <!-- Main App Shell -->
+  <div id="appShell" class="app-shell no-print">
 
-    <!-- ==================== Left Organization Sidebar (Desktop >= 992px) ==================== -->
-    <aside id="appSidebar" class="org-sidebar no-print">
+    <!-- Desktop Left Sidebar -->
+    <aside id="appSidebar" class="org-sidebar">
       <div class="org-sidebar-header">
         <div class="org-brand-icon">
           <i class="bi bi-mortarboard-fill"></i>
         </div>
-        <div style="min-width: 0;">
-          <div class="fw-bold text-white text-truncate" style="font-size: 0.98rem;">ระบบ กพช. ออนไลน์</div>
-          <div class="text-white-50 text-truncate" style="font-size: 0.76rem;">สกร.ระดับอำเภอคลองหลวง</div>
+        <div class="min-w-0">
+          <div class="fw-bold text-white lh-sm text-truncate">ระบบ กพช. ออนไลน์</div>
+          <div class="small text-white-50 text-truncate" style="font-size: 0.75rem;">สกร.ระดับอำเภอคลองหลวง</div>
         </div>
       </div>
 
-      <div class="org-sidebar-nav">
-        <!-- เมนูสำหรับนักศึกษา (Public) -->
+      <nav class="org-sidebar-nav">
+        <!-- Public Menu -->
         <div id="sidebarPublicNav">
-          <div class="org-nav-group-label">เมนูสำหรับนักศึกษา</div>
-          <button type="button" class="org-nav-btn active" id="sbBtnPre12" onclick="switchPublicTab('pre12')">
-            <span><i class="bi bi-file-earmark-check me-2"></i>1. ขออนุมัติ (กพช.1-2)</span>
+          <div class="org-nav-group-label">สำหรับนักศึกษา / ผู้ยื่น</div>
+          <button type="button" id="sbBtnPre12" class="org-nav-btn active" onclick="switchPublicTab('pre12')">
+            <span><i class="bi bi-file-earmark-plus me-2"></i>ขออนุมัติ (กพช. 1-2)</span>
           </button>
-          <button type="button" class="org-nav-btn" id="sbBtnSubmit" onclick="switchPublicTab('submit')">
-            <span><i class="bi bi-camera me-2"></i>2. ส่งรายงานผล (กพช.4)</span>
+          <button type="button" id="sbBtnSubmit" class="org-nav-btn" onclick="switchPublicTab('submit')">
+            <span><i class="bi bi-cloud-arrow-up me-2"></i>ส่งหลักฐาน (กพช. 4)</span>
           </button>
-          <button type="button" class="org-nav-btn" id="sbBtnStatus" onclick="switchPublicTab('status')">
-            <span><i class="bi bi-search me-2"></i>3. เช็กสถานะ / พิมพ์</span>
-          </button>
-        </div>
-
-        <!-- เมนูสำหรับครูประจำกลุ่ม (TEACHER) -->
-        <div id="sidebarTeacherNav" class="d-none">
-          <div class="org-nav-group-label">เมนูครูประจำกลุ่ม</div>
-          <button type="button" class="org-nav-btn active" data-teacher-tab="sub" onclick="switchTeacherTab('sub', this)">
-            <span><i class="bi bi-images me-2"></i>ตรวจผล กพช. 4-6</span>
-            <span class="badge bg-danger rounded-pill d-none" id="sbBadgeWaitSub">0</span>
-          </button>
-          <button type="button" class="org-nav-btn" data-teacher-tab="req12" onclick="switchTeacherTab('req12', this)">
-            <span><i class="bi bi-clipboard-check me-2"></i>อนุมัติ 1-2 &amp; กพช.3</span>
-            <span class="badge bg-danger rounded-pill d-none" id="sbBadgeWait12">0</span>
+          <button type="button" id="sbBtnStatus" class="org-nav-btn" onclick="switchPublicTab('status')">
+            <span><i class="bi bi-search me-2"></i>เช็คสถานะ / แก้ไขข้อมูล</span>
           </button>
         </div>
 
-        <!-- เมนูสำหรับนายทะเบียน (REGISTRAR) -->
-        <div id="sidebarRegistrarNav" class="d-none">
-          <div class="org-nav-group-label">เมนูงานทะเบียน</div>
-          <button type="button" class="org-nav-btn active" onclick="loadDashboard()">
-            <span><i class="bi bi-journal-check me-2"></i>ทะเบียน กพช. 4-6</span>
+        <!-- Teacher Menu -->
+        <div id="sidebarTeacherNav" style="display: none;">
+          <div class="org-nav-group-label">สำหรับครูที่ปรึกษา</div>
+          <button type="button" class="org-nav-btn active" data-teacher-tab="subs" onclick="switchTeacherTab('subs')">
+            <span><i class="bi bi-journal-check me-2"></i>ตรวจหลักฐาน กพช. 4</span>
+            <span id="sbBadgeWaitSub" class="badge bg-warning text-dark rounded-pill">0</span>
+          </button>
+          <button type="button" class="org-nav-btn" data-teacher-tab="req12" onclick="switchTeacherTab('req12')">
+            <span><i class="bi bi-file-earmark-text me-2"></i>คำขออนุมัติ กพช. 1-2</span>
+            <span id="sbBadgeWait12" class="badge bg-info text-dark rounded-pill">0</span>
           </button>
         </div>
 
-        <!-- เมนูสำหรับ Admin -->
-        <div id="sidebarAdminNav" class="d-none">
-          <div class="org-nav-group-label">เมนูผู้ดูแลระบบ</div>
-          <button type="button" class="org-nav-btn active" data-admin-tab="subs" onclick="switchAdminTab('subs', this)">
-            <span><i class="bi bi-images me-2"></i>รายงานผล กพช. 4-6</span>
+        <!-- Registrar Menu -->
+        <div id="sidebarRegistrarNav" style="display: none;">
+          <div class="org-nav-group-label">สำหรับงานทะเบียน</div>
+          <button type="button" class="org-nav-btn active" onclick="loadDashboardData()">
+            <span><i class="bi bi-card-checklist me-2"></i>รอบันทึกชั่วโมง กพช.</span>
           </button>
-          <button type="button" class="org-nav-btn" data-admin-tab="req12" onclick="switchAdminTab('req12', this)">
-            <span><i class="bi bi-clipboard-check me-2"></i>คำขอ กพช. 1-2 &amp; 3</span>
+        </div>
+
+        <!-- Admin Menu -->
+        <div id="sidebarAdminNav" style="display: none;">
+          <div class="org-nav-group-label">ผู้ดูแลระบบ (ADMIN)</div>
+          <button type="button" class="org-nav-btn active" data-admin-tab="subs" onclick="switchAdminTab('subs')">
+            <span><i class="bi bi-journal-check me-2"></i>หลักฐาน กพช. 4</span>
           </button>
-          <button type="button" class="org-nav-btn" data-admin-tab="categories" onclick="switchAdminTab('categories', this)">
-            <span><i class="bi bi-tags me-2"></i>ประเภท กพช.</span>
+          <button type="button" class="org-nav-btn" data-admin-tab="req12" onclick="switchAdminTab('req12')">
+            <span><i class="bi bi-file-earmark-text me-2"></i>คำขอ กพช. 1-2</span>
           </button>
-          <button type="button" class="org-nav-btn" data-admin-tab="users" onclick="switchAdminTab('users', this)">
-            <span><i class="bi bi-people me-2"></i>จัดการบุคลากร</span>
+          <button type="button" class="org-nav-btn" data-admin-tab="categories" onclick="switchAdminTab('categories')">
+            <span><i class="bi bi-tags me-2"></i>ประเภทกิจกรรม</span>
           </button>
-          <button type="button" class="org-nav-btn" data-admin-tab="ann" onclick="switchAdminTab('ann', this)">
+          <button type="button" class="org-nav-btn" data-admin-tab="users" onclick="switchAdminTab('users')">
+            <span><i class="bi bi-people me-2"></i>จัดการผู้ใช้งาน</span>
+          </button>
+          <button type="button" class="org-nav-btn" data-admin-tab="ann" onclick="switchAdminTab('ann')">
             <span><i class="bi bi-megaphone me-2"></i>ประกาศ &amp; ฟอร์ม Docs</span>
           </button>
-          <button type="button" class="org-nav-btn" data-admin-tab="maint" onclick="switchAdminTab('maint', this)">
-            <span><i class="bi bi-tools me-2"></i>ปิดปรับปรุงระบบ</span>
-            <span class="badge bg-warning text-dark rounded-pill d-none" id="sbMaintDot">ON</span>
+          <button type="button" class="org-nav-btn" data-admin-tab="maint" onclick="switchAdminTab('maint')">
+            <span><i class="bi bi-tools me-2"></i>เปิด-ปิดปรับปรุงระบบ</span>
+            <span id="sbMaintDot" class="badge bg-danger rounded-pill" style="display: none;">ON</span>
           </button>
-          <button type="button" class="org-nav-btn" data-admin-tab="logs" onclick="switchAdminTab('logs', this)">
+          <button type="button" class="org-nav-btn" data-admin-tab="logs" onclick="switchAdminTab('logs')">
             <span><i class="bi bi-clock-history me-2"></i>ประวัติการใช้งาน</span>
           </button>
-          <button type="button" class="org-nav-btn" data-admin-tab="trash" onclick="switchAdminTab('trash', this)">
-            <span><i class="bi bi-trash3 me-2"></i>ถังขยะ</span>
-            <span class="badge bg-danger rounded-pill d-none" id="sbBadgeTrashCount">0</span>
+          <button type="button" class="org-nav-btn" data-admin-tab="trash" onclick="switchAdminTab('trash')">
+            <span><i class="bi bi-trash3 me-2"></i>ถังขยะ (กู้คืน)</span>
+            <span id="sbBadgeTrashCount" class="badge bg-secondary rounded-pill">0</span>
           </button>
         </div>
-      </div>
+      </nav>
 
-      <!-- Footer Sidebar -->
       <div class="org-sidebar-footer">
         <div id="sbGuestBox">
-          <div class="small text-white-50 mb-2">สำหรับครู นายทะเบียน และผู้ดูแลระบบ</div>
-          <button type="button" class="btn btn-primary w-100 rounded-pill fw-semibold btn-sm py-2" onclick="openModalById('loginModal')">
-            <i class="bi bi-box-arrow-in-right me-1"></i>เข้าสู่ระบบเจ้าหน้าที่
+          <button type="button" class="btn btn-light w-100 rounded-3 fw-semibold btn-sm py-2" onclick="openLoginModal()">
+            <i class="bi bi-box-arrow-in-right me-1"></i>เข้าสู่ระบบเจ้าหน้าที่ / ครู
           </button>
         </div>
-        <div id="sbUserBox" class="d-none">
+        <div id="sbUserBox" style="display: none;">
           <div class="d-flex align-items-center gap-2 mb-2">
-            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;">
-              <i class="bi bi-person-fill"></i>
+            <div class="rounded-circle bg-white bg-opacity-25 text-white d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;">
+              <i class="bi bi-person-badge"></i>
             </div>
-            <div style="min-width:0;">
-              <div class="fw-semibold text-white small text-truncate" id="sbUserName">-</div>
-              <div class="text-white-50 text-truncate" style="font-size: 0.74rem;" id="sbUserRole">-</div>
+            <div class="min-w-0">
+              <div id="sbUserName" class="fw-semibold text-white small text-truncate">-</div>
+              <div id="sbUserRole" class="text-white-50" style="font-size: 0.73rem;">-</div>
             </div>
           </div>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-outline-light btn-sm rounded-pill flex-fill" onclick="openModalById('changePassModal')">
-              <i class="bi bi-key me-1"></i>เปลี่ยนรหัส
+          <div class="d-flex gap-1">
+            <button type="button" class="btn btn-outline-light btn-sm flex-fill rounded-3" onclick="openChangePassModal()">
+              <i class="bi bi-key"></i> รหัสผ่าน
             </button>
-            <button type="button" class="btn btn-danger btn-sm rounded-pill px-3" onclick="handleLogout()">
-              <i class="bi bi-box-arrow-right"></i>
+            <button type="button" class="btn btn-danger btn-sm flex-fill rounded-3" onclick="logout()">
+              <i class="bi bi-box-arrow-right"></i> ออก
             </button>
           </div>
         </div>
       </div>
     </aside>
 
-    <!-- ==================== Main Content Area ==================== -->
+    <!-- Main Content Column -->
     <div class="app-main">
 
-      <!-- Mobile Topbar (< 992px) -->
-      <header class="mobile-topbar no-print">
-        <div class="d-flex align-items-center gap-2" style="min-width:0;">
-          <span class="bg-white text-primary rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width:32px;height:32px;">
-            <i class="bi bi-mortarboard-fill"></i>
-          </span>
-          <div style="min-width:0;">
-            <div class="fw-bold text-truncate" style="font-size:0.92rem;">กพช. ออนไลน์ สกร.คลองหลวง</div>
+      <!-- Mobile Topbar -->
+      <header class="mobile-topbar">
+        <div class="d-flex align-items-center gap-2 min-w-0">
+          <i class="bi bi-mortarboard-fill fs-5"></i>
+          <div class="min-w-0">
+            <div class="fw-bold small lh-sm text-truncate">ระบบ กพช. ออนไลน์</div>
+            <div class="text-white-50 text-truncate" style="font-size: 0.7rem;">สกร.ระดับอำเภอคลองหลวง</div>
           </div>
         </div>
-        <div class="d-flex align-items-center gap-1 flex-shrink-0" id="mobileUserArea">
-          <button type="button" class="btn btn-light btn-sm rounded-pill px-3 fw-bold text-primary shadow-sm" onclick="openModalById('loginModal')">
-            <i class="bi bi-box-arrow-in-right me-1"></i>เจ้าหน้าที่
+        <div id="mobileUserArea" class="flex-shrink-0"></div>
+      </header>
+
+      <!-- Desktop Topbar -->
+      <header class="org-topbar">
+        <div>
+          <h5 id="desktopPageTitle" class="fw-bold mb-0 text-dark">ยื่นขออนุมัติทำกิจกรรม (กพช. 1-2)</h5>
+          <div id="desktopPageSubtitle" class="small text-muted">กรอกข้อมูลล่วงหน้าก่อนเริ่มทำกิจกรรมพัฒนาคุณภาพชีวิต</div>
+        </div>
+        <div id="desktopTopRight" class="d-flex align-items-center gap-2"></div>
+      </header>
+
+      <!-- Content Area -->
+      <main class="org-content">
+
+        <!-- Admin Maintenance Warning Banner -->
+        <div id="adminMaintenanceBanner" class="alert alert-danger border-0 shadow-sm rounded-4 d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3" style="display: none;">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+            <div>
+              <strong>ขณะนี้เปิดโหมดปิดปรับปรุงระบบอยู่!</strong>
+              <span class="small d-block d-md-inline ms-md-1">ผู้ใช้งานทั่วไปและครูจะยังไม่สามารถเข้าใช้งานระบบได้</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-danger rounded-3" onclick="switchAdminTab('maint')">
+            ตั้งค่า / ปิดโหมดปรับปรุง
           </button>
         </div>
-      </header>
 
-      <!-- Desktop Sticky Topbar (>= 992px) -->
-      <header class="org-topbar no-print">
-        <div>
-          <h5 class="fw-bold text-dark mb-0" id="desktopPageTitle">ยื่นขออนุมัติ กพช. 1-2</h5>
-          <div class="small text-muted" id="desktopPageSubtitle">แบบลงทะเบียนและประเมินตนเองก่อนเริ่มจัดทำกิจกรรมพัฒนาคุณภาพชีวิต</div>
-        </div>
-        <div class="d-flex align-items-center gap-2" id="desktopTopRight">
-          <span class="badge bg-light text-secondary border rounded-pill px-3 py-2 fw-semibold">
-            <i class="bi bi-mortarboard me-1 text-primary"></i>พอร์ทัลนักศึกษา กพช.
-          </span>
-        </div>
-      </header>
+        <!-- ==================== PUBLIC SECTION ==================== -->
+        <section id="publicSection">
 
-      <!-- Content Wrapper -->
-      <div class="org-content no-print">
+          <!-- System Announcement -->
+          <div id="annPublicBox" class="ann-content-box mb-3 shadow-sm" style="display: none;">
+            <div class="fw-bold mb-1"><i class="bi bi-megaphone-fill me-2 text-warning"></i>ประกาศจากงานกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)</div>
+            <div id="annPublicText" class="small"></div>
+          </div>
 
-        <!-- แถบแจ้งเตือนสำหรับ Admin เมื่อเปิด Maintenance Mode อยู่ -->
-        <div id="adminMaintenanceBanner" class="alert alert-warning border-warning rounded-4 d-none mb-3 shadow-sm">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div>
-              <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>โหมดปิดปรับปรุงระบบกำลังเปิดใช้งาน!</strong>
-              <span class="small ms-1">นักศึกษา ครู และนายทะเบียนทุกคนจะเห็นหน้าปิดปรับปรุง (Admin ยังใช้งานได้ปกติ)</span>
+          <!-- 1. Public Pre-Approval 1-2 Form -->
+          <div id="publicPre12View">
+            <div class="cute-card p-3 p-md-4">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <div>
+                  <span class="step-badge bg-indigo-soft mb-1"><i class="bi bi-1-circle-fill"></i> ขั้นตอนที่ 1 : ขออนุมัติก่อนทำกิจกรรม</span>
+                  <h5 class="fw-bold mb-0">แบบยื่นคำขอทำกิจกรรมพัฒนาคุณภาพชีวิต (กพช. 1-2)</h5>
+                </div>
+              </div>
+
+              <div class="cute-progress-bar mb-4">
+                <div class="prog-step active"><i class="bi bi-pencil-square"></i> 1. ยื่นคำขอ กพช. 1-2</div>
+                <div class="prog-step"><i class="bi bi-person-check"></i> 2. ครูที่ปรึกษาอนุมัติ</div>
+                <div class="prog-step"><i class="bi bi-camera"></i> 3. ส่งหลักฐาน กพช. 4</div>
+                <div class="prog-step"><i class="bi bi-award"></i> 4. รับรองชั่วโมง กพช.</div>
+              </div>
+
+              <form id="pre12Form" onsubmit="handlePre12Submit(event)">
+                <!-- Step 1 -->
+                <div class="section-box">
+                  <div class="section-box-title">
+                    <span class="step-number-dot">1</span> ข้อมูลนักศึกษาและครูที่ปรึกษา
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label fw-semibold small">รหัสนักศึกษา (10 หลัก) <span class="text-danger">*</span></label>
+                      <input type="text" id="p12_student_id" class="form-control" maxlength="10" inputmode="numeric" placeholder="เช่น 6712345678" required>
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label fw-semibold small">ชื่อ-นามสกุล นักศึกษา <span class="text-danger">*</span></label>
+                      <input type="text" id="p12_student_name" class="form-control" placeholder="ระบุคำนำหน้า ชื่อ และนามสกุล" required>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label fw-semibold small">ระดับการศึกษา <span class="text-danger">*</span></label>
+                      <select id="p12_level" class="form-select" required>
+                        <option value="">-- เลือกระดับ --</option>
+                        <option value="ประถมศึกษา">ประถมศึกษา</option>
+                        <option value="มัธยมศึกษาตอนต้น">มัธยมศึกษาตอนต้น</option>
+                        <option value="มัธยมศึกษาตอนปลาย">มัธยมศึกษาตอนปลาย</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label fw-semibold small">ครูที่ปรึกษา <span class="text-danger">*</span></label>
+                      <select id="p12_teacher_id" class="form-select" required>
+                        <option value="">-- เลือกครูที่ปรึกษา --</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label fw-semibold small">กลุ่มเรียน / ศกร.ตำบล</label>
+                      <input type="text" id="p12_group_name" class="form-control" placeholder="เช่น ศกร.ตำบลคลองหนึ่ง">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="section-box">
+                  <div class="section-box-title">
+                    <span class="step-number-dot">2</span> รายละเอียดโครงการ / กิจกรรมที่ขออนุมัติ
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label fw-semibold small">ประเภทกิจกรรม กพช. <span class="text-danger">*</span></label>
+                      <select id="p12_category" class="form-select" required>
+                        <option value="">-- เลือกประเภทกิจกรรม --</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label fw-semibold small">ชื่อโครงการ / กิจกรรม <span class="text-danger">*</span></label>
+                      <input type="text" id="p12_activity_name" class="form-control" placeholder="ระบุชื่อโครงการหรือกิจกรรมที่ต้องการทำ" required>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label fw-semibold small">จำนวนชั่วโมงที่ขอ <span class="text-danger">*</span></label>
+                      <input type="number" id="p12_hours" class="form-control" min="1" max="200" placeholder="เช่น 20" required>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label fw-semibold small">บทบาทหน้าที่ในกิจกรรม</label>
+                      <input type="text" id="p12_role_note" class="form-control" list="roleSuggestions" placeholder="เช่น ผู้เรียน / ประธานโครงการ">
+                      <datalist id="roleSuggestions">
+                        <option value="ผู้เรียน / ผู้เข้าร่วมกิจกรรม">
+                        <option value="ประธานโครงการ">
+                        <option value="รองประธานโครงการ">
+                        <option value="เลขานุการโครงการ">
+                        <option value="กรรมการดำเนินงาน">
+                      </datalist>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label fw-semibold small">วันที่เริ่มกิจกรรม <span class="text-danger">*</span></label>
+                      <input type="date" id="p12_start_date" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label fw-semibold small">วันที่สิ้นสุด <span class="text-danger">*</span></label>
+                      <input type="date" id="p12_end_date" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label fw-semibold small">สถานที่จัดกิจกรรม <span class="text-danger">*</span></label>
+                      <input type="text" id="p12_location" class="form-control" placeholder="ระบุสถานที่จัดกิจกรรมโดยละเอียด" required>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label fw-semibold small">วัตถุประสงค์ / แผนการดำเนินงานโดยย่อ <span class="text-danger">*</span></label>
+                      <textarea id="p12_plan_detail" class="form-control" rows="3" placeholder="อธิบายวัตถุประสงค์และขั้นตอนการดำเนินกิจกรรม" required></textarea>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label fw-semibold small">ผลที่คาดว่าจะได้รับ</label>
+                      <textarea id="p12_expected_outcome" class="form-control" rows="2" placeholder="ระบุประโยชน์หรือผลที่คาดว่าจะได้รับจากกิจกรรม"></textarea>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Step 3: Student Online Signature -->
+                <div class="section-box">
+                  <div class="section-box-title">
+                    <span class="step-number-dot">3</span> ลายเซ็นนักศึกษาผู้ยื่นคำขอ <span class="text-danger">*</span>
+                  </div>
+                  <p class="small text-muted mb-2">
+                    กรุณาเซ็นชื่อด้วยนิ้วมือหรือเมาส์ในกรอบด้านล่าง (หรืออัปโหลดรูปถ่ายลายเซ็นบนกระดาษขาว) เพื่อให้นำไปแสดงบนเอกสาร กพช. 1-4 อัตโนมัติทุกเครื่อง
+                  </p>
+                  <div class="sig-pad-wrap">
+                    <canvas id="p12_sig_canvas" class="sig-pad-canvas"></canvas>
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
+                      <div id="p12_sig_status" class="small text-muted">ยังไม่ได้ลงลายเซ็น</div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <input type="file" id="p12_sig_upload" accept="image/*" class="d-none" onchange="handleSignatureImageUpload(this, 'p12_sig_canvas')">
+                        <label for="p12_sig_upload" class="btn btn-outline-primary btn-sm rounded-3 mb-0" style="cursor: pointer;">
+                          <i class="bi bi-image me-1"></i>อัปโหลดรูปลายเซ็น
+                        </label>
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-3" onclick="clearSignaturePad('p12_sig_canvas')">
+                          <i class="bi bi-eraser me-1"></i>ล้างลายเซ็น
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-grid d-md-flex justify-content-md-end">
+                  <button type="submit" class="btn btn-cute-submit px-4 py-2">
+                    <i class="bi bi-send-check me-2"></i>ยื่นคำขออนุมัติทำกิจกรรม (กพช. 1-2)
+                  </button>
+                </div>
+              </form>
             </div>
-            <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="quickDisableMaintenance()">
-              <i class="bi bi-power me-1"></i>เปิดใช้งานระบบตามปกติ
+          </div>
+
+          <!-- 2. Public Submit KPCH 4 Form -->
+          <div id="publicSubmitView" style="display: none;">
+            <div class="cute-card p-3 p-md-4">
+              <span class="step-badge bg-indigo-soft mb-1"><i class="bi bi-2-circle-fill"></i> ขั้นตอนที่ 3 : ส่งผลหลังทำกิจกรรมเสร็จ</span>
+              <h5 class="fw-bold mb-3">ส่งหลักฐานผลการทำกิจกรรม (กพช. 4)</h5>
+
+              <!-- Eligibility Checker -->
+              <div class="section-box border-primary border-opacity-25">
+                <label class="form-label fw-bold text-primary small">
+                  <i class="bi bi-shield-check me-1"></i>ตรวจสอบสิทธิ์การส่ง กพช. 4 (ต้องผ่านอนุมัติ กพช. 1-2 ก่อน)
+                </label>
+                <div class="input-group">
+                  <input type="text" id="f_student_id" class="form-control" maxlength="10" inputmode="numeric" placeholder="กรอกรหัสนักศึกษา 10 หลัก">
+                  <button type="button" class="btn btn-primary px-3 fw-semibold" onclick="checkEligibilityUI()">
+                    <i class="bi bi-search me-1"></i>ตรวจสอบสิทธิ์
+                  </button>
+                </div>
+                <div id="eligibilityResultBox" class="mt-3" style="display: none;"></div>
+              </div>
+
+              <form id="submitForm" onsubmit="handleSubmitKPCH(event)">
+                <input type="hidden" id="f_ref_12_id">
+                <fieldset id="submitFormBody" disabled>
+                  <div class="section-box">
+                    <div class="section-box-title">
+                      <span class="step-number-dot">1</span> ข้อมูลอ้างอิงจากคำขอที่ได้รับอนุมัติ
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label fw-semibold small">ชื่อ-นามสกุล นักศึกษา</label>
+                        <input type="text" id="f_student_name" class="form-control" required>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold small">ระดับการศึกษา</label>
+                        <select id="f_level" class="form-select" required>
+                          <option value="">-- เลือก --</option>
+                          <option value="ประถมศึกษา">ประถมศึกษา</option>
+                          <option value="มัธยมศึกษาตอนต้น">มัธยมศึกษาตอนต้น</option>
+                          <option value="มัธยมศึกษาตอนปลาย">มัธยมศึกษาตอนปลาย</option>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold small">กลุ่มเรียน / ศกร.ตำบล</label>
+                        <input type="text" id="f_group_name" class="form-control">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-semibold small">ครูที่ปรึกษา</label>
+                        <select id="f_teacher_id" class="form-select" required>
+                          <option value="">-- เลือกครูที่ปรึกษา --</option>
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-semibold small">ประเภทกิจกรรม</label>
+                        <select id="f_category" class="form-select" required>
+                          <option value="">-- เลือกประเภท --</option>
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-semibold small">จำนวนชั่วโมงจริง</label>
+                        <input type="number" id="f_hours" class="form-control" min="1" max="200" required>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-semibold small">ชื่อโครงการ / กิจกรรม</label>
+                        <input type="text" id="f_activity_name" class="form-control" required>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold small">วันที่เริ่ม</label>
+                        <input type="date" id="f_start_date" class="form-control" required>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label fw-semibold small">วันที่สิ้นสุด</label>
+                        <input type="date" id="f_end_date" class="form-control" required>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label fw-semibold small">สถานที่จัดกิจกรรม</label>
+                        <input type="text" id="f_location" class="form-control" required>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="section-box">
+                    <div class="section-box-title">
+                      <span class="step-number-dot">2</span> สรุปผลการปฏิบัติกิจกรรม (สำหรับพิมพ์แบบ กพช. 4)
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-12">
+                        <label class="form-label fw-semibold small">1. การวางแผนและการเตรียมการ</label>
+                        <textarea id="f_k4_plan" class="form-control" rows="2" placeholder="อธิบายการเตรียมความพร้อมก่อนเริ่มกิจกรรม"></textarea>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label fw-semibold small">2. ขั้นตอนการดำเนินงาน / ผลที่เกิดขึ้นจริง <span class="text-danger">*</span></label>
+                        <textarea id="f_detail" class="form-control" rows="3" placeholder="บรรยายขั้นตอนการปฏิบัติกิจกรรมและผลสำเร็จ" required></textarea>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label fw-semibold small">3. สิ่งที่ได้เรียนรู้จากการปฏิบัติกิจกรรม</label>
+                        <textarea id="f_k4_learning" class="form-control" rows="2" placeholder="องค์ความรู้ ทักษะ หรือประสบการณ์ที่ได้รับ"></textarea>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-semibold small">4. ปัญหา อุปสรรค และแนวทางแก้ไข</label>
+                        <textarea id="f_k4_problem" class="form-control" rows="2" placeholder="ระบุปัญหาที่พบและวิธีแก้ไข (ถ้าไม่มีใส่ ไม่มี)"></textarea>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-semibold small">5. การนำไปประยุกต์ใช้ในชีวิตประจำวัน</label>
+                        <textarea id="f_k4_apply" class="form-control" rows="2" placeholder="ระบุแนวทางต่อยอดหรือประยุกต์ใช้"></textarea>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="section-box">
+                    <div class="section-box-title">
+                      <span class="step-number-dot">3</span> แนบภาพถ่ายขณะทำกิจกรรม (ไม่เกิน 4 รูป) <span class="text-danger">*</span>
+                    </div>
+                    <input type="file" id="f_images" class="form-control" accept="image/*" multiple onchange="handleImagesSelect(this, 'imagePreviewBox', 'submit')">
+                    <div class="form-text">ระบบจะย่อขนาดภาพให้อัตโนมัติเพื่อให้ส่งได้รวดเร็วบนมือถือ</div>
+                    <div id="imagePreviewBox" class="d-flex flex-wrap gap-2 mt-3"></div>
+                  </div>
+
+                  <div class="d-grid d-md-flex justify-content-md-end">
+                    <button type="submit" class="btn btn-cute-submit px-4 py-2">
+                      <i class="bi bi-cloud-check me-2"></i>ส่งหลักฐานผลการทำกิจกรรม (กพช. 4)
+                    </button>
+                  </div>
+                </fieldset>
+              </form>
+            </div>
+          </div>
+
+          <!-- 3. Public Status Search & Edit View -->
+          <div id="publicStatusView" style="display: none;">
+            <div class="cute-card p-3 p-md-4 mb-3">
+              <h5 class="fw-bold mb-1"><i class="bi bi-search me-2 text-primary"></i>ตรวจสอบสถานะ / แก้ไขข้อมูล / พิมพ์เอกสาร</h5>
+              <p class="small text-muted mb-3">
+                สามารถค้นหาได้จาก <strong>รหัสนักศึกษา 10 หลัก</strong>, <strong>ชื่อ-นามสกุล</strong> (อย่างน้อย 3 ตัวอักษร) หรือ <strong>เลขที่คำขอ</strong> (เช่น REQ12-... / KPCH-...)
+              </p>
+              <div class="input-group input-group-lg">
+                <input type="text" id="searchStudentId" class="form-control fs-6" placeholder="พิมพ์รหัสนักศึกษา / ชื่อ-นามสกุล / เลขที่คำขอ" onkeydown="if(event.key==='Enter'){event.preventDefault();searchMyStatus();}">
+                <button type="button" class="btn btn-primary px-4 fs-6 fw-semibold" onclick="searchMyStatus()">
+                  <i class="bi bi-search me-1"></i> ค้นหา
+                </button>
+              </div>
+            </div>
+            <div id="statusResultArea"></div>
+          </div>
+
+        </section>
+        <!-- ==================== DASHBOARD SECTION (STAFF) ==================== -->
+        <section id="dashboardSection" style="display: none;">
+
+          <!-- Mobile Staff Navigation Grids -->
+          <div id="teacherMobileTabs" class="mobile-staff-grid mb-3 d-lg-none" style="display: none;">
+            <button type="button" class="mobile-staff-tab-btn active" data-teacher-tab="subs" onclick="switchTeacherTab('subs')">
+              <i class="bi bi-journal-check"></i> กพช. 4 <span id="badgeWaitSub" class="badge bg-warning text-dark">0</span>
+            </button>
+            <button type="button" class="mobile-staff-tab-btn" data-teacher-tab="req12" onclick="switchTeacherTab('req12')">
+              <i class="bi bi-file-earmark-text"></i> กพช. 1-2 <span id="badgeWait12" class="badge bg-info text-dark">0</span>
             </button>
           </div>
-        </div>
 
-        <!-- ==================== ส่วนหน้าแรก (นักศึกษา) ==================== -->
-        <div id="publicSection">
-
-          <div id="announcementBox" class="mx-auto mb-4 p-3 p-md-4 shadow-sm" style="max-width: 880px; background: linear-gradient(135deg, #fffbeb 0%, #fdf2f8 100%); border: 2px solid #ffffff; border-radius: 20px;">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-              <span class="badge rounded-pill px-3 py-2 text-white" style="background: linear-gradient(90deg, #f59e0b, #ec4899); font-size: 0.88rem;">
-                📢 ข่าวประกาศ / ประชาสัมพันธ์
-              </span>
-              <span class="small text-muted fw-semibold" id="annBadgeText">กำลังโหลดประกาศ...</span>
-            </div>
-            <div class="text-dark ann-content-box" id="annContentText"></div>
-            <div id="annPdfArea" class="mt-3 d-none"></div>
+          <div id="adminMobileTabs" class="mobile-staff-grid mb-3 d-lg-none" style="display: none;">
+            <button type="button" class="mobile-staff-tab-btn active" data-admin-tab="subs" onclick="switchAdminTab('subs')">
+              <i class="bi bi-journal-check"></i> กพช. 4
+            </button>
+            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="req12" onclick="switchAdminTab('req12')">
+              <i class="bi bi-file-earmark-text"></i> กพช. 1-2
+            </button>
+            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="categories" onclick="switchAdminTab('categories')">
+              <i class="bi bi-tags"></i> ประเภท
+            </button>
+            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="users" onclick="switchAdminTab('users')">
+              <i class="bi bi-people"></i> ผู้ใช้
+            </button>
+            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="ann" onclick="switchAdminTab('ann')">
+              <i class="bi bi-megaphone"></i> ประกาศ/Docs
+            </button>
+            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="maint" onclick="switchAdminTab('maint')">
+              <i class="bi bi-tools"></i> ปรับปรุง <span id="mbMaintDot" class="badge bg-danger" style="display: none;">ON</span>
+            </button>
+            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="logs" onclick="switchAdminTab('logs')">
+              <i class="bi bi-clock-history"></i> Logs
+            </button>
+            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="trash" onclick="switchAdminTab('trash')">
+              <i class="bi bi-trash3"></i> ถังขยะ <span id="badgeTrashCount" class="badge bg-secondary">0</span>
+            </button>
           </div>
 
-          <!-- แท็บ 1: ขออนุมัติทำ กพช. 1-2 -->
-          <div id="publicPre12View" class="cute-card p-3 p-md-4 mx-auto" style="max-width: 880px;">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-              <span class="badge rounded-pill bg-warning bg-opacity-25 text-dark px-3 py-2">📋 ขั้นตอนที่ 1: ลงทะเบียนและประเมินตนเอง (กพช.1-2)</span>
-              <button type="button" class="btn btn-outline-primary btn-sm rounded-pill" onclick="switchPublicTab('status')">
-                <i class="bi bi-search me-1"></i>เคยขอไว้แล้ว? เช็กสถานะ/แก้ไขที่นี่
-              </button>
-            </div>
-            <h4 class="fw-bold text-primary mb-1">แบบลงทะเบียนและประเมินตนเอง กพช. (กพช.1-2)</h4>
-            <p class="text-muted small mb-4">นักศึกษาต้องยื่นขออนุมัติและรอให้ครูอนุมัติ กพช.1-2 ก่อน (รหัสนักศึกษาขึ้นต้นด้วยเลข 6 จำนวน 10 หลัก)</p>
+          <!-- Dashboard Announcement -->
+          <div id="annDashBox" class="ann-content-box mb-3 shadow-sm" style="display: none;">
+            <div class="fw-bold mb-1"><i class="bi bi-megaphone-fill me-2 text-warning"></i>ประกาศระบบ</div>
+            <div id="annDashText" class="small"></div>
+          </div>
 
-            <div class="section-box">
-              <div class="section-box-title">
-                <span><span class="step-number-dot">1</span>ข้อมูลนักศึกษา และกิจกรรมที่จะขอทำ</span>
+          <!-- Summary Stats -->
+          <div id="dashStatsRow" class="row g-2 g-md-3 mb-3">
+            <div class="col-6 col-md-3">
+              <div class="cute-card p-3">
+                <div class="small text-muted" id="statLabel1">ทั้งหมด</div>
+                <div class="fs-4 fw-bold text-dark" id="statTotal">0</div>
               </div>
-              <div class="row g-3">
-                <div class="col-12 col-md-4">
-                  <label class="form-label fw-semibold small">รหัสประจำตัวนักศึกษา (ขึ้นต้น 6, 10 หลัก) <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" id="p12_student_id" maxlength="10" inputmode="numeric" placeholder="เช่น 6912345678">
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="cute-card p-3">
+                <div class="small text-muted" id="statLabel2">รอตรวจ</div>
+                <div class="fs-4 fw-bold text-warning" id="statWait">0</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="cute-card p-3">
+                <div class="small text-muted" id="statLabel3">ผ่านอนุมัติ</div>
+                <div class="fs-4 fw-bold text-primary" id="statApproved">0</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-3">
+              <div class="cute-card p-3">
+                <div class="small text-muted" id="statLabel4">บันทึกทะเบียนแล้ว</div>
+                <div class="fs-4 fw-bold text-success" id="statCompleted">0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- View A: Submissions (KPCH 4) -->
+          <div id="dashSubsView">
+            <div class="cute-card p-3 mb-3">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                  <label class="form-label small fw-semibold mb-1">ค้นหา (รหัส / ชื่อ / กิจกรรม)</label>
+                  <input type="text" id="filterKeyword" class="form-control form-control-sm" placeholder="พิมพ์คำค้น..." oninput="renderSubmissionsTable()">
                 </div>
-                <div class="col-12 col-md-5">
-                  <label class="form-label fw-semibold small">ชื่อ - นามสกุล (เว้นวรรคระหว่างชื่อ-สกุล) <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" id="p12_student_name" placeholder="เช่น นายสมชาย ใจดี">
+                <div class="col-6 col-md-2">
+                  <label class="form-label small fw-semibold mb-1">สถานะ</label>
+                  <select id="filterStatus" class="form-select form-select-sm" onchange="renderSubmissionsTable()">
+                    <option value="ALL">ทุกสถานะ</option>
+                    <option value="PENDING_TEACHER">รอครูตรวจ</option>
+                    <option value="PENDING_REGISTRAR">รอทะเบียน</option>
+                    <option value="COMPLETED">บันทึกทะเบียนแล้ว</option>
+                    <option value="REJECTED">ไม่ผ่าน</option>
+                  </select>
                 </div>
-                <div class="col-12 col-md-3">
-                  <label class="form-label fw-semibold small">ระดับการศึกษา <span class="text-danger">*</span></label>
-                  <select class="form-select" id="p12_level">
-                    <option value="">-- เลือก --</option>
+                <div class="col-6 col-md-2" id="filterTeacherWrap" style="display: none;">
+                  <label class="form-label small fw-semibold mb-1">ครูที่ปรึกษา</label>
+                  <select id="filterTeacher" class="form-select form-select-sm" onchange="renderSubmissionsTable()">
+                    <option value="ALL">ครูทุกคน</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label small fw-semibold mb-1">ภาคเรียน</label>
+                  <select id="filterTerm" class="form-select form-select-sm" onchange="renderSubmissionsTable()">
+                    <option value="ALL">ทุกภาคเรียน</option>
+                  </select>
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label small fw-semibold mb-1">ระดับชั้น</label>
+                  <select id="filterLevel" class="form-select form-select-sm" onchange="renderSubmissionsTable()">
+                    <option value="ALL">ทุกระดับ</option>
                     <option value="ประถมศึกษา">ประถมศึกษา</option>
                     <option value="มัธยมศึกษาตอนต้น">มัธยมศึกษาตอนต้น</option>
                     <option value="มัธยมศึกษาตอนปลาย">มัธยมศึกษาตอนปลาย</option>
                   </select>
                 </div>
+                <div class="col-md-1 d-grid">
+                  <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadDashboardData()" title="รีเฟรช">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
+              </div>
 
-                <div class="col-12 col-md-6">
-                  <label class="form-label fw-semibold small">ครูผู้รับผิดชอบ / ครูประจำกลุ่ม <span class="text-danger">*</span></label>
-                  <select class="form-select" id="p12_teacher_id" onchange="onSelectPre12Teacher()">
-                    <option value="">กำลังโหลดรายชื่อครู...</option>
-                  </select>
+              <div id="subBatchBar" class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 pt-2 border-top">
+                <div class="d-flex align-items-center gap-2">
+                  <input type="checkbox" id="checkAllSubs" class="form-check-input" onchange="toggleSelectAllSubs(this.checked)">
+                  <label for="checkAllSubs" class="small fw-semibold mb-0">เลือกทั้งหมด</label>
+                  <span class="badge bg-secondary" id="subSelectedCount">เลือก 0 รายการ</span>
                 </div>
-                <div class="col-12 col-md-6">
-                  <label class="form-label fw-semibold small">กลุ่ม / ศูนย์การเรียน (ศกร.ตำบล) <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" id="p12_group_name" placeholder="เช่น ศรช.คลองหลวง">
-                </div>
-
-                <div class="col-12 col-md-6">
-                  <label class="form-label fw-semibold small">ประเภท กพช. <span class="text-danger">*</span></label>
-                  <select class="form-select border-primary" id="p12_category" onchange="onSelectKpchCategory('p12')">
-                    <option value="">-- กำลังโหลดประเภท กพช. --</option>
-                  </select>
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label fw-semibold small">ภาคเรียนที่</label>
-                  <select class="form-select" id="p12_term">
-                    <option value="1/2569">1/2569</option>
-                    <option value="2/2569" selected>2/2569</option>
-                    <option value="1/2570">1/2570</option>
-                    <option value="2/2570">2/2570</option>
-                    <option value="1/2571">1/2571</option>
-                    <option value="2/2571">2/2571</option>
-                  </select>
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label fw-semibold small">บทบาทในโครงการ</label>
-                  <select class="form-select" id="p12_role_note">
-                    <option value="">ผู้เข้าร่วมโครงการ</option>
-                    <option value="ประธาน">ประธาน / ผู้เสนอโครงการ</option>
-                    <option value="รองประธาน">รองประธาน</option>
-                    <option value="เหรัญญิก">เหรัญญิก</option>
-                    <option value="ผู้ช่วยเหรัญญิก">ผู้ช่วยเหรัญญิก</option>
-                    <option value="เลขานุการ">เลขานุการ</option>
-                  </select>
-                </div>
-
-                <div class="col-12">
-                  <label class="form-label fw-semibold small">ชื่อกิจกรรม / โครงการ กพช. ที่จะขอทำ <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" id="p12_activity_name" placeholder="เช่น กิจกรรมบันทึกรักการอ่าน">
-                </div>
-
-                <div class="col-6 col-md-4">
-                  <label class="form-label fw-semibold small">วันที่คาดว่าจะเริ่ม <span class="text-danger">*</span></label>
-                  <input type="date" class="form-control" id="p12_start_date">
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label fw-semibold small">วันที่คาดว่าจะสิ้นสุด <span class="text-danger">*</span></label>
-                  <input type="date" class="form-control" id="p12_end_date">
-                </div>
-                <div class="col-12 col-md-4">
-                  <label class="form-label fw-semibold small">สถานที่ดำเนินการ</label>
-                  <input type="text" class="form-control" id="p12_location" value="ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง จังหวัดปทุมธานี">
-                </div>
+                <div id="subBatchButtons" class="d-flex flex-wrap gap-1"></div>
               </div>
             </div>
 
-            <div class="section-box">
-              <div class="section-box-title">
-                <span><span class="step-number-dot">2</span>ส่วนประเมินตนเอง (แบบ กพช. 2) <span class="text-danger">*</span></span>
-              </div>
-              <p class="small text-muted mb-3">กรุณาประเมินระดับความรู้ความเข้าใจของท่านให้ครบทั้ง 10 ข้อ</p>
-              <div class="table-responsive bg-white rounded-3 p-2 border">
-                <table class="table table-striped table-hover table-sm align-middle mb-0" style="font-size: 0.9rem;">
-                  <thead class="table-light text-center">
+            <div class="cute-card p-0 overflow-hidden d-none d-md-block">
+              <div class="table-responsive">
+                <table id="subsTable" class="table table-hover align-middle mb-0 small">
+                  <thead class="table-light">
                     <tr>
-                      <th rowspan="2" style="width:45px; vertical-align:middle;">ที่</th>
-                      <th rowspan="2" style="vertical-align:middle;">รายการ</th>
-                      <th colspan="3">ระดับความรู้ความเข้าใจ</th>
-                    </tr>
-                    <tr>
-                      <th style="width:65px;">มาก</th>
-                      <th style="width:80px;">ปานกลาง</th>
-                      <th style="width:65px;">น้อย</th>
+                      <th width="36"></th>
+                      <th>รหัสนักศึกษา / ชื่อ</th>
+                      <th>กิจกรรม / ประเภท</th>
+                      <th class="text-center">ชม.</th>
+                      <th>ครู / ภาคเรียน</th>
+                      <th>สถานะ</th>
+                      <th class="text-end">จัดการ</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr><td class="text-center fw-bold">1</td><td>ท่านคิดว่า กิจกรรม กพช. มีประโยชน์เพียงใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q1" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q1" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q1" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">2</td><td>ท่านได้รับความรู้เกี่ยวกับโครงสร้างและประโยชน์ของ กพช. ระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q2" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q2" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q2" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">3</td><td>ท่านมีความรู้ในเรื่องแนวทางการพัฒนาตนเอง ครอบครัว ชุมชน สังคมในระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q3" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q3" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q3" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">4</td><td>ท่านได้รับความรู้เกี่ยวกับกระบวนการกลุ่มในระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q4" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q4" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q4" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">5</td><td>ท่านได้รับความรู้ในเรื่องกระบวนการคิดเป็น ทำเป็น แก้ปัญหาเป็น และการนำไปใช้ในการดำเนินชีวิตในระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q5" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q5" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q5" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">6</td><td>ท่านได้รับความรู้ในเรื่องการประสานเครือข่ายในระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q6" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q6" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q6" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">7</td><td>ท่านได้รับความรู้ในเรื่องการเป็นผู้นำผู้ตามในระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q7" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q7" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q7" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">8</td><td>ท่านมีความรู้ในเรื่องการวางแผน และประโยชน์ของการวางแผนในระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q8" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q8" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q8" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">9</td><td>ท่านมีความรู้ในเรื่องมนุษยสัมพันธ์ในระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q9" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q9" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q9" value="น้อย"></td></tr>
-                    <tr><td class="text-center fw-bold">10</td><td>ท่านได้รับความรู้ในเรื่องการเขียนโครงการในระดับใด</td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q10" value="มาก"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q10" value="ปานกลาง"></td><td class="text-center"><input class="eval-radio" type="radio" name="eval_q10" value="น้อย"></td></tr>
-                  </tbody>
+                  <tbody id="subsTableBody"></tbody>
                 </table>
               </div>
             </div>
-
-            <div class="p-3 rounded-4 border bg-white mb-3">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="p12_self_eval_ok">
-                <label class="form-check-label small fw-semibold" for="p12_self_eval_ok">
-                  ข้าพเจ้าขอลงทะเบียนเข้าร่วมกิจกรรมพัฒนาคุณภาพชีวิต (กพช.1-2) และรับรองว่าข้อมูลการประเมินตนเองเป็นความจริง <span class="text-danger">*</span>
-                </label>
-              </div>
-            </div>
-
-            <button type="button" class="btn btn-cute-submit w-100 fs-5" onclick="handlePre12Submit()">
-              <i class="bi bi-file-earmark-check me-2"></i>ยื่นขออนุมัติทำ กพช. (กพช.1-2)
-            </button>
+            <div id="subsMobileList" class="d-md-none"></div>
           </div>
 
-          <!-- แท็บ 2: ส่งบันทึกผล กพช.4 -->
-          <div id="publicSubmitView" class="cute-card p-3 p-md-4 mx-auto d-none" style="max-width: 880px;">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <span class="badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2">📸 ขั้นตอนที่ 2: ส่งรายงานผลสำเร็จ (กพช.4) พร้อมภาพถ่าย</span>
-            </div>
-            <h4 class="fw-bold text-primary mb-1">แบบรายงานผลสำเร็จของโครงการ กพช. (กพช.4)</h4>
-            <p class="text-muted small mb-4">ตรวจสอบสิทธิ์รหัสนักศึกษา (ขึ้นต้น 6 จำนวน 10 หลัก) ก่อนกรอกผลและแนบรูปภาพ</p>
-
-            <div class="section-box">
-              <div class="section-box-title">
-                <span><span class="step-number-dot">1</span>ตรวจสอบสิทธิ์จากรหัสนักศึกษา <span class="text-danger">*</span></span>
-              </div>
-              <div class="input-group">
-                <input type="text" class="form-control" id="f_student_id" maxlength="10" inputmode="numeric" placeholder="กรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วย 6) แล้วกดตรวจสอบสิทธิ์..." onkeydown="if(event.key==='Enter') checkEligibilityUI()">
-                <button type="button" class="btn btn-primary fw-bold px-3" style="border-radius: 0 12px 12px 0;" onclick="checkEligibilityUI()">
-                  <i class="bi bi-shield-check me-1"></i>ตรวจสอบสิทธิ์
-                </button>
-              </div>
-              <div id="eligibilityBanner" class="mt-2 d-none"></div>
-              <div id="ref12SelectWrap" class="mt-2 d-none">
-                <label class="form-label fw-bold small text-success">เลือกโครงการ กพช.1-2 ที่ได้รับอนุมัติแล้ว <span class="text-danger">*</span></label>
-                <select class="form-select border-success" id="f_ref_12_id" onchange="onSelectApproved12()"></select>
-              </div>
-            </div>
-
-            <div class="section-box">
-              <div class="section-box-title">
-                <span><span class="step-number-dot">2</span>ข้อมูลโครงการ และผลการปฏิบัติ (กพช. 4)</span>
-                <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3" onclick="fillDefaultKpch4Template()">
-                  <i class="bi bi-magic me-1"></i>เติมแนวทางคำตอบ กพช.4
-                </button>
-              </div>
-              <div class="row g-3">
-                <div class="col-12 col-md-5"><label class="form-label fw-semibold small">ชื่อ-นามสกุล <span class="text-danger">*</span></label><input type="text" class="form-control" id="f_student_name"></div>
-                <div class="col-12 col-md-3">
-                  <label class="form-label fw-semibold small">ระดับชั้น <span class="text-danger">*</span></label>
-                  <select class="form-select" id="f_level"><option value="">-- เลือก --</option><option value="ประถมศึกษา">ประถมศึกษา</option><option value="มัธยมศึกษาตอนต้น">มัธยมศึกษาตอนต้น</option><option value="มัธยมศึกษาตอนปลาย">มัธยมศึกษาตอนปลาย</option></select>
+          <!-- View B: Requests 1-2 -->
+          <div id="dashReq12View" style="display: none;">
+            <div class="cute-card p-3 mb-3">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                  <label class="form-label small fw-semibold mb-1">ค้นหาคำขอ กพช. 1-2</label>
+                  <input type="text" id="filter12Keyword" class="form-control form-control-sm" placeholder="รหัสนักศึกษา / ชื่อ / โครงการ..." oninput="renderReq12Table()">
                 </div>
-                <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประเภท กพช. <span class="text-danger">*</span></label><select class="form-select border-primary" id="f_category" onchange="onSelectKpchCategory('f')"><option value="">-- เลือกประเภท กพช. --</option></select></div>
-                <div class="col-12 col-md-5"><label class="form-label fw-semibold small">ครูประจำกลุ่ม <span class="text-danger">*</span></label><select class="form-select" id="f_teacher_id"><option value="">กำลังโหลดรายชื่อครู...</option></select><div id="teacherLoadError" class="form-text text-danger d-none"></div></div>
-                <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กศน.ตำบล / กลุ่ม <span class="text-danger">*</span></label><input type="text" class="form-control" id="f_group_name"></div>
-                <div class="col-12 col-md-3"><label class="form-label fw-semibold small">จำนวนชั่วโมง กพช. <span class="text-danger">*</span></label><input type="number" class="form-control" id="f_hours" min="1" max="200"></div>
-                <div class="col-12"><label class="form-label fw-semibold small">ชื่อกิจกรรม / โครงการ กพช. <span class="text-danger">*</span></label><input type="text" class="form-control" id="f_activity_name"></div>
-                <div class="col-6 col-md-4"><label class="form-label fw-semibold small">วันที่เริ่มโครงการจริง <span class="text-danger">*</span></label><input type="date" class="form-control" id="f_activity_date"></div>
-                <div class="col-6 col-md-4"><label class="form-label fw-semibold small">วันสิ้นสุดโครงการจริง <span class="text-danger">*</span></label><input type="date" class="form-control" id="f_activity_end_date"></div>
-                <div class="col-12 col-md-4"><label class="form-label fw-semibold small">สถานที่ปฏิบัติกิจกรรม</label><input type="text" class="form-control" id="f_location"></div>
-                <div class="col-12"><label class="form-label fw-semibold small">4.1 การคิด / การวางแผน</label><textarea class="form-control" id="f_k4_plan" rows="2"></textarea></div>
-                <div class="col-12"><label class="form-label fw-semibold small">4.2 การดำเนินงาน / ขั้นตอนการดำเนินงาน <span class="text-danger">*</span></label><textarea class="form-control" id="f_activity_detail" rows="3"></textarea></div>
-                <div class="col-12"><label class="form-label fw-semibold small">4.3 การเรียนรู้และประสบการณ์ที่ได้รับ</label><textarea class="form-control" id="f_k4_learning" rows="2"></textarea></div>
-                <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.4 ปัญหาที่พบและการแก้ไข</label><textarea class="form-control" id="f_k4_problem" rows="2">ไม่พบปัญหาในการทำงาน</textarea></div>
-                <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.5 / 5. การนำไปใช้ในการพัฒนาคุณภาพชีวิต</label><textarea class="form-control" id="f_k4_apply" rows="2"></textarea></div>
-              </div>
-            </div>
-
-            <div class="section-box">
-              <div class="section-box-title">
-                <span><span class="step-number-dot">3</span>แนบรูปภาพกิจกรรม (ต้องแนบ 2 - 3 ภาพ) <span class="text-danger">*</span></span>
-              </div>
-              <input type="file" class="form-control" id="f_images" accept="image/*" multiple onchange="handleImageSelection(this)">
-              <div class="form-text text-primary">รองรับกล้องมือถือ ระบบย่อขนาดภาพอัตโนมัติให้ส่งไวและภาพชัด</div>
-              <div id="imagePreviewBox" class="d-flex flex-wrap gap-2 mt-2"></div>
-            </div>
-
-            <button type="button" id="btnSubmitKPCH" class="btn btn-cute-submit w-100 fs-5" onclick="handleStudentSubmit()" disabled>
-              <i class="bi bi-lock me-2"></i>กรุณาตรวจสอบสิทธิ์ กพช.1-2 ด้านบนก่อนส่งผลงาน
-            </button>
-          </div>
-
-          <!-- แท็บ 3: ตรวจสอบสถานะ & แก้ไข & พิมพ์ -->
-          <div id="publicStatusView" class="cute-card p-3 p-md-4 mx-auto d-none" style="max-width: 880px;">
-            <h4 class="fw-bold text-primary mb-2">🔍 ตรวจสอบสถานะ กพช. / แก้ไข / พิมพ์เอกสารของฉัน</h4>
-            <p class="small text-muted mb-3">กรอกรหัสนักศึกษา 10 หลัก (ขึ้นต้นด้วย 6) — สามารถกด <b>"ปรับปรุง / แก้ไขข้อมูล"</b> หรือ <b>"สั่งพิมพ์ / โหลด Word"</b> เฉพาะรายการของตนเองได้</p>
-            <div class="input-group mb-4">
-              <input type="text" id="searchStudentId" maxlength="10" inputmode="numeric" class="form-control" placeholder="กรอกรหัสนักศึกษา 10 หลัก (เช่น 6912345678)..." onkeydown="if(event.key==='Enter') searchMyStatus()">
-              <button type="button" class="btn btn-primary px-4 fw-bold" style="border-radius: 0 12px 12px 0;" onclick="searchMyStatus()">ค้นหา</button>
-            </div>
-            <div id="statusResultArea"></div>
-          </div>
-
-        </div><!-- /#publicSection -->
-<!-- ==================== ส่วนหลังบ้าน (นักศึกษา -> ครู -> นายทะเบียน) ==================== -->
-        <div id="dashboardSection" class="d-none">
-
-          <!-- การ์ดหัวข้อสำหรับมือถือ (บนเดสก์ท็อปแสดงที่แถบองค์กรด้านบนและแถบซ้าย) -->
-          <div class="cute-card p-3 mb-3 d-lg-none">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-              <div>
-                <h6 class="fw-bold text-primary mb-0" id="dashTitle">ระบบหลังบ้าน</h6>
-                <div class="text-muted small" id="dashSubtitle"></div>
-              </div>
-              <div class="d-flex flex-wrap gap-1">
-                <button type="button" class="btn btn-outline-warning text-dark btn-sm rounded-pill px-2" onclick="openModalById('changePassModal')">
-                  <i class="bi bi-key"></i>
-                </button>
-                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-2" onclick="loadDashboard()">
-                  <i class="bi bi-arrow-clockwise"></i>
-                </button>
-                <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-2" onclick="handleLogout()">ออก</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- แถบเมนูมือถือเฉพาะ ครู (จัดกริด 2 ช่อง ไม่ต้องเลื่อนซ้าย-ขวา) -->
-          <div class="mobile-staff-grid d-none d-lg-none" id="teacherMobileTabs">
-            <button type="button" class="mobile-staff-tab-btn active" data-teacher-tab="sub" onclick="switchTeacherTab('sub', this)">
-              <span>📸 ตรวจผล กพช.4-6</span>
-              <span class="badge bg-danger rounded-pill d-none" id="badgeWaitSub">0</span>
-            </button>
-            <button type="button" class="mobile-staff-tab-btn" data-teacher-tab="req12" onclick="switchTeacherTab('req12', this)">
-              <span>📋 อนุมัติ 1-2 &amp; กพช.3</span>
-              <span class="badge bg-danger rounded-pill d-none" id="badgeWait12">0</span>
-            </button>
-          </div>
-
-          <!-- แถบเมนูมือถือเฉพาะ ADMIN (จัดกริด 2 ช่อง ไม่ต้องเลื่อนซ้าย-ขวา) -->
-          <div class="mobile-staff-grid d-none d-lg-none" id="adminMobileTabs">
-            <button type="button" class="mobile-staff-tab-btn active" data-admin-tab="subs" onclick="switchAdminTab('subs', this)">📸 รายงานผล 4-6</button>
-            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="req12" onclick="switchAdminTab('req12', this)">📋 อนุมัติ 1-2 &amp; 3</button>
-            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="categories" onclick="switchAdminTab('categories', this)">🏷️ ประเภท กพช.</button>
-            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="users" onclick="switchAdminTab('users', this)">👥 บุคลากร</button>
-            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="ann" onclick="switchAdminTab('ann', this)">📢 ประกาศ/ฟอร์ม</button>
-            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="maint" onclick="switchAdminTab('maint', this)">
-              🛠️ ปิดปรับปรุง <span class="badge bg-danger rounded-pill d-none" id="mbMaintDot">ON</span>
-            </button>
-            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="logs" onclick="switchAdminTab('logs', this)">📜 ประวัติระบบ</button>
-            <button type="button" class="mobile-staff-tab-btn" data-admin-tab="trash" onclick="switchAdminTab('trash', this)">
-              🗑️ ถังขยะ <span class="badge bg-danger rounded-pill d-none" id="badgeTrashCount">0</span>
-            </button>
-          </div>
-
-          <!-- มุมมอง 1: รายงานผล กพช. 4-6 -->
-          <div id="dashSubmissionsView" class="cute-card p-3 p-md-4">
-            <div class="row g-2 align-items-center mb-3" id="subFilterRow">
-              <div class="col-12 col-lg-auto">
-                <div class="btn-group w-100 w-lg-auto" id="filterStatusBtns">
-                  <button type="button" class="btn btn-primary btn-sm active" onclick="setFilterMode('PENDING', this)">⏳ รอดำเนินการ</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setFilterMode('HISTORY', this)">📁 อนุมัติแล้ว / ทั้งหมด</button>
+                <div class="col-6 col-md-3">
+                  <label class="form-label small fw-semibold mb-1">สถานะคำขอ</label>
+                  <select id="filter12Status" class="form-select form-select-sm" onchange="renderReq12Table()">
+                    <option value="ALL">ทุกสถานะ</option>
+                    <option value="PENDING_TEACHER">รอครูอนุมัติ</option>
+                    <option value="APPROVED">อนุมัติแล้ว</option>
+                    <option value="REJECTED">ไม่อนุมัติ</option>
+                  </select>
                 </div>
-              </div>
-              <div class="col-6 col-md-3 col-lg-2">
-                <select id="dashTermFilter" class="form-select form-select-sm" onchange="renderDashboardList()">
-                  <option value="ALL">📅 ทุกภาคเรียน</option>
-                </select>
-              </div>
-              <div class="col-6 col-md-3 col-lg-2">
-                <select id="dashCategoryFilter" class="form-select form-select-sm border-primary" onchange="renderDashboardList()">
-                  <option value="ALL">🏷️ ทุกประเภท กพช.</option>
-                </select>
-              </div>
-              <div class="col-6 col-md-3 col-lg-2">
-                <select id="dashPrintFilter" class="form-select form-select-sm" onchange="renderDashboardList()">
-                  <option value="ALL">🖨️ สถานะปริ้นทั้งหมด</option>
-                  <option value="NOT_PRINTED">⏳ ยังไม่ปริ้น 4-6</option>
-                  <option value="PRINTED">✅ ปริ้น 4-6 แล้ว</option>
-                </select>
-              </div>
-              <div class="col-6 col-md-3 col-lg-2 d-none" id="dashTeacherFilterWrap">
-                <select id="dashTeacherFilter" class="form-select form-select-sm border-success" onchange="renderDashboardList()">
-                  <option value="ALL">👩‍🏫 ครูประจำกลุ่มทั้งหมด</option>
-                </select>
-              </div>
-              <div class="col-12 col-md-4 col-lg">
-                <input type="text" id="dashSearchInput" class="form-control form-control-sm" placeholder="ค้นหาชื่อ นศ. / รหัส / กิจกรรม..." oninput="renderDashboardList()">
-              </div>
-            </div>
-
-            <div id="teacherSubActionBar" class="alert alert-info border-0 rounded-4 d-none mb-3">
-              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                <div class="small">
-                  <strong><i class="bi bi-check2-square me-1"></i>ตรวจอนุมัติ &amp; ออกเอกสาร กพช. 4-6 ส่งนายทะเบียน:</strong>
-                  ติ๊กเลือกรายการที่ต้องการ เพื่ออนุมัติส่งตรงถึงนายทะเบียน หรือสั่งพิมพ์ / ดาวน์โหลด Word กพช. 4-6
+                <div class="col-6 col-md-3" id="filter12TeacherWrap" style="display: none;">
+                  <label class="form-label small fw-semibold mb-1">ครูที่ปรึกษา</label>
+                  <select id="filter12Teacher" class="form-select form-select-sm" onchange="renderReq12Table()">
+                    <option value="ALL">ครูทุกคน</option>
+                  </select>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
-                  <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchApproveSub()">
-                    <i class="bi bi-check-all me-1"></i>อนุมัติส่งนายทะเบียน (ที่ติ๊ก)
-                  </button>
-                  <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchRejectSub()">
-                    <i class="bi bi-arrow-return-left me-1"></i>ตีกลับระบุเหตุผล
-                  </button>
-                  <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openDoc57ConfigAndPrint()">
-                    <i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช. 4-6 (ที่ติ๊ก)
+                <div class="col-md-2 d-grid">
+                  <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadDashboardData()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>รีเฟรช
                   </button>
                 </div>
               </div>
-            </div>
 
-            <div id="registrarTools" class="alert alert-success border-0 rounded-4 d-none mb-3">
-              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                <div>
-                  <strong><i class="bi bi-file-earmark-excel me-1"></i>เครื่องมือนายทะเบียน (กรองดูรายครู / ภาคเรียน / ประเภท กพช. ได้ด้านบน)</strong>
-                  <div class="small">ดาวน์โหลดรายชื่อที่ครูอนุมัติแล้วแยกตามครูประจำกลุ่ม หรือติ๊กเลือกเพื่อบันทึกปิดงาน</div>
+              <div id="req12BatchBar" class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 pt-2 border-top">
+                <div class="d-flex align-items-center gap-2">
+                  <input type="checkbox" id="checkAll12" class="form-check-input" onchange="toggleSelectAll12(this.checked)">
+                  <label for="checkAll12" class="small fw-semibold mb-0">เลือกทั้งหมด</label>
+                  <span class="badge bg-secondary" id="req12SelectedCount">เลือก 0 รายการ</span>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
-                  <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="exportRegistrarCSV()">
-                    <i class="bi bi-download me-1"></i>โหลด Excel (.CSV) ที่รอลงทะเบียน
-                  </button>
-                  <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openDoc57ConfigAndPrint()">
-                    <i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช. 4-6 (ที่ติ๊ก)
-                  </button>
-                  <button type="button" class="btn btn-dark btn-sm rounded-pill px-3 fw-bold" onclick="confirmRegistrarComplete()">
-                    <i class="bi bi-check2-all me-1"></i>ยืนยันบันทึกทะเบียนแล้ว (ที่ติ๊ก)
-                  </button>
-                </div>
+                <div id="req12BatchButtons" class="d-flex flex-wrap gap-1"></div>
               </div>
             </div>
 
-            <div id="adminDeleteSubBar" class="alert alert-danger border-0 rounded-4 d-none mb-3">
-              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                <div class="small"><strong><i class="bi bi-trash3 me-1"></i>สิทธิ์แอดมิน:</strong> ติ๊กเลือกรายการเพื่อย้ายลงถังขยะ</div>
-                <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchDeleteSub()"><i class="bi bi-trash me-1"></i>ย้ายที่ติ๊กเลือกลงถังขยะ</button>
+            <div class="cute-card p-0 overflow-hidden d-none d-md-block">
+              <div class="table-responsive">
+                <table id="req12Table" class="table table-hover align-middle mb-0 small">
+                  <thead class="table-light">
+                    <tr>
+                      <th width="36"></th>
+                      <th>เลขที่คำขอ / นักศึกษา</th>
+                      <th>โครงการ / ประเภท</th>
+                      <th class="text-center">ชม.</th>
+                      <th>ครูที่ปรึกษา</th>
+                      <th>สถานะ</th>
+                      <th class="text-end">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="req12TableBody"></tbody>
+                </table>
               </div>
             </div>
-
-            <div class="table-responsive d-none d-md-block">
-              <table class="table table-hover align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th id="thCheckbox" class="d-none"><input type="checkbox" id="checkAllBox" onchange="toggleAllChecks(this)"></th>
-                    <th>รหัส / วันที่ส่ง</th>
-                    <th>นักศึกษา</th>
-                    <th>ครู / ประเภท กพช.</th>
-                    <th>กิจกรรม / ช่วงวันที่ / ชม.</th>
-                    <th>สถานะ &amp; การปริ้น</th>
-                    <th class="text-end">จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody id="dashTableBody"></tbody>
-              </table>
-            </div>
-
-            <div class="d-block d-md-none mb-2 d-none" id="mobileCheckAllSubWrap">
-              <label class="small fw-bold text-primary"><input type="checkbox" onchange="toggleAllChecks(this)"> เลือกทั้งหมดในหน้านี้</label>
-            </div>
-            <div class="d-block d-md-none" id="dashMobileCards"></div>
+            <div id="req12MobileList" class="d-md-none"></div>
           </div>
 
-          <!-- มุมมอง 2: อนุมัติ กพช. 1-2 & กพช. 3 + บันทึกข้อความ -->
-          <div id="dash12View" class="cute-card p-3 p-md-4 d-none">
-            <div class="row g-2 align-items-center mb-3">
-              <div class="col-12 col-lg-auto">
-                <div class="btn-group w-100 w-lg-auto" id="filter12Btns">
-                  <button type="button" class="btn btn-primary btn-sm active" onclick="setFilter12Mode('PENDING', this)">⏳ รออนุมัติ กพช.1-2</button>
-                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setFilter12Mode('HISTORY', this)">📁 ทั้งหมด / ที่อนุมัติแล้ว</button>
-                </div>
-              </div>
-              <div class="col-6 col-md-3 col-lg-2">
-                <select id="dash12TermFilter" class="form-select form-select-sm" onchange="render12List()">
-                  <option value="ALL">📅 ทุกภาคเรียน</option>
-                </select>
-              </div>
-              <div class="col-6 col-md-3 col-lg-3">
-                <select id="dash12CategoryFilter" class="form-select form-select-sm border-primary" onchange="render12List()">
-                  <option value="ALL">🏷️ ทุกประเภท กพช.</option>
-                </select>
-              </div>
-              <div class="col-6 col-md-3 col-lg-2">
-                <select id="dash12PrintFilter" class="form-select form-select-sm" onchange="render12List()">
-                  <option value="ALL">🖨️ สถานะปริ้นทั้งหมด</option>
-                  <option value="NOT_12">⏳ ยังไม่ปริ้น 1-2</option>
-                  <option value="DONE_12">✅ ปริ้น 1-2 แล้ว</option>
-                  <option value="NOT_3">⏳ ยังไม่ปริ้น กพช.3</option>
-                  <option value="DONE_3">✅ ปริ้น กพช.3 แล้ว</option>
-                </select>
-              </div>
-              <div class="col-6 col-md-3 col-lg">
-                <input type="text" id="dash12SearchInput" class="form-control form-control-sm" placeholder="ค้นหารหัส / ชื่อ นศ. / โครงการ..." oninput="render12List()">
-              </div>
-            </div>
-
-            <div class="alert alert-primary border-0 rounded-4 mb-3">
-              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                <div class="small">
-                  <strong><i class="bi bi-file-earmark-richtext me-1"></i>จัดชุดเสนอโครงการ (กพช. 3 + บันทึกข้อความ):</strong>
-                  ติ๊กเลือกรายการที่ <b>อนุมัติ กพช.1-2 แล้ว</b> (รวมกลุ่มหลายคนได้) เพื่อสั่งพิมพ์หรือดาวน์โหลด Word ชุด กพช. 3 + บันทึกข้อความ
-                </div>
-                <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openDoc56PrintModal()">
-                  <i class="bi bi-printer me-1"></i>พิมพ์ / โหลด Word กพช. 3 + บันทึก (ที่ติ๊กเลือก)
-                </button>
-              </div>
-            </div>
-
-            <div id="batchApprove12Bar" class="alert alert-success border-0 rounded-4 mb-3">
-              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                <div class="small">
-                  <strong><i class="bi bi-check2-square me-1"></i>อนุมัติ / ตีกลับ กพช.1-2 หลายรายการ:</strong>
-                  ติ๊กเลือกรายการที่รออนุมัติ แล้วกดอนุมัติหรือตีกลับระบุเหตุผล
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                  <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchApprove12()"><i class="bi bi-check-all me-1"></i>อนุมัติที่ติ๊กทั้งหมด</button>
-                  <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchReject12()"><i class="bi bi-arrow-return-left me-1"></i>ตีกลับระบุเหตุผล</button>
-                </div>
-              </div>
-            </div>
-
-            <div id="adminDelete12Bar" class="alert alert-danger border-0 rounded-4 d-none mb-3">
-              <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                <div class="small"><strong><i class="bi bi-trash3 me-1"></i>สิทธิ์แอดมิน:</strong> ติ๊กเลือกรายการ กพช.1-2 เพื่อย้ายลงถังขยะ</div>
-                <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold" onclick="confirmBatchDelete12()"><i class="bi bi-trash me-1"></i>ย้ายที่ติ๊กเลือกลงถังขยะ</button>
-              </div>
-            </div>
-
-            <div class="table-responsive d-none d-md-block">
-              <table class="table table-hover align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th><input type="checkbox" id="checkAll12Box" onchange="toggleAll12Checks(this)"></th>
-                    <th>รหัส กพช.1-2</th>
-                    <th>นักศึกษา</th>
-                    <th>ประเภท / ภาคเรียน</th>
-                    <th>โครงการที่ขอทำ / ช่วงวันที่</th>
-                    <th>สถานะ &amp; การปริ้น</th>
-                    <th class="text-end">จัดการ / กพช.1-2 รายคน</th>
-                  </tr>
-                </thead>
-                <tbody id="dash12TableBody"></tbody>
-              </table>
-            </div>
-
-            <div class="d-block d-md-none mb-2">
-              <label class="small fw-bold text-primary"><input type="checkbox" onchange="toggleAll12Checks(this)"> เลือก กพช.1-2 ทั้งหมดในหน้านี้</label>
-            </div>
-            <div class="d-block d-md-none" id="dash12MobileCards"></div>
-          </div>
-
-          <!-- มุมมองแอดมิน: จัดการประเภท กพช. -->
-          <div id="adminCategoriesView" class="cute-card p-3 p-md-4 d-none">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-              <div><h5 class="fw-bold mb-0">🏷️ จัดการประเภท กพช. (เชื่อมชีต KPCH_Categories)</h5><div class="small text-muted">ใช้จัดหมวดหมู่หน้าเว็บ นศ. และให้ครูเลือกประเภทสั่งพิมพ์ชุดเอกสารพร้อมกัน</div></div>
-              <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openCategoryModal()"><i class="bi bi-plus-circle me-1"></i>เพิ่มประเภท กพช. ใหม่</button>
-            </div>
-            <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>รหัส</th><th>ชื่อประเภท กพช.</th><th>ชื่อโครงการแนะนำ</th><th>ชม.มาตรฐาน</th><th>สถานะ</th><th class="text-end">จัดการ</th></tr></thead><tbody id="adminCategoriesBody"></tbody></table></div>
-          </div>
-
-          <!-- มุมมองแอดมิน: จัดการผู้ใช้ -->
-          <div id="adminUsersView" class="cute-card p-3 p-md-4 d-none">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h5 class="fw-bold mb-0">👥 รายชื่อบุคลากรในระบบ</h5><button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="openUserModal()"><i class="bi bi-person-plus me-1"></i>เพิ่มบุคลากรใหม่</button></div>
-            <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>ID</th><th>Username</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>กลุ่ม/สังกัด</th><th>สถานะ</th><th>แก้ไข</th></tr></thead><tbody id="adminUsersBody"></tbody></table></div>
-          </div>
-
-          <!-- มุมมองแอดมิน: ข่าวประกาศ & ลิงก์เทมเพลตฟอร์มบันทึกข้อความ Google Docs -->
-          <div id="adminAnnView" class="d-none">
+          <!-- Admin: Categories -->
+          <div id="adminCategoriesView" style="display: none;">
             <div class="cute-card p-3 p-md-4 mb-3">
-              <h5 class="fw-bold mb-3">📢 จัดการข่าวประกาศหน้าแรก</h5>
-              <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="ann_visible" checked><label class="form-check-label fw-semibold" for="ann_visible">แสดงกล่องข่าวประกาศบนหน้าแรก</label></div>
-              <div class="mb-3"><label class="form-label fw-semibold small">ข้อความกำกับมุมขวา</label><input type="text" class="form-control" id="ann_badge"></div>
-              <div class="mb-3"><label class="form-label fw-semibold small">รายละเอียดข่าวประกาศ</label><textarea class="form-control" id="ann_content" rows="4"></textarea></div>
-              <div class="mb-3"><label class="form-label fw-semibold small">📎 แนบไฟล์ประกาศ PDF (ไม่เกิน 8 MB)</label><input type="file" class="form-control" id="ann_pdf_file" accept="application/pdf,.pdf"><div id="annCurrentPdfBox" class="mt-2 d-none"></div></div>
-              <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="handleSaveAnnouncement()"><i class="bi bi-save me-1"></i>บันทึกข่าวประกาศ</button>
+              <h6 class="fw-bold mb-3"><i class="bi bi-tags me-2 text-primary"></i>จัดการประเภทกิจกรรม กพช.</h6>
+              <div class="input-group mb-3" style="max-width: 520px;">
+                <input type="text" id="newCatName" class="form-control" placeholder="ระบุชื่อประเภทกิจกรรมใหม่">
+                <button type="button" class="btn btn-primary" onclick="addCategoryUI()"><i class="bi bi-plus-lg me-1"></i>เพิ่มประเภท</button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle small">
+                  <thead class="table-light">
+                    <tr>
+                      <th>ชื่อประเภทกิจกรรม</th>
+                      <th>สถานะ</th>
+                      <th class="text-end">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="catTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin: Users -->
+          <div id="adminUsersView" style="display: none;">
+            <div class="cute-card p-3 p-md-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0"><i class="bi bi-people me-2 text-primary"></i>จัดการบัญชีผู้ใช้ (ครู / ทะเบียน / Admin)</h6>
+                <button type="button" class="btn btn-primary btn-sm rounded-3" onclick="openUserModal()">
+                  <i class="bi bi-person-plus me-1"></i>เพิ่มผู้ใช้งาน
+                </button>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle small">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Username</th>
+                      <th>ชื่อ-นามสกุล</th>
+                      <th>สิทธิ์</th>
+                      <th>กลุ่ม / ตำบล</th>
+                      <th>สถานะ</th>
+                      <th class="text-end">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usersTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Admin: Announcement & Google Docs Templates -->
+          <div id="adminAnnView" style="display: none;">
+            <div class="cute-card p-3 p-md-4 mb-3">
+              <h6 class="fw-bold mb-2"><i class="bi bi-megaphone me-2 text-warning"></i>แก้ไขข้อความประกาศหน้าเว็บ</h6>
+              <textarea id="annEditInput" class="form-control mb-2" rows="3" placeholder="พิมพ์ข้อความประกาศ... (เว้นว่างไว้หากต้องการซ่อนกล่องประกาศ)"></textarea>
+              <button type="button" class="btn btn-primary btn-sm rounded-3" onclick="saveAnnouncementUI()">
+                <i class="bi bi-save me-1"></i>บันทึกประกาศ
+              </button>
             </div>
 
             <div class="cute-card p-3 p-md-4">
-              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                <h5 class="fw-bold mb-0 text-primary">📄 ตั้งค่าลิงก์เทมเพลต "บันทึกข้อความ" จาก Google Docs</h5>
-                <span class="badge bg-info bg-opacity-10 text-dark border rounded-pill px-3 py-1">ตรงตามแบบฟอร์มราชการ 100%</span>
-              </div>
+              <h6 class="fw-bold mb-1"><i class="bi bi-file-earmark-word me-2 text-primary"></i>ตั้งค่าลิงก์ฟอร์มบันทึกข้อความ Google Docs</h6>
               <p class="small text-muted mb-3">
-                สร้างไฟล์บันทึกข้อความใน Google Docs (จัดครุฑ ย่อหน้า ฟอนต์ TH SarabunPSK ให้เรียบร้อย) แชร์แบบ <b>"ทุกคนที่มีลิงก์ ดูได้"</b> แล้วนำลิงก์มาวางด้านล่าง (หากมีไฟล์ Word อยู่บน Drive ให้เปิดแล้วเลือก <b>ไฟล์ &gt; บันทึกเป็น Google เอกสาร</b> ก่อน)
+                สร้างเอกสาร Google Docs ในบัญชีเดียวกับ Apps Script (หรือแชร์สิทธิ์แก้ไข) แล้วใส่แท็กตัวแปรด้านล่างลงในเอกสาร จากนั้นนำลิงก์มาวาง
               </p>
-
-              <div class="row g-3 mb-3">
+              <div class="mb-3">
+                <div class="small fw-semibold text-secondary mb-1">แท็กตัวแปรที่รองรับ (คลิกเพื่อคัดลอก):</div>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{DOC_NO}}')">{{DOC_NO}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{DOC_DATE}}')">{{DOC_DATE}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{PROJECT_NAME}}')">{{PROJECT_NAME}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{STUDENT_COUNT}}')">{{STUDENT_COUNT}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{HOURS}}')">{{HOURS}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{START_DATE}}')">{{START_DATE}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{END_DATE}}')">{{END_DATE}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{LOCATION}}')">{{LOCATION}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{ADVISOR_NAME}}')">{{ADVISOR_NAME}}</span>
+                <span class="tpl-tag-chip" onclick="copyTemplateTag('{{STUDENT_LIST}}')">{{STUDENT_LIST}}</span>
+              </div>
+              <div class="row g-3">
                 <div class="col-12">
-                  <label class="form-label fw-semibold small">1. ลิงก์ Google Docs: บันทึกข้อความขออนุมัติโครงการ (ชุด กพช. 3)</label>
-                  <input type="url" class="form-control" id="tpl_memo56_url" placeholder="https://docs.google.com/document/d/xxxxxxxxxxxxxxxx/edit">
-                  <div class="small mt-1" id="tpl_memo56_status"></div>
+                  <label class="form-label small fw-semibold">ลิงก์ Google Docs สำหรับบันทึกข้อความ กพช. 3 (ขออนุมัติโครงการ)</label>
+                  <input type="url" id="tpl_memo56_url" class="form-control" placeholder="https://docs.google.com/document/d/...">
+                  <div id="tpl_memo56_status" class="form-text"></div>
                 </div>
                 <div class="col-12">
-                  <label class="form-label fw-semibold small">2. ลิงก์ Google Docs: บันทึกข้อความรายงานผล (ชุด กพช. 4-6)</label>
-                  <input type="url" class="form-control" id="tpl_memo46_url" placeholder="https://docs.google.com/document/d/xxxxxxxxxxxxxxxx/edit">
-                  <div class="small mt-1" id="tpl_memo46_status"></div>
+                  <label class="form-label small fw-semibold">ลิงก์ Google Docs สำหรับบันทึกข้อความ กพช. 4-6 (รายงานผล)</label>
+                  <input type="url" id="tpl_memo46_url" class="form-control" placeholder="https://docs.google.com/document/d/...">
+                  <div id="tpl_memo46_status" class="form-text"></div>
                 </div>
               </div>
-
-              <div class="section-box mb-3">
-                <div class="small fw-bold text-dark mb-2"><i class="bi bi-braces me-1"></i>แท็กคำสั่งที่ใส่ใน Google Docs ได้ (คลิกเพื่อคัดลอก):</div>
-                <div class="d-flex flex-wrap">
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{DOC_NO}}')">{{DOC_NO}} ที่หนังสือ</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{DOC_DATE}}')">{{DOC_DATE}} วันที่</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{SCHOOL_NAME}}')">{{SCHOOL_NAME}} สถานศึกษา</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{PROJECT_NAME}}')">{{PROJECT_NAME}} ชื่อโครงการ</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{START_DATE}}')">{{START_DATE}} วันเริ่ม</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{END_DATE}}')">{{END_DATE}} วันสิ้นสุด</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{LOCATION}}')">{{LOCATION}} สถานที่</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{STUDENT_COUNT}}')">{{STUDENT_COUNT}} จำนวนคน</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{PASS_COUNT}}')">{{PASS_COUNT}} ผ่าน(คน)</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{FAIL_COUNT}}')">{{FAIL_COUNT}} ไม่ผ่าน(คน)</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{HOURS}}')">{{HOURS}} ชั่วโมง</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{TEACHER_NAME}}')">{{TEACHER_NAME}} ชื่อครู</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{TEACHER_POS}}')">{{TEACHER_POS}} ตำแหน่งครู</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{DIRECTOR_NAME}}')">{{DIRECTOR_NAME}} ผู้อำนวยการ</span>
-                  <span class="tpl-tag-chip" onclick="copyTemplateTag('{{REGISTRAR_NAME}}')">{{REGISTRAR_NAME}} นายทะเบียน</span>
-                </div>
-              </div>
-
-              <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="handleSaveDocTemplates()">
-                <i class="bi bi-cloud-check me-1"></i>ตรวจสอบสิทธิ์และบันทึกลิงก์ Google Docs
+              <button type="button" class="btn btn-primary btn-sm rounded-3 mt-3" onclick="saveDocTemplatesUI()">
+                <i class="bi bi-check2-circle me-1"></i>บันทึกลิงก์ Google Docs &amp; ตรวจสอบสิทธิ์
               </button>
             </div>
           </div>
 
-          <!-- มุมมองแอดมิน: ปิดปรับปรุงเว็บไซต์ (แสดงพร้อมกันทุกหน้าจอ) -->
-          <div id="adminMaintView" class="cute-card p-3 p-md-4 d-none">
-            <h5 class="fw-bold mb-2">🛠️ ระบบปิดปรับปรุงเว็บไซต์ (แสดงผลพร้อมกันทุกหน้าจอ)</h5>
-            <p class="small text-muted mb-3">
-              เมื่อเปิดใช้งาน ทุกหน้าจอที่กำลังเปิดเว็บไซต์อยู่ (นักศึกษา, ครู, นายทะเบียน) จะสลับเป็นหน้า <b>"ปิดปรับปรุงระบบชั่วคราว"</b> พร้อมกันอัตโนมัติภายใน ~12 วินาที โดยบัญชี <b>Admin</b> ยังสามารถเข้าจัดการระบบได้ตามปกติ
-            </p>
-            <div class="p-3 rounded-4 border bg-light mb-3">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="maint_enabled" style="width: 3rem; height: 1.5rem;">
-                <label class="form-check-label fw-bold ms-2 text-danger" for="maint_enabled">เปิดโหมด "ปิดปรับปรุงระบบชั่วคราว" ทันที</label>
+          <!-- Admin: Maintenance Mode -->
+          <div id="adminMaintView" style="display: none;">
+            <div class="cute-card p-3 p-md-4">
+              <h6 class="fw-bold mb-2"><i class="bi bi-tools me-2 text-danger"></i>โหมดปิดปรับปรุงระบบชั่วคราว (Maintenance Mode)</h6>
+              <p class="small text-muted mb-3">
+                เมื่อเปิดใช้งาน หน้าเว็บของนักศึกษา ครู และงานทะเบียนจะแสดงหน้าแจ้งปิดปรับปรุงทันที (เฉพาะ Admin เท่านั้นที่เข้าจัดการต่อได้)
+              </p>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="maint_enabled">
+                <label class="form-check-label fw-semibold" for="maint_enabled">เปิดโหมดปิดปรับปรุงระบบ</label>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold">หัวข้อแจ้งเตือน</label>
+                  <input type="text" id="maint_title" class="form-control" placeholder="ระบบอยู่ระหว่างการปรับปรุงชั่วคราว">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold">เวลาที่คาดว่าจะเปิดใช้งาน</label>
+                  <input type="text" id="maint_eta" class="form-control" placeholder="เช่น วันนี้ เวลา 18.00 น.">
+                </div>
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">รายละเอียดข้อความ</label>
+                  <textarea id="maint_message" class="form-control" rows="2"></textarea>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+                <div class="small text-muted">อัปเดตล่าสุด: <span id="maint_last_updated">-</span></div>
+                <button type="button" class="btn btn-danger btn-sm rounded-3 px-3" onclick="saveMaintenanceUI()">
+                  <i class="bi bi-save me-1"></i>บันทึกการตั้งค่า
+                </button>
               </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label fw-semibold small">หัวข้อประกาศปิดปรับปรุง</label>
-              <input type="text" class="form-control" id="maint_title" placeholder="เช่น ปิดปรับปรุงระบบชั่วคราว">
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-semibold small">รายละเอียดแจ้งผู้ใช้งาน</label>
-              <textarea class="form-control" id="maint_message" rows="3" placeholder="เช่น ขณะนี้ผู้ดูแลระบบกำลังปรับปรุงฐานข้อมูลและพัฒนาประสิทธิภาพ..."></textarea>
-            </div>
-            <div class="mb-3">
-              <label class="form-label fw-semibold small">เวลาที่คาดว่าจะเปิดใช้งานปกติ (ไม่บังคับ)</label>
-              <input type="text" class="form-control" id="maint_eta" placeholder="เช่น คาดว่าจะแล้วเสร็จเวลา 21:00 น.">
-            </div>
-            <div class="small text-muted mb-3" id="maint_last_updated"></div>
-            <button type="button" class="btn btn-danger rounded-pill px-4 fw-bold" onclick="handleSaveMaintenance()">
-              <i class="bi bi-broadcast me-1"></i>บันทึกและประกาศสถานะทุกหน้าจอ
-            </button>
           </div>
 
-          <!-- มุมมองแอดมิน: Audit Logs -->
-          <div id="adminLogsView" class="cute-card p-3 p-md-4 d-none">
-            <h5 class="fw-bold mb-3">📜 ประวัติการทำงานล่าสุด (Audit_Logs)</h5>
-            <div class="table-responsive"><table class="table table-sm table-striped"><thead class="table-dark"><tr><th>วันเวลา</th><th>รหัสคำขอ</th><th>ผู้ดำเนินการ</th><th>ตำแหน่ง</th><th>การกระทำ</th><th>หมายเหตุ</th></tr></thead><tbody id="adminLogsBody"></tbody></table></div>
+          <!-- Admin: Logs -->
+          <div id="adminLogsView" style="display: none;">
+            <div class="cute-card p-3 p-md-4">
+              <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-2 text-primary"></i>ประวัติการใช้งานระบบล่าสุด</h6>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle small">
+                  <thead class="table-light">
+                    <tr>
+                      <th>วัน-เวลา</th>
+                      <th>ผู้ดำเนินการ</th>
+                      <th>เหตุการณ์</th>
+                      <th>รายละเอียด</th>
+                    </tr>
+                  </thead>
+                  <tbody id="logsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          <!-- มุมมองแอดมิน: ถังขยะ -->
-          <div id="adminTrashView" class="cute-card p-3 p-md-4 d-none">
-            <div class="alert alert-warning border-0 rounded-4 small mb-3"><i class="bi bi-shield-check me-1"></i><strong>ถังขยะสำรองข้อมูล:</strong> กู้คืนหรือลบถาวรได้</div>
-            <h6 class="fw-bold text-primary mb-2">📸 ผลงาน กพช.4-6 ที่อยู่ในถังขยะ</h6>
-            <div class="table-responsive mb-4"><table class="table table-bordered table-sm align-middle"><thead class="table-light"><tr><th>รหัสคำขอ</th><th>นักศึกษา</th><th>กิจกรรม / ชม.</th><th>สถานะเดิม</th><th>ลบเมื่อ / โดย</th><th class="text-end">จัดการ</th></tr></thead><tbody id="trashSubsBody"></tbody></table></div>
-            <h6 class="fw-bold text-primary mb-2">📋 คำขอ กพช.1-2 ที่อยู่ในถังขยะ</h6>
-            <div class="table-responsive"><table class="table table-bordered table-sm align-middle"><thead class="table-light"><tr><th>รหัส กพช.1-2</th><th>นักศึกษา</th><th>ภาคเรียน / โครงการ</th><th>สถานะเดิม</th><th>ลบเมื่อ / โดย</th><th class="text-end">จัดการ</th></tr></thead><tbody id="trash12Body"></tbody></table></div>
+          <!-- Admin: Trash -->
+          <div id="adminTrashView" style="display: none;">
+            <div class="cute-card p-3 p-md-4 mb-3">
+              <h6 class="fw-bold mb-2"><i class="bi bi-trash3 me-2 text-danger"></i>ถังขยะคำขอ กพช. 1-2</h6>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle small">
+                  <thead class="table-light">
+                    <tr>
+                      <th>เลขที่คำขอ</th>
+                      <th>นักศึกษา</th>
+                      <th>โครงการ</th>
+                      <th>ผู้ลบ</th>
+                      <th class="text-end">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="trash12TableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="cute-card p-3 p-md-4">
+              <h6 class="fw-bold mb-2"><i class="bi bi-trash3 me-2 text-danger"></i>ถังขยะหลักฐาน กพช. 4</h6>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle small">
+                  <thead class="table-light">
+                    <tr>
+                      <th>รหัสรายการ</th>
+                      <th>นักศึกษา</th>
+                      <th>กิจกรรม</th>
+                      <th>ผู้ลบ</th>
+                      <th class="text-end">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="trashSubsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-        </div>
+        </section>
 
-      </div>
-    </main>
+      </main>
+    </div>
   </div>
 
-  <!-- แถบเมนูล่างติดหน้าจอสำหรับมือถือ (หน้านักศึกษา — แตะสลับได้ทันทีไม่ต้องเลื่อน) -->
-  <nav id="mobilePublicBottomNav" class="mobile-bottom-nav d-lg-none no-print">
-    <button type="button" class="mobile-bottom-btn active" id="mbBtnPre12" onclick="switchPublicTab('pre12')">
-      <i class="bi bi-clipboard2-check"></i>
-      <span>1. ขออนุมัติ 1-2</span>
+  <!-- Mobile Bottom Navigation (Public) -->
+  <nav id="mobilePublicBottomNav" class="mobile-bottom-nav no-print">
+    <button type="button" id="mbBtnPre12" class="mobile-bottom-btn active" onclick="switchPublicTab('pre12')">
+      <i class="bi bi-file-earmark-plus"></i>
+      <span>กพช. 1-2</span>
     </button>
-    <button type="button" class="mobile-bottom-btn" id="mbBtnSubmit" onclick="switchPublicTab('submit')">
-      <i class="bi bi-camera"></i>
-      <span>2. ส่งผล กพช.4</span>
+    <button type="button" id="mbBtnSubmit" class="mobile-bottom-btn" onclick="switchPublicTab('submit')">
+      <i class="bi bi-cloud-arrow-up"></i>
+      <span>ส่ง กพช. 4</span>
     </button>
-    <button type="button" class="mobile-bottom-btn" id="mbBtnStatus" onclick="switchPublicTab('status')">
+    <button type="button" id="mbBtnStatus" class="mobile-bottom-btn" onclick="switchPublicTab('status')">
       <i class="bi bi-search"></i>
-      <span>3. เช็ก/พิมพ์</span>
+      <span>เช็คสถานะ</span>
     </button>
   </nav>
 
-  <!-- Modal เข้าสู่ระบบ -->
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Login Modal -->
   <div class="modal fade no-print" id="loginModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content rounded-4 border-0 shadow">
-        <div class="modal-header cute-navbar text-white border-0 rounded-top-4"><h5 class="modal-title fw-bold"><i class="bi bi-shield-lock me-2"></i>เข้าสู่ระบบเจ้าหน้าที่</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body p-4">
-          <div class="mb-3"><label class="form-label fw-semibold small">ชื่อผู้ใช้ (Username)</label><input type="text" class="form-control" id="loginUser"></div>
-          <div class="mb-1"><label class="form-label fw-semibold small">รหัสผ่าน (Password)</label><input type="password" class="form-control" id="loginPass" onkeydown="if(event.key==='Enter') handleLogin()"></div>
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock me-2 text-primary"></i>เข้าสู่ระบบเจ้าหน้าที่ / ครู</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-footer border-0 pt-0 px-4 pb-4"><button type="button" class="btn btn-cute-submit w-100" onclick="handleLogin()">เข้าสู่ระบบ</button></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal ดูรายละเอียดคำขอ -->
-  <div class="modal fade no-print" id="detailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
-      <div class="modal-content rounded-4 border-0">
-        <div class="modal-header"><h5 class="modal-title fw-bold">รายละเอียด <span id="mdReqId" class="text-primary"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body" id="detailModalBody"></div>
-        <div class="modal-footer d-flex flex-wrap justify-content-between gap-2" id="detailModalFooter"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal จัดการประเภท กพช. -->
-  <div class="modal fade no-print" id="categoryModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content rounded-4 border-0">
-        <div class="modal-header"><h5 class="modal-title fw-bold" id="catModalTitle">🏷️ จัดการประเภท กพช.</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <input type="hidden" id="cat_id">
-          <div class="mb-2"><label class="form-label fw-semibold small">ชื่อประเภท กพช. <span class="text-danger">*</span></label><input type="text" class="form-control" id="cat_name"></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">ชื่อโครงการมาตรฐาน</label><input type="text" class="form-control" id="cat_default_project"></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">จำนวนชั่วโมงมาตรฐาน</label><input type="number" class="form-control" id="cat_default_hours" value="25"></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">หลักการและเหตุผลมาตรฐาน</label><textarea class="form-control" id="cat_default_rationale" rows="3"></textarea></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">สถานะ</label><select class="form-select" id="cat_status"><option value="ACTIVE">เปิดใช้งาน (ACTIVE)</option><option value="INACTIVE">ปิดใช้งาน (INACTIVE)</option></select></div>
-        </div>
-        <div class="modal-footer"><button type="button" class="btn btn-primary w-100 rounded-pill fw-bold py-2" onclick="handleSaveCategory()">บันทึกลง Google Sheet</button></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal จัดชุด & พิมพ์ / Word กพช. 3 + บันทึกข้อความ -->
-  <div class="modal fade no-print" id="doc56Modal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content rounded-4 border-0">
-        <div class="modal-header bg-primary text-white"><h5 class="modal-title fw-bold">🖨️ ชุด กพช. 3 + บันทึกข้อความ (พิมพ์ / Word / Google Docs)</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <div class="alert alert-info small py-2 mb-2">รวมรายชื่อนักศึกษาที่ผ่านการอนุมัติ กพช.1-2 แล้ว จำนวน <strong id="d56_count">0</strong> คน (จัดพิมพ์เป็น 1 ชุดเอกสาร)</div>
-          <div id="d56_gdoc_bar" class="alert alert-warning border-0 rounded-4 py-2 mb-2 d-none">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-              <div class="small fw-semibold"><i class="bi bi-file-earmark-text me-1"></i>สร้างเฉพาะ <b>บันทึกข้อความ</b> จากฟอร์ม Google Docs มาตรฐาน:</div>
-              <div class="d-flex flex-wrap gap-1">
-                <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold" onclick="generateDocFromTemplateUI('memo56', 'docx')"><i class="bi bi-file-earmark-word me-1"></i>.docx</button>
-                <button type="button" class="btn btn-danger btn-sm rounded-pill fw-bold" onclick="generateDocFromTemplateUI('memo56', 'pdf')"><i class="bi bi-file-earmark-pdf me-1"></i>.pdf</button>
-                <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="generateDocFromTemplateUI('memo56', 'gdoc')"><i class="bi bi-box-arrow-up-right me-1"></i>เปิด Google Docs</button>
-              </div>
+        <form onsubmit="handleLogin(event)">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">ชื่อผู้ใช้ (Username)</label>
+              <input type="text" id="login_username" class="form-control" required autocomplete="username">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">รหัสผ่าน (Password)</label>
+              <input type="password" id="login_password" class="form-control" required autocomplete="current-password">
             </div>
           </div>
-          <div class="row g-2">
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control" id="d56_doc_no" value="ศธ 07058.02/"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">วันที่ (บันทึกข้อความ)</label><input type="text" class="form-control" id="d56_doc_date"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label><input type="text" class="form-control" id="d56_advisor_pos" value="บรรณารักษ์ / ครูประจำกลุ่ม"></div>
-            <div class="col-12 col-md-8"><label class="form-label fw-semibold small">1. ชื่อโครงการ</label><input type="text" class="form-control" id="d56_project_name"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประมาณค่าหน่วยกิจกรรม (ชม.)</label><input type="number" class="form-control" id="d56_hours" value="25"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">2. หลักการและเหตุผล</label><textarea class="form-control" id="d56_rationale" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">3. วัตถุประสงค์</label><textarea class="form-control" id="d56_objectives" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4. เป้าหมาย</label><textarea class="form-control" id="d56_target" rows="2"></textarea></div>
-            <div class="col-12"><label class="form-label fw-semibold small">5. ขั้นตอน/แผนการปฏิบัติโครงการ</label><textarea class="form-control" id="d56_steps" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">6. สถานที่ดำเนินการ</label><input type="text" class="form-control" id="d56_location"></div>
-            <div class="col-6 col-md-3"><label class="form-label fw-semibold small">7. วันที่เริ่ม</label><input type="date" class="form-control" id="d56_start_date"></div>
-            <div class="col-6 col-md-3"><label class="form-label fw-semibold small">วันที่สิ้นสุด</label><input type="date" class="form-control" id="d56_end_date"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.1 เงิน</label><input type="text" class="form-control" id="d56_budget" value="-"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.2 วัสดุ</label><input type="text" class="form-control" id="d56_material" value="หนังสือ"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.3 แรงงาน</label><input type="text" class="form-control" id="d56_labor" value="นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">9. ผลที่คาดว่าจะได้รับ</label><textarea class="form-control" id="d56_expected" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">12. ที่ปรึกษาโครงการ / ครูผู้รับผิดชอบ</label><input type="text" class="form-control" id="d56_advisor"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ความเห็นครูผู้รับผิดชอบกลุ่ม</label><input type="text" class="form-control" id="d56_teacher_opinion" value="เป็นกิจกรรมที่มีประโยชน์ต่อนักศึกษา ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก เพื่อเป็นการพัฒนาตนเอง ในการดำเนินชีวิต"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประธานคณะกรรมการ</label><input type="text" class="form-control" id="d56_comm1"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กรรมการ</label><input type="text" class="form-control" id="d56_comm2"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กรรมการและเลขานุการ</label><input type="text" class="form-control" id="d56_comm3"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control" id="d56_director"></div>
+          <div class="modal-footer border-0 pt-0">
+            <button type="submit" class="btn btn-primary w-100 rounded-3 fw-semibold">เข้าสู่ระบบ</button>
           </div>
-        </div>
-        <div class="modal-footer d-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-outline-primary flex-fill rounded-pill fw-bold py-2" onclick="executeOutputDoc56('word')"><i class="bi bi-file-earmark-word me-1"></i>ดาวน์โหลดชุดรวม Word (.doc)</button>
-          <button type="button" class="btn btn-primary flex-fill rounded-pill fw-bold py-2" onclick="executeOutputDoc56('print')"><i class="bi bi-printer me-1"></i>สั่งปริ้นทันที</button>
-        </div>
+        </form>
       </div>
     </div>
   </div>
 
-  <!-- Modal จัดชุด & พิมพ์ / Word กพช. 4-6 + บันทึกข้อความ -->
-  <div class="modal fade no-print" id="doc57Modal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content rounded-4 border-0">
-        <div class="modal-header bg-success text-white"><h5 class="modal-title fw-bold">🖨️ ชุด กพช. 4-6 + บันทึกข้อความ (พิมพ์ / Word / Google Docs)</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <div class="alert alert-success small py-2 mb-2">จำนวนรายการที่ติ๊กเลือก: <strong id="d57_count">0</strong> คน</div>
-          <div id="d57_gdoc_bar" class="alert alert-warning border-0 rounded-4 py-2 mb-2 d-none">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-              <div class="small fw-semibold"><i class="bi bi-file-earmark-text me-1"></i>สร้างเฉพาะ <b>บันทึกข้อความ</b> จากฟอร์ม Google Docs มาตรฐาน:</div>
-              <div class="d-flex flex-wrap gap-1">
-                <button type="button" class="btn btn-success btn-sm rounded-pill fw-bold" onclick="generateDocFromTemplateUI('memo46', 'docx')"><i class="bi bi-file-earmark-word me-1"></i>.docx</button>
-                <button type="button" class="btn btn-danger btn-sm rounded-pill fw-bold" onclick="generateDocFromTemplateUI('memo46', 'pdf')"><i class="bi bi-file-earmark-pdf me-1"></i>.pdf</button>
-                <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold" onclick="generateDocFromTemplateUI('memo46', 'gdoc')"><i class="bi bi-box-arrow-up-right me-1"></i>เปิด Google Docs</button>
-              </div>
-            </div>
-          </div>
-          <div class="row g-2">
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control" id="d57_doc_no" value="ศธ 07058.02/"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">วันที่บันทึกข้อความ</label><input type="text" class="form-control" id="d57_doc_date"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">โครงการ/กิจกรรม</label><input type="text" class="form-control" id="d57_project_name"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">สถานที่ปฏิบัติกิจกรรม</label><input type="text" class="form-control" id="d57_location"></div>
-            <div class="col-4"><label class="form-label fw-semibold small">ผ่านกิจกรรม (คน)</label><input type="number" class="form-control" id="d57_pass_count"></div>
-            <div class="col-4"><label class="form-label fw-semibold small">ไม่ผ่านกิจกรรม (คน)</label><input type="number" class="form-control" id="d57_fail_count" value="0"></div>
-            <div class="col-4"><label class="form-label fw-semibold small">ชั่วโมงที่อนุมัติ</label><input type="number" class="form-control" id="d57_hours" value="25"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ชื่อครูผู้เสนอ</label><input type="text" class="form-control" id="d57_teacher_name"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label><input type="text" class="form-control" id="d57_teacher_pos" value="ครูประจำกลุ่ม / บรรณารักษ์"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ผู้กรอก (กพช.6)</label><input type="text" class="form-control" id="d57_filler"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ผู้ทาน (กพช.6)</label><input type="text" class="form-control" id="d57_checker"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">นายทะเบียน</label><input type="text" class="form-control" id="d57_registrar"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control" id="d57_director"></div>
-          </div>
-        </div>
-        <div class="modal-footer d-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-outline-success flex-fill rounded-pill fw-bold py-2" onclick="executeOutputDoc57('word')"><i class="bi bi-file-earmark-word me-1"></i>ดาวน์โหลดชุดรวม Word (.doc)</button>
-          <button type="button" class="btn btn-success flex-fill rounded-pill fw-bold py-2" onclick="executeOutputDoc57('print')"><i class="bi bi-printer me-1"></i>สั่งปริ้นทันที</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal นักศึกษาแก้ไขข้อมูล -->
-  <div class="modal fade no-print" id="studentEditModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content rounded-4 border-0">
-        <div class="modal-header bg-warning bg-opacity-25"><h5 class="modal-title fw-bold">✏️ ปรับปรุง / แก้ไขข้อมูล <span id="se_req_id" class="text-primary"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <input type="hidden" id="se_type"><input type="hidden" id="se_id">
-          <div id="se_reject_alert" class="alert alert-danger small d-none"></div>
-          <div class="row g-2">
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ชื่อ - นามสกุล</label><input type="text" class="form-control" id="se_student_name"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ระดับการศึกษา</label><select class="form-select" id="se_level"><option value="ประถมศึกษา">ประถมศึกษา</option><option value="มัธยมศึกษาตอนต้น">มัธยมศึกษาตอนต้น</option><option value="มัธยมศึกษาตอนปลาย">มัธยมศึกษาตอนปลาย</option></select></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ครูประจำกลุ่ม</label><select class="form-select" id="se_teacher_id"></select></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">กลุ่ม / ศกร.ตำบล</label><input type="text" class="form-control" id="se_group_name"></div>
-            <div class="col-12 col-md-8"><label class="form-label fw-semibold small">ประเภท กพช.</label><select class="form-select" id="se_category"></select></div>
-            <div class="col-12 col-md-4" id="se_hours_wrap"><label class="form-label fw-semibold small">จำนวนชั่วโมง</label><input type="number" class="form-control" id="se_hours"></div>
-            <div class="col-12 col-md-4" id="se_role_wrap"><label class="form-label fw-semibold small">บทบาทในโครงการ</label><select class="form-select" id="se_role_note"><option value="">ผู้เข้าร่วมโครงการ</option><option value="ประธาน">ประธาน</option><option value="รองประธาน">รองประธาน</option><option value="เหรัญญิก">เหรัญญิก</option><option value="ผู้ช่วยเหรัญญิก">ผู้ช่วยเหรัญญิก</option><option value="เลขานุการ">เลขานุการ</option></select></div>
-            <div class="col-12"><label class="form-label fw-semibold small">ชื่อกิจกรรม / โครงการ</label><input type="text" class="form-control" id="se_activity_name"></div>
-            <div class="col-6"><label class="form-label fw-semibold small">วันที่เริ่ม</label><input type="date" class="form-control" id="se_start_date"></div>
-            <div class="col-6"><label class="form-label fw-semibold small">วันที่สิ้นสุด</label><input type="date" class="form-control" id="se_end_date"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">สถานที่ดำเนินการ</label><input type="text" class="form-control" id="se_location"></div>
-            <div id="se_k4_wrap" class="col-12 d-none">
-              <div class="row g-2 mt-1">
-                <div class="col-12"><label class="form-label fw-semibold small">4.1 การคิด/การวางแผน</label><textarea class="form-control" id="se_k4_plan" rows="2"></textarea></div>
-                <div class="col-12"><label class="form-label fw-semibold small">4.2 การดำเนินงาน / รายละเอียด</label><textarea class="form-control" id="se_detail" rows="3"></textarea></div>
-                <div class="col-12"><label class="form-label fw-semibold small">4.3 การเรียนรู้และประสบการณ์</label><textarea class="form-control" id="se_k4_learning" rows="2"></textarea></div>
-                <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.4 ปัญหาและการแก้ไข</label><textarea class="form-control" id="se_k4_problem" rows="2"></textarea></div>
-                <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4.5 / 5. การนำไปใช้</label><textarea class="form-control" id="se_k4_apply" rows="2"></textarea></div>
-                <div class="col-12"><label class="form-label fw-semibold small">📸 เปลี่ยนรูปภาพใหม่ (2-3 ภาพ)</label><input type="file" class="form-control" id="se_images" accept="image/*" multiple onchange="handleEditImageSelection(this)"><div id="se_imagePreviewBox" class="d-flex flex-wrap gap-2 mt-2"></div></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer"><button type="button" class="btn btn-primary w-100 rounded-pill fw-bold py-2" onclick="saveStudentEdit()"><i class="bi bi-save me-1"></i>บันทึกการแก้ไขและส่งตรวจสอบใหม่</button></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal เพิ่ม/แก้ไขผู้ใช้ -->
-  <div class="modal fade no-print" id="userModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content rounded-4 border-0">
-        <div class="modal-header"><h5 class="modal-title fw-bold" id="userModalTitle">จัดการข้อมูลบุคลากร</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <input type="hidden" id="u_id">
-          <div class="mb-2"><label class="form-label fw-semibold small">Username *</label><input type="text" class="form-control" id="u_username"></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">ชื่อ-นามสกุล *</label><input type="text" class="form-control" id="u_fullname"></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">ตำแหน่ง (Role) *</label><select class="form-select" id="u_role"><option value="TEACHER">ครูประจำกลุ่ม (TEACHER)</option><option value="REGISTRAR">นายทะเบียน (REGISTRAR)</option><option value="ADMIN">ผู้ดูแลระบบ (ADMIN)</option></select></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">ชื่อกลุ่ม / ศกร.ตำบล</label><input type="text" class="form-control" id="u_group"></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">รหัสผ่าน <span id="u_pass_hint" class="small text-muted"></span></label><input type="password" class="form-control" id="u_password"></div>
-          <div class="mb-2" id="u_status_wrap"><label class="form-label fw-semibold small">สถานะบัญชี</label><select class="form-select" id="u_status"><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option></select></div>
-        </div>
-        <div class="modal-footer"><button type="button" class="btn btn-primary w-100 rounded-pill fw-bold py-2" onclick="handleSaveUser()">บันทึกข้อมูล</button></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal เปลี่ยนรหัสผ่าน -->
+  <!-- Change Password Modal -->
   <div class="modal fade no-print" id="changePassModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content rounded-4 border-0">
-        <div class="modal-header"><h5 class="modal-title fw-bold"><i class="bi bi-key me-2 text-warning"></i>เปลี่ยนรหัสผ่านของฉัน</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-          <div class="mb-2"><label class="form-label fw-semibold small">รหัสผ่านเดิม *</label><input type="password" class="form-control" id="cp_old"></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">รหัสผ่านใหม่ *</label><input type="password" class="form-control" id="cp_new"></div>
-          <div class="mb-2"><label class="form-label fw-semibold small">ยืนยันรหัสผ่านใหม่ *</label><input type="password" class="form-control" id="cp_confirm"></div>
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold"><i class="bi bi-key me-2 text-primary"></i>เปลี่ยนรหัสผ่าน</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-primary w-100 rounded-pill fw-bold py-2" onclick="handleChangeMyPassword()">บันทึกรหัสผ่านใหม่</button></div>
+        <form onsubmit="handleChangePass(event)">
+          <div class="modal-body">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">รหัสผ่านเดิม</label>
+              <input type="password" id="cp_old" class="form-control" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">รหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)</label>
+              <input type="password" id="cp_new" class="form-control" minlength="4" required>
+            </div>
+            <div>
+              <label class="form-label small fw-semibold">ยืนยันรหัสผ่านใหม่</label>
+              <input type="password" id="cp_confirm" class="form-control" minlength="4" required>
+            </div>
+          </div>
+          <div class="modal-footer border-0 pt-0">
+            <button type="submit" class="btn btn-primary w-100 rounded-3">บันทึกรหัสผ่านใหม่</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
 
+  <!-- Admin User Modal -->
+  <div class="modal fade no-print" id="userModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="userModalTitle">จัดการผู้ใช้งาน</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form onsubmit="handleSaveUser(event)">
+          <div class="modal-body">
+            <input type="hidden" id="u_id">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">Username</label>
+              <input type="text" id="u_username" class="form-control" required>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">รหัสผ่าน <span class="text-muted fw-normal">(เว้นว่างถ้าไม่เปลี่ยน)</span></label>
+              <input type="password" id="u_password" class="form-control">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-semibold">ชื่อ-นามสกุล (เช่น นายสมชาย ใจดี)</label>
+              <input type="text" id="u_fullname" class="form-control" required>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="form-label small fw-semibold">บทบาทสิทธิ์</label>
+                <select id="u_role" class="form-select">
+                  <option value="TEACHER">ครูที่ปรึกษา (TEACHER)</option>
+                  <option value="REGISTRAR">งานทะเบียน (REGISTRAR)</option>
+                  <option value="ADMIN">ผู้ดูแลระบบ (ADMIN)</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-semibold">ศกร.ตำบล / กลุ่ม</label>
+                <input type="text" id="u_group" class="form-control">
+              </div>
+            </div>
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" id="u_active" checked>
+              <label class="form-check-label small" for="u_active">เปิดใช้งานบัญชีนี้</label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary rounded-3 px-4">บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Staff Detail 1-2 Modal -->
+  <div class="modal fade no-print" id="detail12Modal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-text me-2 text-primary"></i>รายละเอียดคำขอ กพช. 1-2</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="detail12Body"></div>
+        <div class="modal-footer flex-wrap gap-2" id="detail12Footer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Staff Detail Sub (KPCH 4) Modal -->
+  <div class="modal fade no-print" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold"><i class="bi bi-journal-check me-2 text-primary"></i>รายละเอียดหลักฐาน กพช. 4</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="detailSubBody"></div>
+        <div class="modal-footer flex-wrap gap-2" id="detailSubFooter"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Student Edit Modal (Supports editing Student ID & Online Signature) -->
+  <div class="modal fade no-print" id="studentEditModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2 text-primary"></i>แก้ไขข้อมูลคำขอ / รหัสนักศึกษา</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form onsubmit="saveStudentEdit(event)">
+          <div class="modal-body">
+            <input type="hidden" id="se_type">
+            <input type="hidden" id="se_id">
+            <input type="hidden" id="se_orig_student_id">
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">รหัสนักศึกษา (10 หลัก) <span class="text-danger">*</span></label>
+                <input type="text" id="se_student_id" class="form-control" maxlength="10" inputmode="numeric" required>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label small fw-semibold">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+                <input type="text" id="se_student_name" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">ระดับการศึกษา</label>
+                <select id="se_level" class="form-select">
+                  <option value="ประถมศึกษา">ประถมศึกษา</option>
+                  <option value="มัธยมศึกษาตอนต้น">มัธยมศึกษาตอนต้น</option>
+                  <option value="มัธยมศึกษาตอนปลาย">มัธยมศึกษาตอนปลาย</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">ครูที่ปรึกษา</label>
+                <select id="se_teacher_id" class="form-select"></select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">กลุ่มเรียน / ศกร.ตำบล</label>
+                <input type="text" id="se_group_name" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-semibold">ประเภทกิจกรรม</label>
+                <select id="se_category" class="form-select"></select>
+              </div>
+              <div class="col-md-3" id="se_hours_wrap">
+                <label class="form-label small fw-semibold">จำนวนชั่วโมง</label>
+                <input type="number" id="se_hours" class="form-control" min="1" max="200">
+              </div>
+              <div class="col-md-3" id="se_role_wrap">
+                <label class="form-label small fw-semibold">บทบาทหน้าที่</label>
+                <input type="text" id="se_role_note" class="form-control">
+              </div>
+              <div class="col-12">
+                <label class="form-label small fw-semibold">ชื่อโครงการ / กิจกรรม</label>
+                <input type="text" id="se_activity_name" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">วันที่เริ่ม</label>
+                <input type="date" id="se_start_date" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">วันที่สิ้นสุด</label>
+                <input type="date" id="se_end_date" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small fw-semibold">สถานที่จัดกิจกรรม</label>
+                <input type="text" id="se_location" class="form-control" required>
+              </div>
+            </div>
+
+            <!-- Extra fields for KPCH 4 -->
+            <div id="se_k4_wrap" class="mt-3 pt-2 border-top" style="display: none;">
+              <div class="row g-2">
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">การวางแผนและการเตรียมการ</label>
+                  <textarea id="se_k4_plan" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">ขั้นตอนการดำเนินงาน / ผลที่เกิดขึ้นจริง</label>
+                  <textarea id="se_detail" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">สิ่งที่ได้เรียนรู้</label>
+                  <textarea id="se_k4_learning" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold">ปัญหาและแนวทางแก้ไข</label>
+                  <textarea id="se_k4_problem" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small fw-semibold">การนำไปประยุกต์ใช้</label>
+                  <textarea id="se_k4_apply" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">เปลี่ยนภาพถ่ายประกอบ (เลือกเฉพาะเมื่อต้องการเปลี่ยนรูปใหม่)</label>
+                  <input type="file" id="se_images" class="form-control" accept="image/*" multiple onchange="handleImagesSelect(this, 'se_imagePreviewBox', 'studentEdit')">
+                  <div id="se_imagePreviewBox" class="d-flex flex-wrap gap-2 mt-2"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Extra fields for KPCH 1-2 (Plan + Online Signature) -->
+            <div id="se_p12_wrap" class="mt-3 pt-2 border-top" style="display: none;">
+              <div class="row g-2 mb-3">
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">วัตถุประสงค์ / แผนการดำเนินงาน</label>
+                  <textarea id="se_plan_detail" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">ผลที่คาดว่าจะได้รับ</label>
+                  <textarea id="se_expected_outcome" class="form-control" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div id="se_sig_wrap" class="mt-2" style="display: none;">
+              <label class="form-label small fw-semibold">ลายเซ็นนักศึกษาผู้ยื่นคำขอ</label>
+              <div class="sig-pad-wrap">
+                <canvas id="se_sig_canvas" class="sig-pad-canvas"></canvas>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
+                  <div id="se_sig_status" class="small text-muted">ยังไม่ได้ลงลายเซ็น</div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <input type="file" id="se_sig_upload" accept="image/*" class="d-none" onchange="handleSignatureImageUpload(this, 'se_sig_canvas')">
+                    <label for="se_sig_upload" class="btn btn-outline-primary btn-sm rounded-3 mb-0" style="cursor: pointer;">
+                      <i class="bi bi-image me-1"></i>อัปโหลดลายเซ็น
+                    </label>
+                    <button type="button" class="btn btn-outline-danger btn-sm rounded-3" onclick="clearSignaturePad('se_sig_canvas')">
+                      <i class="bi bi-eraser me-1"></i>ล้างลายเซ็น
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary rounded-3 px-4">บันทึกการแก้ไข</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Doc 5-6 (Memo KPCH 3) Modal -->
+  <div class="modal fade no-print" id="doc56Modal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-richtext me-2 text-primary"></i>สร้างบันทึกข้อความขออนุมัติโครงการ (กพช. 3)</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="d56_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-3" style="display: none;">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
+              <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'gdoc')">Google Docs</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'docx')">.DOCX</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo56', 'pdf')">PDF</button>
+              </div>
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-5">
+              <label class="form-label small fw-semibold">ที่ (เลขที่หนังสือ)</label>
+              <input type="text" id="d56_doc_no" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-7">
+              <label class="form-label small fw-semibold">วันที่</label>
+              <input type="text" id="d56_doc_date" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label small fw-semibold">ชื่อโครงการ</label>
+              <input type="text" id="d56_project_name" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">จำนวนนักศึกษา (คน)</label>
+              <input type="number" id="d56_student_count" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">วันที่เริ่ม</label>
+              <input type="text" id="d56_start_date" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">วันที่สิ้นสุด</label>
+              <input type="text" id="d56_end_date" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">ครูที่ปรึกษา / ผู้เสนอ</label>
+              <input type="text" id="d56_advisor_name" class="form-control form-control-sm">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">สถานที่ดำเนินโครงการ</label>
+              <input type="text" id="d56_location" class="form-control form-control-sm">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">รายชื่อนักศึกษา (แก้ไขได้)</label>
+              <textarea id="d56_student_list" class="form-control form-control-sm" rows="4"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-3" onclick="executeOutputDoc56('word')">
+            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
+          </button>
+          <button type="button" class="btn btn-primary btn-sm rounded-3" onclick="executeOutputDoc56('print')">
+            <i class="bi bi-printer me-1"></i>พิมพ์เอกสาร (A4)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Doc 5-7 (Memo KPCH 4-6) Modal -->
+  <div class="modal fade no-print" id="doc57Modal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-check me-2 text-primary"></i>สร้างบันทึกข้อความรายงานผล (กพช. 4-6)</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="d57_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-3" style="display: none;">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
+              <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo46', 'gdoc')">Google Docs</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo46', 'docx')">.DOCX</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo46', 'pdf')">PDF</button>
+              </div>
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-md-5">
+              <label class="form-label small fw-semibold">ที่ (เลขที่หนังสือ)</label>
+              <input type="text" id="d57_doc_no" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-7">
+              <label class="form-label small fw-semibold">วันที่</label>
+              <input type="text" id="d57_doc_date" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">ชื่อโครงการ / กิจกรรม</label>
+              <input type="text" id="d57_project_name" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">จำนวนนักศึกษา</label>
+              <input type="number" id="d57_student_count" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small fw-semibold">จำนวนชั่วโมง</label>
+              <input type="number" id="d57_hours" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">วันที่เริ่ม</label>
+              <input type="text" id="d57_start_date" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">วันที่สิ้นสุด</label>
+              <input type="text" id="d57_end_date" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">ครูที่ปรึกษา</label>
+              <input type="text" id="d57_advisor_name" class="form-control form-control-sm">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">สถานที่จัดกิจกรรม</label>
+              <input type="text" id="d57_location" class="form-control form-control-sm">
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-semibold">รายชื่อนักศึกษา</label>
+              <textarea id="d57_student_list" class="form-control form-control-sm" rows="4"></textarea>
+            </div>
+            <div class="col-12 mt-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="d57_include_photos" checked>
+                <label class="form-check-label small fw-semibold" for="d57_include_photos">แนบภาพถ่ายประกอบกิจกรรมในชุดเอกสารด้วย</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-3" onclick="executeOutputDoc57('word')">
+            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
+          </button>
+          <button type="button" class="btn btn-primary btn-sm rounded-3" onclick="executeOutputDoc57('print')">
+            <i class="bi bi-printer me-1"></i>พิมพ์เอกสาร (A4)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Print Area -->
   <div id="printOnlyContainer"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="app.js?v=20261123"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="app.js?v=20261124"></script>
 </body>
 </html>
-
-        
