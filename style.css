@@ -1,580 +1,826 @@
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@400;600;700&display=swap');
-
-:root {
-  --cute-primary: #4f46e5;
-  --cute-primary-dark: #4338ca;
-  --cute-pink: #ec4899;
-  --cute-mint: #10b981;
-  --cute-bg: #f1f5f9;
-  --org-sidebar-w: 276px;
-  --org-sidebar-bg: #0f172a;
-  --org-sidebar-border: rgba(255, 255, 255, 0.08);
+// ==================== API: ส่วนสาธารณะ & กพช. 1-2 ====================
+function getTeachersPublic() {
+  return sheetToObjects(ensureUsersSheet(SpreadsheetApp.getActiveSpreadsheet()))
+    .filter(u => u.role === 'TEACHER' && u.status === 'ACTIVE')
+    .map(u => ({ user_id: u.user_id, full_name: u.full_name, group_name: u.group_name }));
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
+function submitPreApproval12(payload) {
+  if (!payload || !payload.student_id || !payload.student_name || !payload.teacher_id || !payload.activity_name) {
+    throw new Error('กรุณากรอกข้อมูลการขออนุมัติ กพช.1-2 ให้ครบถ้วน');
+  }
+  const cleanSid = payload.student_id.trim();
+  if (!/^6\d{9}$/.test(cleanSid)) throw new Error('รหัสนักศึกษาต้องขึ้นต้นด้วยเลข 6 และเป็นตัวเลข 10 หลักเท่านั้น (เช่น 6912345678)');
+  if (!payload.self_eval_ok) throw new Error('กรุณาติ๊กยืนยันแบบประเมินตนเองและการลงทะเบียน กพช.1-2');
+
+  const cleanSig = sanitizeSignatureData(payload.student_signature);
+  if (!cleanSig) throw new Error('กรุณาลงลายมือชื่อนักศึกษาในช่องลายเซ็นก่อนยื่นคำขอ');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet12 = ensureApprovals12Sheet(ss);
+    const teacher = sheetToObjects(ensureUsersSheet(ss)).find(u => u.user_id === payload.teacher_id && u.role === 'TEACHER');
+    if (!teacher) throw new Error('ไม่พบข้อมูลครูประจำกลุ่มที่เลือก');
+
+    const cleanTerm = normalizeTermStr(payload.term || '2/2569');
+    const all12Rows = sheetToObjects(sheet12);
+    const existing12 = all12Rows.find(r => r.student_id === cleanSid && normalizeTermStr(r.term) === cleanTerm && ['WAIT_TEACHER_12', 'APPROVED_12'].includes(r.status_12));
+    if (existing12) {
+      throw new Error(existing12.status_12 === 'APPROVED_12'
+        ? `นักศึกษาได้รับอนุมัติ กพช.1-2 ภาคเรียน ${cleanTerm} แล้ว (${existing12.req12_id}) ไม่ต้องขอซ้ำ`
+        : `นักศึกษายื่นขอ กพช.1-2 ภาคเรียน ${cleanTerm} ไว้แล้ว (${existing12.req12_id}) อยู่ระหว่างรอครูอนุมัติ`);
+    }
+
+    const thaiYear = new Date().getFullYear() + 543;
+    const prefix = `REQ12-${thaiYear}-`;
+    let maxNum = 0;
+    all12Rows.forEach(r => { if (r.req12_id && r.req12_id.startsWith(prefix)) { const n = parseInt(r.req12_id.replace(prefix, ''), 10); if (!isNaN(n) && n > maxNum) maxNum = n; } });
+    const req12Id = prefix + String(maxNum + 1).padStart(4, '0');
+
+    const rowMap = {
+      req12_id: req12Id, created_at: getNowString(),
+      student_id: cleanSid, student_name: payload.student_name.trim(), level: payload.level || '',
+      teacher_id: teacher.user_id, teacher_name: teacher.full_name,
+      group_name: (payload.group_name || teacher.group_name || '').trim(),
+      term: "'" + cleanTerm, category: (payload.category || '').trim(), role_note: (payload.role_note || '').trim(),
+      activity_name: payload.activity_name.trim(),
+      plan_start_date: payload.plan_start_date || '', plan_end_date: payload.plan_end_date || '',
+      location: (payload.location || '').trim(), hours: Number(payload.hours) || 0,
+      plan_detail: payload.plan_detail || '',
+      self_eval_ok: 'ผ่านการประเมินตนเอง กพช.1-2', eval_scores: JSON.stringify(payload.eval_scores || []),
+      status_12: 'WAIT_TEACHER_12', reject_reason_12: '', approved_at_12: '', printed_12_at: '', printed_3_at: '',
+      student_signature: cleanSig
+    };
+    const headers = sheet12.getRange(1, 1, 1, sheet12.getLastColumn()).getValues()[0];
+    sheet12.appendRow(headers.map(col => rowMap[col] !== undefined ? rowMap[col] : ''));
+    writeAuditLog(req12Id, payload.student_name.trim(), 'STUDENT', 'ยื่นขอ กพช.1-2', `ภาคเรียน ${cleanTerm} ประเภท: ${rowMap.category || '-'} ส่งถึง ${teacher.full_name}`);
+    return { req12_id: req12Id };
+  } finally { lock.releaseLock(); }
 }
 
-body {
-  font-family: 'Prompt', sans-serif !important;
-  background: var(--cute-bg);
-  color: #1e293b;
-  min-height: 100vh;
-  margin: 0;
-  line-height: 1.6;
+function checkStudentEligibility(studentId) {
+  if (!studentId || !studentId.trim()) return { hasAny12: false, approvals12: [], availableApproved12: [] };
+  const cleanId = studentId.trim();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const my12 = sheetToObjects(ensureApprovals12Sheet(ss)).filter(r => r.student_id === cleanId).reverse();
+  const mySubs = sheetToObjects(ensureSubmissionsSheet(ss)).filter(r => r.student_id === cleanId && r.current_step !== 'REJECTED');
+  const used12Ids = mySubs.map(s => s.ref_12_id).filter(Boolean);
+  const decorated12 = my12.map(r => ({ ...r, is_used: used12Ids.includes(r.req12_id) }));
+  return { hasAny12: decorated12.length > 0, approvals12: decorated12, availableApproved12: decorated12.filter(r => r.status_12 === 'APPROVED_12') };
 }
 
-input, select, textarea, button,
-.form-control, .form-select, .btn,
-.swal2-popup, .swal2-title, .swal2-html-container,
-.ann-content-box, .detail-text-box {
-  font-family: 'Prompt', sans-serif !important;
+function submitKPCH(payload) {
+  if (!payload || !payload.student_id || !payload.student_name || !payload.teacher_id || !payload.activity_name) {
+    throw new Error('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+  }
+  const cleanSid = payload.student_id.trim();
+  if (!/^6\d{9}$/.test(cleanSid)) throw new Error('รหัสนักศึกษาต้องขึ้นต้นด้วยเลข 6 และเป็นตัวเลข 10 หลักเท่านั้น (เช่น 6912345678)');
+  if (!payload.ref_12_id) throw new Error('กรุณายื่นขออนุมัติ กพช.1-2 และรอครูอนุมัติก่อนส่งผลงาน');
+  if (!payload.images || payload.images.length < 2 || payload.images.length > 3) throw new Error('กรุณาแนบรูปภาพกิจกรรม 2 - 3 ภาพ');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const req12 = sheetToObjects(ensureApprovals12Sheet(ss)).find(r => r.req12_id === payload.ref_12_id && r.student_id === cleanSid);
+    if (!req12) throw new Error('ไม่พบรหัสคำขออนุมัติ กพช.1-2 ของรหัสนักศึกษานี้');
+    if (req12.status_12 !== 'APPROVED_12') throw new Error('คำขอ กพช.1-2 ของคุณยังไม่ได้รับการอนุมัติจากครูประจำกลุ่ม');
+
+    const teacher = sheetToObjects(ensureUsersSheet(ss)).find(u => u.user_id === payload.teacher_id && u.role === 'TEACHER');
+    if (!teacher) throw new Error('ไม่พบข้อมูลครูประจำกลุ่มที่เลือก');
+
+    const subSheet = ensureSubmissionsSheet(ss);
+    const thaiYear = new Date().getFullYear() + 543;
+    const prefix = `KPCH-${thaiYear}-`;
+    let maxNum = 0;
+    sheetToObjects(subSheet).forEach(r => { if (r.req_id && r.req_id.startsWith(prefix)) { const n = parseInt(r.req_id.replace(prefix, ''), 10); if (!isNaN(n) && n > maxNum) maxNum = n; } });
+    const reqId = prefix + String(maxNum + 1).padStart(4, '0');
+
+    const folder = getOrCreateImageFolder();
+    const imgUrls = ['', '', ''];
+    for (let i = 0; i < payload.images.length; i++) {
+      const img = payload.images[i];
+      const blob = Utilities.newBlob(Utilities.base64Decode(img.base64Data), img.mimeType || 'image/jpeg', `${reqId}_img${i + 1}.jpg`);
+      const file = folder.createFile(blob);
+      imgUrls[i] = `https://drive.google.com/file/d/${file.getId()}/view`;
+    }
+
+    const rowMap = {
+      req_id: reqId, created_at: getNowString(),
+      student_id: cleanSid, student_name: payload.student_name.trim(), level: payload.level || '',
+      teacher_id: teacher.user_id, teacher_name: teacher.full_name,
+      group_name: (payload.group_name || req12.group_name || teacher.group_name || '').trim(),
+      category: (payload.category || req12.category || '').trim(),
+      activity_name: payload.activity_name.trim(), activity_date: payload.activity_date || '',
+      activity_end_date: payload.activity_end_date || '', location: payload.location || '',
+      hours: Number(payload.hours) || 0,
+      k4_plan: payload.k4_plan || '', activity_detail: payload.activity_detail || '',
+      k4_learning: payload.k4_learning || '', k4_problem: payload.k4_problem || 'ไม่พบปัญหาในการทำงาน', k4_apply: payload.k4_apply || '',
+      img_1: imgUrls[0], img_2: imgUrls[1], img_3: imgUrls[2],
+      current_step: 'WAIT_TEACHER', reject_reason: '',
+      teacher_approved_at: '', teacher_presented_at: '', registrar_exported_at: '',
+      ref_12_id: payload.ref_12_id, printed_46_at: ''
+    };
+    const headers = subSheet.getRange(1, 1, 1, subSheet.getLastColumn()).getValues()[0];
+    subSheet.appendRow(headers.map(col => rowMap[col] !== undefined ? rowMap[col] : ''));
+    writeAuditLog(reqId, payload.student_name.trim(), 'STUDENT', 'ส่งผลงาน กพช.4', `อ้างอิง ${payload.ref_12_id} ประเภท: ${rowMap.category || '-'} ส่งถึง ${teacher.full_name}`);
+    return { req_id: reqId };
+  } finally { lock.releaseLock(); }
 }
 
-input.form-control, select.form-select, textarea.form-control {
-  font-size: 15px !important;
-  line-height: 1.5 !important;
-  border-radius: 12px !important;
-  border: 1.5px solid #cbd5e1 !important;
-  padding: 10px 14px !important;
-  background-color: #ffffff;
-}
-
-input.form-control-sm, select.form-select-sm {
-  font-size: 14px !important;
-  padding: 7px 12px !important;
-  border-radius: 10px !important;
-}
-
-select.form-select {
-  padding-right: 2.3rem !important;
-  height: auto !important;
-}
-
-input:focus, select:focus, textarea:focus {
-  border-color: var(--cute-primary) !important;
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.14) !important;
-}
-
-.ann-content-box, .detail-text-box {
-  font-size: 0.96rem;
-  line-height: 1.75;
-  white-space: pre-line;
-  word-break: break-word;
-}
-
-.bg-indigo-soft {
-  background-color: #eef2ff !important;
-}
-
-/* ==================== App Shell & Organization Sidebar (Desktop Left) ==================== */
-.app-shell {
-  display: flex;
-  min-height: 100vh;
-}
-
-.org-sidebar {
-  display: none;
-}
-
-.app-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 84px;
-}
-
-.org-topbar {
-  display: none;
-}
-
-.mobile-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 1020;
-  background: linear-gradient(90deg, #0f172a 0%, #312e81 100%);
-  color: #ffffff;
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
-}
-
-.org-content {
-  width: 100%;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 14px 12px 24px;
-}
-
-@media (min-width: 992px) {
-  .org-sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: var(--org-sidebar-w);
-    background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
-    color: #e2e8f0;
-    display: flex;
-    flex-direction: column;
-    z-index: 1030;
-    border-right: 1px solid var(--org-sidebar-border);
-    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.16);
+function checkStudentStatus(query) {
+  const q = String(query || '').trim();
+  if (!q) return { approvals12: [], submissions: [] };
+  const qLower = q.toLowerCase();
+  const qUpper = q.toUpperCase();
+  const isSid = /^6\d{9}$/.test(q);
+  const isReqCode = /^(REQ12|KPCH)-\d{4}-\d+$/i.test(q);
+  if (!isSid && !isReqCode && q.length < 3) {
+    throw new Error('กรุณากรอกรหัสนักศึกษา 10 หลัก, รหัสคำขอ หรือชื่อ-นามสกุลอย่างน้อย 3 ตัวอักษร');
   }
 
-  .org-sidebar-header {
-    padding: 20px 18px 16px;
-    border-bottom: 1px solid var(--org-sidebar-border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const all12 = sheetToObjects(ensureApprovals12Sheet(ss));
+  const allSubs = sheetToObjects(ensureSubmissionsSheet(ss));
+  const sigMap12 = {};
+  all12.forEach(r => { if (r.req12_id && r.student_signature) sigMap12[r.req12_id] = r.student_signature; });
+
+  const match12 = (r) => {
+    if (isSid) return r.student_id === q;
+    if (isReqCode) return String(r.req12_id || '').toUpperCase() === qUpper;
+    return String(r.student_name || '').toLowerCase().includes(qLower) || String(r.student_id || '').includes(q);
+  };
+  const matchSub = (r) => {
+    if (isSid) return r.student_id === q;
+    if (isReqCode) return String(r.req_id || '').toUpperCase() === qUpper || String(r.ref_12_id || '').toUpperCase() === qUpper;
+    return String(r.student_name || '').toLowerCase().includes(qLower) || String(r.student_id || '').includes(q);
+  };
+
+  return {
+    approvals12: all12.filter(match12).reverse(),
+    submissions: allSubs.filter(matchSub).reverse().map(r => ({
+      ...r,
+      student_signature: sigMap12[r.ref_12_id] || ''
+    }))
+  };
+}
+
+function studentUpdateRecord(payload) {
+  if (!payload || !payload.item_type || !payload.id || !payload.student_id) throw new Error('ข้อมูลสำหรับแก้ไขไม่ครบถ้วน');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const newSid = String(payload.student_id).trim();
+    const origSid = String(payload.original_student_id || payload.student_id).trim();
+    if (!/^6\d{9}$/.test(newSid)) throw new Error('รหัสนักศึกษาใหม่ต้องขึ้นต้นด้วยเลข 6 และมี 10 หลักเท่านั้น');
+
+    const teacher = payload.teacher_id ? sheetToObjects(ensureUsersSheet(ss)).find(u => u.user_id === payload.teacher_id && u.role === 'TEACHER') : null;
+
+    if (payload.item_type === '12') {
+      const sheet12 = ensureApprovals12Sheet(ss);
+      const headers = sheet12.getRange(1, 1, 1, sheet12.getLastColumn()).getValues()[0];
+      const all12 = sheetToObjects(sheet12);
+      const target = all12.find(r => r.req12_id === payload.id && r.student_id === origSid);
+      if (!target) throw new Error('ไม่พบคำขอ กพช.1-2 ที่ต้องการแก้ไข');
+      if (!['WAIT_TEACHER_12', 'REJECTED_12'].includes(target.status_12)) throw new Error('คำขอนี้ได้รับการอนุมัติแล้ว ไม่สามารถแก้ไขเองได้ กรุณาแจ้งครูประจำกลุ่ม');
+
+      if (newSid !== target.student_id) {
+        const targetTerm = normalizeTermStr(target.term);
+        const conflict = all12.find(r => r.req12_id !== target.req12_id && r.student_id === newSid && normalizeTermStr(r.term) === targetTerm && ['WAIT_TEACHER_12', 'APPROVED_12'].includes(r.status_12));
+        if (conflict) throw new Error(`รหัสนักศึกษา ${newSid} มีคำขอ กพช.1-2 ในภาคเรียน ${targetTerm} อยู่แล้ว (${conflict.req12_id})`);
+      }
+
+      const updates = {
+        student_id: newSid,
+        student_name: (payload.student_name || target.student_name).trim(),
+        level: payload.level || target.level,
+        teacher_id: teacher ? teacher.user_id : target.teacher_id,
+        teacher_name: teacher ? teacher.full_name : target.teacher_name,
+        group_name: (payload.group_name !== undefined ? payload.group_name : target.group_name).trim(),
+        category: (payload.category !== undefined ? payload.category : target.category).trim(),
+        role_note: (payload.role_note !== undefined ? payload.role_note : target.role_note).trim(),
+        activity_name: (payload.activity_name || target.activity_name).trim(),
+        plan_start_date: payload.start_date || target.plan_start_date,
+        plan_end_date: payload.end_date || target.plan_end_date,
+        location: (payload.location !== undefined ? payload.location : target.location).trim(),
+        status_12: 'WAIT_TEACHER_12',
+        reject_reason_12: ''
+      };
+      if (payload.student_signature) {
+        updates.student_signature = sanitizeSignatureData(payload.student_signature);
+      }
+
+      Object.keys(updates).forEach(col => { const cIdx = headers.indexOf(col); if (cIdx >= 0) sheet12.getRange(target._rowIndex, cIdx + 1).setValue(updates[col]); });
+      const idNote = newSid !== origSid ? ` (แก้รหัส ${origSid} -> ${newSid})` : '';
+      writeAuditLog(target.req12_id, updates.student_name, 'STUDENT', 'นศ.แก้ไขข้อมูล กพช.1-2', `ส่งตรวจใหม่: ${updates.activity_name}${idNote}`);
+      return { success: true, student_id: newSid };
+    } else {
+      const subSheet = ensureSubmissionsSheet(ss);
+      const headers = subSheet.getRange(1, 1, 1, subSheet.getLastColumn()).getValues()[0];
+      const target = sheetToObjects(subSheet).find(r => r.req_id === payload.id && r.student_id === origSid);
+      if (!target) throw new Error('ไม่พบรายการผลงานที่ต้องการแก้ไข');
+      if (!['WAIT_TEACHER', 'REJECTED'].includes(target.current_step)) throw new Error('ผลงานนี้ผ่านการอนุมัติแล้ว ไม่สามารถแก้ไขเองได้ กรุณาแจ้งครูประจำกลุ่ม');
+
+      const updates = {
+        student_id: newSid,
+        student_name: (payload.student_name || target.student_name).trim(),
+        level: payload.level || target.level,
+        teacher_id: teacher ? teacher.user_id : target.teacher_id,
+        teacher_name: teacher ? teacher.full_name : target.teacher_name,
+        group_name: (payload.group_name !== undefined ? payload.group_name : target.group_name).trim(),
+        category: (payload.category !== undefined ? payload.category : target.category).trim(),
+        hours: payload.hours ? Number(payload.hours) : Number(target.hours) || 0,
+        activity_name: (payload.activity_name || target.activity_name).trim(),
+        activity_date: payload.start_date || target.activity_date,
+        activity_end_date: payload.end_date || target.activity_end_date,
+        location: (payload.location !== undefined ? payload.location : target.location).trim(),
+        k4_plan: payload.k4_plan !== undefined ? payload.k4_plan : target.k4_plan,
+        activity_detail: payload.activity_detail !== undefined ? payload.activity_detail : target.activity_detail,
+        k4_learning: payload.k4_learning !== undefined ? payload.k4_learning : target.k4_learning,
+        k4_problem: payload.k4_problem !== undefined ? payload.k4_problem : target.k4_problem,
+        k4_apply: payload.k4_apply !== undefined ? payload.k4_apply : target.k4_apply,
+        current_step: 'WAIT_TEACHER',
+        reject_reason: ''
+      };
+      if (payload.images && payload.images.length >= 2 && payload.images.length <= 3) {
+        const folder = getOrCreateImageFolder();
+        for (let i = 0; i < 3; i++) {
+          if (i < payload.images.length) {
+            const img = payload.images[i];
+            const blob = Utilities.newBlob(Utilities.base64Decode(img.base64Data), img.mimeType || 'image/jpeg', `${target.req_id}_rev_img${i + 1}.jpg`);
+            const file = folder.createFile(blob);
+            updates[`img_${i + 1}`] = `https://drive.google.com/file/d/${file.getId()}/view`;
+          } else updates[`img_${i + 1}`] = '';
+        }
+      }
+      Object.keys(updates).forEach(col => { const cIdx = headers.indexOf(col); if (cIdx >= 0) subSheet.getRange(target._rowIndex, cIdx + 1).setValue(updates[col]); });
+      const idNote = newSid !== origSid ? ` (แก้รหัส ${origSid} -> ${newSid})` : '';
+      writeAuditLog(target.req_id, updates.student_name, 'STUDENT', 'นศ.แก้ไขผลงาน กพช.4', `ส่งตรวจใหม่: ${updates.activity_name}${idNote}`);
+      return { success: true, student_id: newSid };
+    }
+  } finally { lock.releaseLock(); }
+}
+
+function staffUpdateStudentId(token, payload) {
+  const user = requireAuth(token, ['TEACHER', 'ADMIN']);
+  if (!payload || !payload.item_type || !payload.id || !payload.new_student_id) {
+    throw new Error('ข้อมูลไม่ครบถ้วน');
+  }
+  const newSid = String(payload.new_student_id).trim();
+  if (!/^6\d{9}$/.test(newSid)) throw new Error('รหัสนักศึกษาต้องขึ้นต้นด้วยเลข 6 และมี 10 หลักเท่านั้น');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet12 = ensureApprovals12Sheet(ss);
+    const subSheet = ensureSubmissionsSheet(ss);
+    const h12 = sheet12.getRange(1, 1, 1, sheet12.getLastColumn()).getValues()[0];
+    const hSub = subSheet.getRange(1, 1, 1, subSheet.getLastColumn()).getValues()[0];
+    const idxSid12 = h12.indexOf('student_id') + 1;
+    const idxSidSub = hSub.indexOf('student_id') + 1;
+
+    if (payload.item_type === '12') {
+      const target = sheetToObjects(sheet12).find(r => r.req12_id === payload.id);
+      if (!target) throw new Error('ไม่พบรายการ กพช.1-2');
+      if (user.role === 'TEACHER' && target.teacher_id !== user.user_id) throw new Error('ไม่มีสิทธิ์แก้ไขนักศึกษาต่างกลุ่ม');
+      const oldSid = target.student_id;
+      sheet12.getRange(target._rowIndex, idxSid12).setValue(newSid);
+      sheetToObjects(subSheet).filter(s => s.ref_12_id === target.req12_id).forEach(s => {
+        subSheet.getRange(s._rowIndex, idxSidSub).setValue(newSid);
+      });
+      writeAuditLog(target.req12_id, user.full_name, user.role, 'แก้ไขรหัส นศ.', `${oldSid} -> ${newSid}`);
+    } else {
+      const target = sheetToObjects(subSheet).find(r => r.req_id === payload.id);
+      if (!target) throw new Error('ไม่พบรายการผลงาน กพช.4');
+      if (user.role === 'TEACHER' && target.teacher_id !== user.user_id) throw new Error('ไม่มีสิทธิ์แก้ไขนักศึกษาต่างกลุ่ม');
+      const oldSid = target.student_id;
+      subSheet.getRange(target._rowIndex, idxSidSub).setValue(newSid);
+      if (target.ref_12_id) {
+        const linked12 = sheetToObjects(sheet12).find(r => r.req12_id === target.ref_12_id);
+        if (linked12) sheet12.getRange(linked12._rowIndex, idxSid12).setValue(newSid);
+      }
+      writeAuditLog(target.req_id, user.full_name, user.role, 'แก้ไขรหัส นศ.', `${oldSid} -> ${newSid}`);
+    }
+    return { success: true, new_student_id: newSid };
+  } finally { lock.releaseLock(); }
+}
+
+// ==================== บันทึกสถานะ "ปริ้นแล้ว" (12, 3, 46) ====================
+function markPrintedRecords(token, docType, ids) {
+  const user = requireAuth(token, ['TEACHER', 'REGISTRAR', 'ADMIN']);
+  if (!ids || ids.length === 0) return { count: 0, printed_at: '' };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const nowStr = getNowString();
+    let count = 0;
+
+    if (docType === '12' || docType === '3') {
+      const sheet12 = ensureApprovals12Sheet(ss);
+      const range = sheet12.getDataRange(), values = range.getValues();
+      if (values.length < 2) return { count: 0, printed_at: nowStr };
+      const headers = values[0], idxId = headers.indexOf('req12_id'), idxTeacher = headers.indexOf('teacher_id');
+      const idxPrint = headers.indexOf(docType === '12' ? 'printed_12_at' : 'printed_3_at');
+      if (idxPrint >= 0) {
+        for (let i = 1; i < values.length; i++) {
+          if (ids.includes(String(values[i][idxId])) && (user.role !== 'TEACHER' || String(values[i][idxTeacher]) === user.user_id)) {
+            values[i][idxPrint] = nowStr; count++;
+          }
+        }
+        if (count > 0) range.setValues(values);
+      }
+    } else if (docType === '46') {
+      const subSheet = ensureSubmissionsSheet(ss);
+      const range = subSheet.getDataRange(), values = range.getValues();
+      if (values.length < 2) return { count: 0, printed_at: nowStr };
+      const headers = values[0], idxId = headers.indexOf('req_id'), idxTeacher = headers.indexOf('teacher_id'), idxPrint = headers.indexOf('printed_46_at');
+      if (idxPrint >= 0) {
+        for (let i = 1; i < values.length; i++) {
+          if (ids.includes(String(values[i][idxId])) && (user.role !== 'TEACHER' || String(values[i][idxTeacher]) === user.user_id)) {
+            values[i][idxPrint] = nowStr; count++;
+          }
+        }
+        if (count > 0) range.setValues(values);
+      }
+    }
+    return { count: count, printed_at: nowStr };
+  } finally { lock.releaseLock(); }
+}
+
+// ==================== ระบบล็อคอิน & หลังบ้าน ====================
+function loginUser(username, password) {
+  if (!username || !password) throw new Error('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
+  const user = sheetToObjects(ensureUsersSheet(SpreadsheetApp.getActiveSpreadsheet()))
+    .find(u => u.username === username.trim() && u.password_hash === hashPassword(password));
+  if (!user) throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+  if (user.status !== 'ACTIVE') throw new Error('บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อแอดมิน');
+
+  const maint = getMaintenanceState();
+  if (maint.enabled && user.role !== 'ADMIN') {
+    throw new Error('ขณะนี้ระบบปิดปรับปรุงชั่วคราว (อนุญาตเฉพาะผู้ดูแลระบบ Admin เข้าใช้งาน)');
   }
 
-  .org-brand-icon {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #6366f1, #ec4899);
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  const token = Utilities.getUuid();
+  const sessionUser = { user_id: user.user_id, username: user.username, full_name: user.full_name, role: user.role, group_name: user.group_name };
+  CacheService.getScriptCache().put('SESSION_' + token, JSON.stringify(sessionUser), 21600);
+  return { token: token, user: sessionUser, maintenance: maint };
+}
+
+function logoutUser(token) {
+  if (token) CacheService.getScriptCache().remove('SESSION_' + token);
+  return true;
+}
+
+function requireAuth(token, allowedRoles) {
+  if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
+  const cached = CacheService.getScriptCache().get('SESSION_' + token);
+  if (!cached) throw new Error('Session หมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
+  const user = JSON.parse(cached);
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) throw new Error('คุณไม่มีสิทธิ์เข้าถึงส่วนนี้');
+  return user;
+}
+
+function getDashboardData(token) {
+  const user = requireAuth(token);
+  const maint = getMaintenanceState();
+  if (maint.enabled && user.role !== 'ADMIN') {
+    return {
+      user,
+      maintenance_blocked: true,
+      maintenance: maint,
+      items: [],
+      items12: []
+    };
   }
 
-  .org-sidebar-nav {
-    flex: 1;
-    overflow-y: auto;
-    padding: 14px 12px;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const allUsers = sheetToObjects(ensureUsersSheet(ss));
+  const all12 = sheetToObjects(ensureApprovals12Sheet(ss)).reverse();
+  const termMap12 = {}, catMap12 = {}, sigMap12 = {};
+  all12.forEach(r => {
+    if (r.req12_id && r.term) termMap12[r.req12_id] = normalizeTermStr(r.term);
+    if (r.req12_id && r.category) catMap12[r.req12_id] = r.category;
+    if (r.req12_id && r.student_signature) sigMap12[r.req12_id] = r.student_signature;
+  });
+
+  const allSubs = sheetToObjects(ensureSubmissionsSheet(ss)).reverse().map(r => ({
+    ...r,
+    term: r.term ? normalizeTermStr(r.term) : (termMap12[r.ref_12_id] || ''),
+    category: r.category || catMap12[r.ref_12_id] || '',
+    student_signature: r.student_signature || sigMap12[r.ref_12_id] || ''
+  }));
+
+  let items = [], items12 = [];
+  if (user.role === 'TEACHER') {
+    items = allSubs.filter(r => r.teacher_id === user.user_id);
+    items12 = all12.filter(r => r.teacher_id === user.user_id);
+  } else if (user.role === 'REGISTRAR') {
+    items = allSubs.filter(r => r.current_step === 'APPROVED_FOR_REGISTRAR' || r.current_step === 'COMPLETED');
+  } else if (user.role === 'ADMIN') {
+    items = allSubs;
+    items12 = all12;
   }
 
-  .org-nav-group-label {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #94a3b8;
-    font-weight: 600;
-    padding: 6px 12px 8px;
+  const registrarObj = allUsers.find(u => u.role === 'REGISTRAR' && u.status === 'ACTIVE');
+  const result = {
+    user,
+    items,
+    items12,
+    categories: getCategoriesList(),
+    registrar_name: registrarObj ? registrarObj.full_name : '',
+    maintenance: maint,
+    doc_templates: getPublicDocTemplatesFlag()
+  };
+  if (user.role === 'ADMIN') {
+    result.users = allUsers.map(u => ({ user_id: u.user_id, username: u.username, full_name: u.full_name, role: u.role, group_name: u.group_name, status: u.status }));
+    result.logs = sheetToObjects(ensureLogsSheet(ss)).reverse().slice(0, 200);
+    result.announcement = getAnnouncement();
+    result.trash_submissions = sheetToObjects(ensureTrashSubmissionsSheet(ss)).reverse();
+    result.trash_approvals12 = sheetToObjects(ensureTrash12Sheet(ss)).reverse();
+    result.doc_templates_admin = getDocTemplatesConfig();
   }
-
-  .org-nav-btn {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    text-align: left;
-    background: transparent;
-    border: none;
-    border-radius: 12px;
-    padding: 11px 14px;
-    margin-bottom: 5px;
-    color: #cbd5e1;
-    font-size: 0.92rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.16s ease;
-  }
-
-  .org-nav-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #ffffff;
-  }
-
-  .org-nav-btn.active {
-    background: linear-gradient(135deg, #4f46e5, #6366f1);
-    color: #ffffff;
-    font-weight: 600;
-    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
-  }
-
-  .org-sidebar-footer {
-    padding: 14px;
-    border-top: 1px solid var(--org-sidebar-border);
-    background: rgba(15, 23, 42, 0.55);
-  }
-
-  .app-main {
-    margin-left: var(--org-sidebar-w);
-    padding-bottom: 24px;
-  }
-
-  .mobile-topbar {
-    display: none;
-  }
-
-  .org-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 1010;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid #e2e8f0;
-    padding: 14px 28px;
-  }
-
-  .org-content {
-    padding: 24px 28px 40px;
-  }
+  return result;
 }
 
-/* ==================== Mobile Bottom Nav & Compact Staff Grid ==================== */
-.mobile-bottom-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1025;
-  background: #ffffff;
-  border-top: 1px solid #e2e8f0;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
-  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.08);
+function processApproval12(token, req12Id, decision, reason) {
+  const user = requireAuth(token, ['TEACHER', 'ADMIN']);
+  if (decision === 'REJECT' && (!reason || !reason.trim())) throw new Error('กรุณาระบุเหตุผลในการไม่อนุมัติ/ตีกลับ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet12 = ensureApprovals12Sheet(SpreadsheetApp.getActiveSpreadsheet());
+    const headers = sheet12.getRange(1, 1, 1, sheet12.getLastColumn()).getValues()[0];
+    const target = sheetToObjects(sheet12).find(r => r.req12_id === req12Id);
+    if (!target) throw new Error('ไม่พบคำขอ กพช.1-2 รหัส ' + req12Id);
+    if (user.role === 'TEACHER' && target.teacher_id !== user.user_id) throw new Error('นักศึกษาคนนี้ไม่ได้อยู่ในกลุ่มของคุณ');
+    if (target.status_12 !== 'WAIT_TEACHER_12') throw new Error('รายการนี้ถูกดำเนินการไปแล้ว');
+
+    const rowIdx = target._rowIndex;
+    if (decision === 'APPROVE') {
+      sheet12.getRange(rowIdx, headers.indexOf('status_12') + 1).setValue('APPROVED_12');
+      sheet12.getRange(rowIdx, headers.indexOf('reject_reason_12') + 1).setValue('');
+      sheet12.getRange(rowIdx, headers.indexOf('approved_at_12') + 1).setValue(getNowString());
+      writeAuditLog(req12Id, user.full_name, user.role, 'อนุมัติ กพช.1-2', `อนุญาตให้ ${target.student_name} ทำกิจกรรมได้`);
+    } else {
+      sheet12.getRange(rowIdx, headers.indexOf('status_12') + 1).setValue('REJECTED_12');
+      sheet12.getRange(rowIdx, headers.indexOf('reject_reason_12') + 1).setValue(reason.trim());
+      writeAuditLog(req12Id, user.full_name, user.role, 'ตีกลับ กพช.1-2', reason.trim());
+    }
+    return { success: true };
+  } finally { lock.releaseLock(); }
 }
 
-.mobile-bottom-btn {
-  border: none;
-  background: transparent;
-  color: #64748b;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 6px 4px;
-  border-radius: 12px;
-  font-size: 0.76rem;
-  font-weight: 500;
+function batchApprove12(token, req12Ids) {
+  const user = requireAuth(token, ['TEACHER', 'ADMIN']);
+  if (!req12Ids || req12Ids.length === 0) throw new Error('กรุณาเลือกรายการ กพช.1-2 อย่างน้อย 1 รายการ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet12 = ensureApprovals12Sheet(ss);
+    const range = sheet12.getDataRange(), values = range.getValues();
+    if (values.length < 2) throw new Error('ไม่พบข้อมูล');
+    const headers = values[0], idxId = headers.indexOf('req12_id'), idxTeacher = headers.indexOf('teacher_id'), idxStudent = headers.indexOf('student_name'), idxStatus = headers.indexOf('status_12'), idxReject = headers.indexOf('reject_reason_12'), idxTime = headers.indexOf('approved_at_12'), nowStr = getNowString();
+    let count = 0; const logRows = [];
+    for (let i = 1; i < values.length; i++) {
+      if (req12Ids.includes(String(values[i][idxId])) && String(values[i][idxStatus]) === 'WAIT_TEACHER_12' && (user.role !== 'TEACHER' || String(values[i][idxTeacher]) === user.user_id)) {
+        values[i][idxStatus] = 'APPROVED_12'; values[i][idxReject] = ''; values[i][idxTime] = nowStr;
+        logRows.push([nowStr, String(values[i][idxId]), user.full_name, user.role, 'อนุมัติ กพช.1-2 (แบบกลุ่ม)', `อนุญาตให้ ${values[i][idxStudent]} ทำกิจกรรมได้`]);
+        count++;
+      }
+    }
+    if (count === 0) throw new Error('ไม่พบรายการที่รออนุมัติในรายการที่เลือก');
+    range.setValues(values); writeBatchAuditLogs(ss, logRows);
+    return { count: count };
+  } finally { lock.releaseLock(); }
 }
 
-.mobile-bottom-btn i {
-  font-size: 1.2rem;
-  line-height: 1;
+function batchReject12(token, req12Ids, reason) {
+  const user = requireAuth(token, ['TEACHER', 'ADMIN']);
+  if (!req12Ids || req12Ids.length === 0) throw new Error('กรุณาเลือกรายการ กพช.1-2 อย่างน้อย 1 รายการ');
+  if (!reason || !reason.trim()) throw new Error('กรุณาระบุเหตุผลในการตีกลับ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet12 = ensureApprovals12Sheet(ss);
+    const range = sheet12.getDataRange(), values = range.getValues();
+    if (values.length < 2) throw new Error('ไม่พบข้อมูล');
+    const headers = values[0], idxId = headers.indexOf('req12_id'), idxTeacher = headers.indexOf('teacher_id'), idxStatus = headers.indexOf('status_12'), idxReject = headers.indexOf('reject_reason_12'), nowStr = getNowString(), cleanReason = reason.trim();
+    let count = 0; const logRows = [];
+    for (let i = 1; i < values.length; i++) {
+      if (req12Ids.includes(String(values[i][idxId])) && String(values[i][idxStatus]) === 'WAIT_TEACHER_12' && (user.role !== 'TEACHER' || String(values[i][idxTeacher]) === user.user_id)) {
+        values[i][idxStatus] = 'REJECTED_12'; values[i][idxReject] = cleanReason;
+        logRows.push([nowStr, String(values[i][idxId]), user.full_name, user.role, 'ตีกลับ กพช.1-2 (แบบกลุ่ม)', cleanReason]);
+        count++;
+      }
+    }
+    if (count === 0) throw new Error('ไม่พบรายการที่รออนุมัติในรายการที่เลือก');
+    range.setValues(values); writeBatchAuditLogs(ss, logRows);
+    return { count: count };
+  } finally { lock.releaseLock(); }
 }
 
-.mobile-bottom-btn.active {
-  background: #eef2ff;
-  color: #4f46e5;
-  font-weight: 700;
+function processApproval(token, reqId, decision, reason) {
+  const user = requireAuth(token, ['TEACHER', 'ADMIN']);
+  if (decision === 'REJECT' && (!reason || !reason.trim())) throw new Error('กรุณาระบุเหตุผลในการส่งกลับแก้ไข');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const subSheet = ensureSubmissionsSheet(SpreadsheetApp.getActiveSpreadsheet());
+    const headers = subSheet.getRange(1, 1, 1, subSheet.getLastColumn()).getValues()[0];
+    const target = sheetToObjects(subSheet).find(r => r.req_id === reqId);
+    if (!target) throw new Error('ไม่พบคำขอรหัส ' + reqId);
+    if (user.role === 'TEACHER' && target.teacher_id !== user.user_id) throw new Error('นักศึกษาคนนี้ไม่ได้อยู่ในกลุ่มของคุณ');
+
+    const rowIdx = target._rowIndex, nowStr = getNowString();
+    if (decision === 'APPROVE') {
+      if (target.current_step !== 'WAIT_TEACHER') throw new Error('รายการนี้ไม่อยู่ในขั้นตอนรอครูอนุมัติ');
+      subSheet.getRange(rowIdx, headers.indexOf('current_step') + 1).setValue('APPROVED_FOR_REGISTRAR');
+      subSheet.getRange(rowIdx, headers.indexOf('reject_reason') + 1).setValue('');
+      const cApp = headers.indexOf('teacher_approved_at') + 1;
+      const cPres = headers.indexOf('teacher_presented_at') + 1;
+      if (cApp > 0) subSheet.getRange(rowIdx, cApp).setValue(nowStr);
+      if (cPres > 0) subSheet.getRange(rowIdx, cPres).setValue(nowStr);
+      writeAuditLog(reqId, user.full_name, user.role, 'ครูอนุมัติและส่งต่อนายทะเบียน', `${target.student_name} (${target.hours} ชม.)`);
+    } else {
+      subSheet.getRange(rowIdx, headers.indexOf('current_step') + 1).setValue('REJECTED');
+      subSheet.getRange(rowIdx, headers.indexOf('reject_reason') + 1).setValue(reason.trim());
+      writeAuditLog(reqId, user.full_name, user.role, 'ครูตีกลับ/ให้แก้ไข', reason.trim());
+    }
+    return { success: true };
+  } finally { lock.releaseLock(); }
 }
 
-.mobile-staff-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+function batchApproveSubmissions(token, reqIds) {
+  const user = requireAuth(token, ['TEACHER', 'ADMIN']);
+  if (!reqIds || reqIds.length === 0) throw new Error('กรุณาเลือกรายการอย่างน้อย 1 รายการ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const subSheet = ensureSubmissionsSheet(ss);
+    const range = subSheet.getDataRange(), values = range.getValues();
+    if (values.length < 2) throw new Error('ไม่พบข้อมูล');
+    const headers = values[0], idxId = headers.indexOf('req_id'), idxTeacher = headers.indexOf('teacher_id'), idxStep = headers.indexOf('current_step'), idxReject = headers.indexOf('reject_reason'), idxApp = headers.indexOf('teacher_approved_at'), idxPres = headers.indexOf('teacher_presented_at'), nowStr = getNowString();
+    let count = 0; const logRows = [];
+    for (let i = 1; i < values.length; i++) {
+      if (reqIds.includes(String(values[i][idxId])) && String(values[i][idxStep]) === 'WAIT_TEACHER' && (user.role !== 'TEACHER' || String(values[i][idxTeacher]) === user.user_id)) {
+        values[i][idxStep] = 'APPROVED_FOR_REGISTRAR';
+        values[i][idxReject] = '';
+        if (idxApp >= 0) values[i][idxApp] = nowStr;
+        if (idxPres >= 0) values[i][idxPres] = nowStr;
+        logRows.push([nowStr, String(values[i][idxId]), user.full_name, user.role, 'ครูอนุมัติและส่งต่อนายทะเบียน (กลุ่ม)', 'ส่งตรงถึงนายทะเบียน']);
+        count++;
+      }
+    }
+    if (count === 0) throw new Error('ไม่พบรายการที่รอครูอนุมัติในรายการที่เลือก');
+    range.setValues(values); writeBatchAuditLogs(ss, logRows);
+    return { count: count };
+  } finally { lock.releaseLock(); }
 }
 
-.mobile-staff-tab-btn {
-  border: 1.5px solid #e2e8f0;
-  background: #ffffff;
-  color: #334155;
-  border-radius: 12px;
-  padding: 9px 10px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-align: center;
-  line-height: 1.25;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+function batchRejectSubmissions(token, reqIds, reason) {
+  const user = requireAuth(token, ['TEACHER', 'ADMIN']);
+  if (!reqIds || reqIds.length === 0) throw new Error('กรุณาเลือกรายการอย่างน้อย 1 รายการ');
+  if (!reason || !reason.trim()) throw new Error('กรุณาระบุเหตุผลในการตีกลับ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const subSheet = ensureSubmissionsSheet(ss);
+    const range = subSheet.getDataRange(), values = range.getValues();
+    if (values.length < 2) throw new Error('ไม่พบข้อมูล');
+    const headers = values[0], idxId = headers.indexOf('req_id'), idxTeacher = headers.indexOf('teacher_id'), idxStep = headers.indexOf('current_step'), idxReject = headers.indexOf('reject_reason'), nowStr = getNowString(), cleanReason = reason.trim();
+    let count = 0; const logRows = [];
+    for (let i = 1; i < values.length; i++) {
+      if (reqIds.includes(String(values[i][idxId])) && String(values[i][idxStep]) === 'WAIT_TEACHER' && (user.role !== 'TEACHER' || String(values[i][idxTeacher]) === user.user_id)) {
+        values[i][idxStep] = 'REJECTED'; values[i][idxReject] = cleanReason;
+        logRows.push([nowStr, String(values[i][idxId]), user.full_name, user.role, 'ครูตีกลับผลงาน (แบบกลุ่ม)', cleanReason]);
+        count++;
+      }
+    }
+    if (count === 0) throw new Error('ไม่พบรายการที่รอครูตรวจในรายการที่เลือก');
+    range.setValues(values); writeBatchAuditLogs(ss, logRows);
+    return { count: count };
+  } finally { lock.releaseLock(); }
 }
 
-.mobile-staff-tab-btn.active {
-  background: linear-gradient(135deg, #4f46e5, #6366f1);
-  border-color: transparent;
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+function markRegistrarCompleted(token, reqIds) {
+  const user = requireAuth(token, ['REGISTRAR', 'ADMIN']);
+  if (!reqIds || reqIds.length === 0) throw new Error('กรุณาเลือกรายการอย่างน้อย 1 รายการ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const subSheet = ensureSubmissionsSheet(ss);
+    const range = subSheet.getDataRange(), values = range.getValues();
+    if (values.length < 2) return { count: 0 };
+    const headers = values[0], idxId = headers.indexOf('req_id'), idxStep = headers.indexOf('current_step'), idxRegTime = headers.indexOf('registrar_exported_at'), nowStr = getNowString();
+    let count = 0; const logRows = [];
+    for (let i = 1; i < values.length; i++) {
+      if (reqIds.includes(String(values[i][idxId])) && String(values[i][idxStep]) === 'APPROVED_FOR_REGISTRAR') {
+        values[i][idxStep] = 'COMPLETED'; if (idxRegTime >= 0) values[i][idxRegTime] = nowStr;
+        logRows.push([nowStr, String(values[i][idxId]), user.full_name, user.role, 'นายทะเบียนบันทึกแล้ว', 'ปิดงานเรียบร้อย']);
+        count++;
+      }
+    }
+    if (count > 0) { range.setValues(values); writeBatchAuditLogs(ss, logRows); }
+    return { count: count };
+  } finally { lock.releaseLock(); }
 }
 
-/* ==================== Cards, Form Sections, Badges ==================== */
-.cute-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.05);
+// ==================== ถังขยะ ====================
+function deleteSubmissionsAdmin(token, reqIds) {
+  const admin = requireAuth(token, ['ADMIN']);
+  if (!reqIds || reqIds.length === 0) throw new Error('กรุณาเลือกรายการผลงานที่ต้องการลบ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const subSheet = ensureSubmissionsSheet(ss), trashSheet = ensureTrashSubmissionsSheet(ss);
+    const trashHeaders = trashSheet.getRange(1, 1, 1, trashSheet.getLastColumn()).getValues()[0];
+    const targets = sheetToObjects(subSheet).filter(r => reqIds.includes(r.req_id)).sort((a, b) => b._rowIndex - a._rowIndex);
+    if (targets.length === 0) throw new Error('ไม่พบรายการที่ต้องการลบ');
+    const nowStr = getNowString(), logRows = [];
+    targets.forEach(item => {
+      const rowMap = { ...item, deleted_at: nowStr, deleted_by: admin.full_name, hours: item.hours !== '' ? Number(item.hours) || 0 : 0 };
+      trashSheet.appendRow(trashHeaders.map(col => rowMap[col] !== undefined ? rowMap[col] : ''));
+      subSheet.deleteRow(item._rowIndex);
+      logRows.push([nowStr, item.req_id, admin.full_name, 'ADMIN', 'ย้ายผลงาน กพช. ลงถังขยะ', `${item.student_id} ${item.student_name}`]);
+    });
+    writeBatchAuditLogs(ss, logRows);
+    return { count: targets.length };
+  } finally { lock.releaseLock(); }
 }
 
-.section-box {
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 18px;
+function deleteApprovals12Admin(token, req12Ids) {
+  const admin = requireAuth(token, ['ADMIN']);
+  if (!req12Ids || req12Ids.length === 0) throw new Error('กรุณาเลือกรายการ กพช.1-2 ที่ต้องการลบ');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet12 = ensureApprovals12Sheet(ss), trashSheet = ensureTrash12Sheet(ss);
+    const trashHeaders = trashSheet.getRange(1, 1, 1, trashSheet.getLastColumn()).getValues()[0];
+    const targets = sheetToObjects(sheet12).filter(r => req12Ids.includes(r.req12_id)).sort((a, b) => b._rowIndex - a._rowIndex);
+    if (targets.length === 0) throw new Error('ไม่พบรายการ กพช.1-2 ที่ต้องการลบ');
+    const nowStr = getNowString(), logRows = [];
+    targets.forEach(item => {
+      const rowMap = { ...item, deleted_at: nowStr, deleted_by: admin.full_name, term: "'" + normalizeTermStr(item.term), hours: item.hours !== '' ? Number(item.hours) || 0 : 0 };
+      trashSheet.appendRow(trashHeaders.map(col => rowMap[col] !== undefined ? rowMap[col] : ''));
+      sheet12.deleteRow(item._rowIndex);
+      logRows.push([nowStr, item.req12_id, admin.full_name, 'ADMIN', 'ย้าย กพช.1-2 ลงถังขยะ', `${item.student_id} ${item.student_name}`]);
+    });
+    writeBatchAuditLogs(ss, logRows);
+    return { count: targets.length };
+  } finally { lock.releaseLock(); }
 }
 
-.section-box-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 1rem;
-  color: #3730a3;
-  padding-bottom: 10px;
-  margin-bottom: 14px;
-  border-bottom: 1.5px dashed #cbd5e1;
+function restoreTrashAdmin(token, trashType, itemId) {
+  const admin = requireAuth(token, ['ADMIN']);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (trashType === 'SUB') {
+      const trashSheet = ensureTrashSubmissionsSheet(ss), subSheet = ensureSubmissionsSheet(ss);
+      const subHeaders = subSheet.getRange(1, 1, 1, subSheet.getLastColumn()).getValues()[0];
+      const target = sheetToObjects(trashSheet).find(r => r.req_id === itemId);
+      if (!target) throw new Error('ไม่พบข้อมูลในถังขยะ');
+      const rowMap = { ...target, hours: target.hours !== '' ? Number(target.hours) || 0 : 0 };
+      subSheet.appendRow(subHeaders.map(col => rowMap[col] !== undefined ? rowMap[col] : ''));
+      trashSheet.deleteRow(target._rowIndex);
+      writeAuditLog(itemId, admin.full_name, 'ADMIN', 'กู้คืนผลงาน กพช.', `${target.student_id} ${target.student_name}`);
+    } else if (trashType === '12') {
+      const trashSheet = ensureTrash12Sheet(ss), sheet12 = ensureApprovals12Sheet(ss);
+      const headers12 = sheet12.getRange(1, 1, 1, sheet12.getLastColumn()).getValues()[0];
+      const target = sheetToObjects(trashSheet).find(r => r.req12_id === itemId);
+      if (!target) throw new Error('ไม่พบข้อมูล กพช.1-2 ในถังขยะ');
+      const rowMap = { ...target, term: "'" + normalizeTermStr(target.term), hours: target.hours !== '' ? Number(target.hours) || 0 : 0 };
+      sheet12.appendRow(headers12.map(col => rowMap[col] !== undefined ? rowMap[col] : ''));
+      trashSheet.deleteRow(target._rowIndex);
+      writeAuditLog(itemId, admin.full_name, 'ADMIN', 'กู้คืน กพช.1-2', `${target.student_id} ${target.student_name}`);
+    } else throw new Error('ประเภทไม่ถูกต้อง');
+    return { success: true };
+  } finally { lock.releaseLock(); }
 }
 
-.step-number-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 700;
-  margin-right: 8px;
+function purgeTrashAdmin(token, trashType, itemId) {
+  const admin = requireAuth(token, ['ADMIN']);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (trashType === 'SUB') {
+      const trashSheet = ensureTrashSubmissionsSheet(ss);
+      const target = sheetToObjects(trashSheet).find(r => r.req_id === itemId);
+      if (!target) throw new Error('ไม่พบข้อมูลในถังขยะ');
+      ['img_1', 'img_2', 'img_3'].forEach(f => { const fid = extractDriveFileId(target[f]); if (fid) { try { DriveApp.getFileById(fid).setTrashed(true); } catch (e) {} } });
+      trashSheet.deleteRow(target._rowIndex);
+      writeAuditLog(itemId, admin.full_name, 'ADMIN', 'ลบผลงานถาวร', `${target.student_id} ${target.student_name}`);
+    } else if (trashType === '12') {
+      const trashSheet = ensureTrash12Sheet(ss);
+      const target = sheetToObjects(trashSheet).find(r => r.req12_id === itemId);
+      if (!target) throw new Error('ไม่พบข้อมูล กพช.1-2 ในถังขยะ');
+      trashSheet.deleteRow(target._rowIndex);
+      writeAuditLog(itemId, admin.full_name, 'ADMIN', 'ลบ กพช.1-2 ถาวร', `${target.student_id} ${target.student_name}`);
+    } else throw new Error('ประเภทไม่ถูกต้อง');
+    return { success: true };
+  } finally { lock.releaseLock(); }
 }
 
-.eval-radio {
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  accent-color: #4f46e5;
+function getSubmissionForPrint(token, reqId) {
+  const user = requireAuth(token);
+  const item = sheetToObjects(ensureSubmissionsSheet(SpreadsheetApp.getActiveSpreadsheet())).find(r => r.req_id === reqId);
+  if (!item) throw new Error('ไม่พบข้อมูลคำขอ');
+  if (user.role === 'TEACHER' && item.teacher_id !== user.user_id) throw new Error('ไม่มีสิทธิ์เข้าถึงข้อมูลเด็กต่างกลุ่ม');
+  const base64Images = [];
+  ['img_1', 'img_2', 'img_3'].forEach(field => {
+    const fileId = extractDriveFileId(item[field]);
+    if (fileId) { try { const blob = DriveApp.getFileById(fileId).getBlob(); base64Images.push(`data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`); } catch (e) {} }
+  });
+  return { item: item, imagesBase64: base64Images };
 }
 
-.btn-cute-submit {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  border: none;
-  border-radius: 14px;
-  color: #fff;
-  font-weight: 600;
-  padding: 14px;
-  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.28);
-  transition: transform 0.15s ease;
+function getSubmissionsBatchForPrint(token, reqIds) {
+  const user = requireAuth(token, ['TEACHER', 'REGISTRAR', 'ADMIN']);
+  if (!reqIds || reqIds.length === 0) throw new Error('กรุณาเลือกรายการอย่างน้อย 1 รายการ');
+  const all12 = sheetToObjects(ensureApprovals12Sheet(SpreadsheetApp.getActiveSpreadsheet()));
+  const termMap12 = {}, grpMap12 = {}, sigMap12 = {};
+  all12.forEach(r => {
+    if (r.req12_id) {
+      if (r.term) termMap12[r.req12_id] = normalizeTermStr(r.term);
+      if (r.group_name) grpMap12[r.req12_id] = r.group_name;
+      if (r.student_signature) sigMap12[r.req12_id] = r.student_signature;
+    }
+  });
+  const selected = sheetToObjects(ensureSubmissionsSheet(SpreadsheetApp.getActiveSpreadsheet())).filter(r => reqIds.includes(r.req_id) && (user.role !== 'TEACHER' || r.teacher_id === user.user_id));
+  if (selected.length === 0) throw new Error('ไม่พบข้อมูลรายการที่เลือก');
+  return selected.map(item => {
+    const base64Images = [];
+    ['img_1', 'img_2', 'img_3'].forEach(field => {
+      const fileId = extractDriveFileId(item[field]);
+      if (fileId) { try { const blob = DriveApp.getFileById(fileId).getBlob(); base64Images.push(`data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`); } catch (e) {} }
+    });
+    return {
+      item: {
+        ...item,
+        term: item.term ? normalizeTermStr(item.term) : (termMap12[item.ref_12_id] || ''),
+        group_name: item.group_name || grpMap12[item.ref_12_id] || '',
+        student_signature: sigMap12[item.ref_12_id] || ''
+      },
+      imagesBase64: base64Images
+    };
+  });
 }
 
-.btn-cute-submit:hover:not(:disabled) {
-  transform: translateY(-1px);
-  color: #fff;
+function saveUserAdmin(token, userData) {
+  const admin = requireAuth(token, ['ADMIN']);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const userSheet = ensureUsersSheet(SpreadsheetApp.getActiveSpreadsheet()), rows = sheetToObjects(userSheet);
+    if (userData.user_id) {
+      const target = rows.find(r => r.user_id === userData.user_id);
+      if (!target) throw new Error('ไม่พบผู้ใช้ที่ต้องการแก้ไข');
+      const rowIdx = target._rowIndex;
+      userSheet.getRange(rowIdx, 4).setValue(userData.full_name.trim());
+      userSheet.getRange(rowIdx, 5).setValue(userData.role);
+      userSheet.getRange(rowIdx, 6).setValue(userData.group_name || '');
+      userSheet.getRange(rowIdx, 7).setValue(userData.status || 'ACTIVE');
+      if (userData.new_password && userData.new_password.trim() !== '') userSheet.getRange(rowIdx, 3).setValue(hashPassword(userData.new_password.trim()));
+      writeAuditLog('USER_MGMT', admin.full_name, 'ADMIN', 'แก้ไขข้อมูลผู้ใช้', `${userData.username} (${userData.role})`);
+    } else {
+      if (!userData.username || !userData.new_password || !userData.full_name) throw new Error('กรุณากรอกข้อมูลให้ครบ');
+      if (rows.find(r => r.username === userData.username.trim())) throw new Error('Username นี้มีในระบบแล้ว');
+      let maxId = 0; rows.forEach(r => { const n = parseInt((r.user_id || '').replace('U', ''), 10); if (!isNaN(n) && n > maxId) maxId = n; });
+      const newId = 'U' + String(maxId + 1).padStart(3, '0');
+      userSheet.appendRow([newId, userData.username.trim(), hashPassword(userData.new_password.trim()), userData.full_name.trim(), userData.role, userData.group_name || '', 'ACTIVE']);
+      writeAuditLog('USER_MGMT', admin.full_name, 'ADMIN', 'เพิ่มผู้ใช้ใหม่', `${userData.username} (${userData.role})`);
+    }
+    return { success: true };
+  } finally { lock.releaseLock(); }
 }
 
-.btn-cute-submit:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.thumb-preview {
-  width: 92px;
-  height: 92px;
-  object-fit: cover;
-  border-radius: 12px;
-  border: 2px solid #c7d2fe;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-}
-
-.mobile-item-card {
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 14px;
-  margin-bottom: 12px;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
-}
-
-.step-badge {
-  font-size: 0.76rem;
-  padding: 0.42em 0.82em;
-  border-radius: 50px;
-  font-weight: 500;
-}
-
-.cute-progress-bar {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px dashed #e2e8f0;
-  font-size: 0.72rem;
-  text-align: center;
-  gap: 4px;
-}
-
-.prog-step { flex: 1; color: #94a3b8; }
-.prog-step.done { color: #10b981; font-weight: 600; }
-.prog-step.rejected { color: #ef4444; font-weight: 600; }
-
-/* ==================== Google Docs Template Tag Chip ==================== */
-.tpl-tag-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: #eef2ff;
-  color: #3730a3;
-  border: 1px solid #c7d2fe;
-  border-radius: 8px;
-  padding: 3px 9px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.14s ease;
-}
-
-.tpl-tag-chip:hover {
-  background: #4f46e5;
-  color: #ffffff;
-  border-color: #4f46e5;
-}
-
-/* ==================== Loading & Maintenance Overlays ==================== */
-#loadingOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(4px);
-  z-index: 10080;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-}
-
-#maintenanceOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10020;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 27, 75, 0.96) 100%);
-  backdrop-filter: blur(10px);
-}
-
-.maint-card {
-  width: 100%;
-  max-width: 520px;
-  background: #ffffff;
-  border-radius: 24px;
-  padding: 32px 26px;
-  text-align: center;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-}
-
-.maint-icon-wrap {
-  width: 76px;
-  height: 76px;
-  margin: 0 auto 18px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  color: #b45309;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.3rem;
-}
-
-#printOnlyContainer { display: none; }
-
-@page {
-  size: A4;
-  margin: 1.5cm 2cm;
-}
-
-@media print {
-  .no-print, .modal-backdrop, .org-sidebar, .org-topbar, .mobile-topbar, .mobile-bottom-nav, #maintenanceOverlay {
-    display: none !important;
-  }
-  body { background: #fff !important; padding: 0; margin: 0; }
-  .app-main { margin-left: 0 !important; padding: 0 !important; }
-  #printOnlyContainer, #printOnlyContainer * {
-    font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important;
-  }
-  #printOnlyContainer {
-    display: block !important;
-    width: 100%;
-    padding: 0;
-    font-size: 16pt !important;
-    line-height: 1.35;
-    color: #000;
-  }
-  .memo-page { page-break-after: always; }
-  .memo-header { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 8px; }
-  .memo-garuda { width: 56px; height: auto; }
-  .memo-title { font-size: 28pt !important; font-weight: 700; line-height: 1; flex: 1; text-align: center; padding-right: 56px; }
-  .memo-field { margin-bottom: 3px; font-size: 16pt !important; }
-  .memo-divider { border-top: 1.5px solid #000; margin: 6px 0 10px 0; }
-  .memo-indent { text-indent: 2.5cm; text-align: justify; margin-bottom: 8px; font-size: 16pt !important; }
-  .print-img-box img {
-    max-height: 195px; max-width: 100%; object-fit: contain; border: 1px solid #999; padding: 3px;
-  }
-  .sig-grid { display: flex; flex-wrap: wrap; justify-content: space-between; margin-top: 18px; }
-  .sig-box { width: 48%; text-align: center; margin-bottom: 18px; page-break-inside: avoid; font-size: 15pt !important; }
-  .batch-table { width: 100%; border-collapse: collapse; font-size: 14pt !important; margin-top: 8px; }
-  .batch-table th, .batch-table td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; }
-  .batch-table th { background-color: #f1f5f9 !important; text-align: center; font-weight: 700; }
-  .kpch-box-tag {
-    float: right;
-    border: 1.5px solid #000;
-    padding: 3px 14px;
-    font-weight: 700;
-    font-size: 16pt !important;
-  }
-  .doc-title-center {
-    text-align: center;
-    font-weight: 700;
-    font-size: 18pt !important;
-    line-height: 1.3;
-    clear: both;
-  }
-  .doc-section-indent {
-    margin-left: 1.2cm;
-    text-align: justify;
-  }
-  .doc-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 8px 0;
-    font-size: 14.5pt !important;
-  }
-  .doc-table th, .doc-table td {
-    border: 1px solid #000;
-    padding: 4px 7px;
-    vertical-align: middle;
-  }
-  .doc-table th {
-    text-align: center;
-    font-weight: 700;
-    background-color: #f8fafc !important;
-  }
-  .sig-row-2 {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 18px;
-    page-break-inside: avoid;
-  }
-  .sig-col { width: 48%; text-align: center; }
-  .sig-center { text-align: center; margin-top: 18px; page-break-inside: avoid; }
-  .photo-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    justify-content: center;
-    margin-top: 10px;
-  }
-  .photo-grid img {
-    width: 46%;
-    max-height: 215px;
-    object-fit: contain;
-    border: 1px solid #666;
-    padding: 3px;
-  }
-  .page-break-before { page-break-before: always; }
+function changeMyPassword(token, oldPass, newPass) {
+  const sessionUser = requireAuth(token);
+  if (!oldPass || !newPass || newPass.trim().length < 4) throw new Error('กรุณากรอกรหัสผ่านเดิม และรหัสผ่านใหม่อย่างน้อย 4 ตัวอักษร');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const userSheet = ensureUsersSheet(SpreadsheetApp.getActiveSpreadsheet());
+    const target = sheetToObjects(userSheet).find(r => r.user_id === sessionUser.user_id);
+    if (!target) throw new Error('ไม่พบข้อมูลผู้ใช้');
+    if (target.password_hash !== hashPassword(oldPass)) throw new Error('รหัสผ่านเดิมไม่ถูกต้อง');
+    userSheet.getRange(target._rowIndex, 3).setValue(hashPassword(newPass.trim()));
+    writeAuditLog('PASSWORD', sessionUser.full_name, sessionUser.role, 'เปลี่ยนรหัสผ่านเอง', 'เปลี่ยนรหัสผ่านสำเร็จ');
+    return { success: true };
+  } finally { lock.releaseLock(); }
 }
