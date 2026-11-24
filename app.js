@@ -318,8 +318,12 @@ function applyMaintenanceState(m) {
     }
   }
 
-  const banner = document.getElementById('adminMaintenanceBanner');
-  if (banner) banner.style.display = (enabled && isAdmin) ? 'flex' : 'none';
+ const banner = document.getElementById('adminMaintenanceBanner');
+  if (banner) {
+    const showBanner = enabled && isAdmin;
+    banner.classList.toggle('d-none', !showBanner);
+    banner.classList.toggle('d-flex', showBanner);
+  }
 
   const sbDot = document.getElementById('sbMaintDot');
   const mbDot = document.getElementById('mbMaintDot');
