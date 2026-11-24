@@ -205,9 +205,186 @@
 
           <!-- 1. Public Pre-Approval 1-2 Form -->
           <div id="publicPre12View">
+            <!-- 1. Public Pre-Approval 1-2 Form -->
+          <div id="publicPre12View">
             <div class="cute-card p-3 p-md-4">
               <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                 <div>
+                  <span class="step-badge bg-indigo-soft mb-1"><i class="bi bi-1-circle-fill"></i> ขั้นตอนที่ 1 : ขออนุมัติก่อนทำกิจกรรม</span>
+                  <h5 class="fw-bold mb-0">แบบลงทะเบียนและประเมินตนเองกิจกรรม กพช. (กพช. 1-2)</h5>
+                </div>
+              </div>
+
+              <div class="cute-progress-bar mb-4">
+                <div class="prog-step active"><i class="bi bi-pencil-square"></i> 1. ยื่นคำขอ กพช. 1-2</div>
+                <div class="prog-step"><i class="bi bi-person-check"></i> 2. ครูที่ปรึกษาอนุมัติ</div>
+                <div class="prog-step"><i class="bi bi-camera"></i> 3. ส่งหลักฐาน กพช. 4</div>
+                <div class="prog-step"><i class="bi bi-award"></i> 4. รับรองชั่วโมง กพช.</div>
+              </div>
+
+              <form id="pre12Form" onsubmit="handlePre12Submit(event)">
+                <!-- Step 1 -->
+                <div class="section-box">
+                  <div class="section-box-title">
+                    <span class="step-number-dot">1</span> ข้อมูลนักศึกษา และกิจกรรมที่จะขอทำ
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label fw-semibold small">รหัสประจำตัวนักศึกษา (ขึ้นต้น 6, 10 หลัก) <span class="text-danger">*</span></label>
+                      <input type="text" id="p12_student_id" class="form-control" maxlength="10" inputmode="numeric" placeholder="เช่น 6912345678" required>
+                    </div>
+                    <div class="col-12 col-md-5">
+                      <label class="form-label fw-semibold small">ชื่อ - นามสกุล (เว้นวรรคระหว่างชื่อ-สกุล) <span class="text-danger">*</span></label>
+                      <input type="text" id="p12_student_name" class="form-control" placeholder="เช่น นายสมชาย ใจดี" required>
+                    </div>
+                    <div class="col-12 col-md-3">
+                      <label class="form-label fw-semibold small">ระดับการศึกษา <span class="text-danger">*</span></label>
+                      <select id="p12_level" class="form-select" required>
+                        <option value="">-- เลือก --</option>
+                        <option value="ประถมศึกษา">ประถมศึกษา</option>
+                        <option value="มัธยมศึกษาตอนต้น">มัธยมศึกษาตอนต้น</option>
+                        <option value="มัธยมศึกษาตอนปลาย">มัธยมศึกษาตอนปลาย</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label fw-semibold small">ครูผู้รับผิดชอบ / ครูประจำกลุ่ม <span class="text-danger">*</span></label>
+                      <select id="p12_teacher_id" class="form-select" onchange="onSelectPre12Teacher()" required>
+                        <option value="">-- เลือกครูที่ปรึกษา --</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label fw-semibold small">กลุ่ม / ศูนย์การเรียน (ศกร.ตำบล) <span class="text-danger">*</span></label>
+                      <input type="text" id="p12_group_name" class="form-control" placeholder="เช่น ศรช.คลองหลวง" required>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label fw-semibold small">ประเภท กพช. <span class="text-danger">*</span></label>
+                      <select id="p12_category" class="form-select border-primary" onchange="onSelectKpchCategory('p12')" required>
+                        <option value="">-- เลือกประเภทกิจกรรม --</option>
+                      </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                      <label class="form-label fw-semibold small">ภาคเรียนที่</label>
+                      <select id="p12_term" class="form-select">
+                        <option value="1/2569">1/2569</option>
+                        <option value="2/2569" selected>2/2569</option>
+                        <option value="1/2570">1/2570</option>
+                        <option value="2/2570">2/2570</option>
+                        <option value="1/2571">1/2571</option>
+                        <option value="2/2571">2/2571</option>
+                      </select>
+                    </div>
+                    <div class="col-6 col-md-3">
+                      <label class="form-label fw-semibold small">บทบาทในโครงการ</label>
+                      <select id="p12_role_note" class="form-select">
+                        <option value="">ผู้เข้าร่วมโครงการ</option>
+                        <option value="ประธาน">ประธาน / ผู้เสนอโครงการ</option>
+                        <option value="รองประธาน">รองประธาน</option>
+                        <option value="เหรัญญิก">เหรัญญิก</option>
+                        <option value="ผู้ช่วยเหรัญญิก">ผู้ช่วยเหรัญญิก</option>
+                        <option value="เลขานุการ">เลขานุการ</option>
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-9">
+                      <label class="form-label fw-semibold small">ชื่อกิจกรรม / โครงการ กพช. ที่จะขอทำ <span class="text-danger">*</span></label>
+                      <input type="text" id="p12_activity_name" class="form-control" placeholder="เช่น กิจกรรมบันทึกรักการอ่าน" required>
+                    </div>
+                    <div class="col-12 col-md-3">
+                      <label class="form-label fw-semibold small">จำนวนชั่วโมงที่ขอ</label>
+                      <input type="number" id="p12_hours" class="form-control" min="1" max="200" value="25">
+                    </div>
+                    <div class="col-6 col-md-4">
+                      <label class="form-label fw-semibold small">วันที่คาดว่าจะเริ่ม <span class="text-danger">*</span></label>
+                      <input type="date" id="p12_start_date" class="form-control" required>
+                    </div>
+                    <div class="col-6 col-md-4">
+                      <label class="form-label fw-semibold small">วันที่คาดว่าจะสิ้นสุด <span class="text-danger">*</span></label>
+                      <input type="date" id="p12_end_date" class="form-control" required>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label fw-semibold small">สถานที่ดำเนินการ</label>
+                      <input type="text" id="p12_location" class="form-control" value="ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง จังหวัดปทุมธานี">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Step 2: Self Evaluation (KPCH 2) -->
+                <div class="section-box">
+                  <div class="section-box-title">
+                    <span class="step-number-dot">2</span> ส่วนประเมินตนเอง (แบบ กพช. 2) <span class="text-danger">*</span>
+                  </div>
+                  <p class="small text-muted mb-3">กรุณาประเมินระดับความรู้ความเข้าใจของท่านให้ครบทั้ง 10 ข้อ</p>
+                  <div class="table-responsive bg-white rounded-3 p-2 border">
+                    <table class="table table-striped table-hover table-sm align-middle mb-0" style="font-size: 0.9rem;">
+                      <thead class="table-light text-center">
+                        <tr>
+                          <th rowspan="2" style="width:45px; vertical-align:middle;">ที่</th>
+                          <th rowspan="2" style="vertical-align:middle;">รายการ</th>
+                          <th colspan="3">ระดับความรู้ความเข้าใจ</th>
+                        </tr>
+                        <tr>
+                          <th style="width:65px;">มาก</th>
+                          <th style="width:80px;">ปานกลาง</th>
+                          <th style="width:65px;">น้อย</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr><td class="text-center fw-bold">1</td><td>ท่านคิดว่า กิจกรรม กพช. มีประโยชน์เพียงใด</td><td class="text-center"><input type="radio" name="eval_q1" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q1" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q1" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">2</td><td>ท่านได้รับความรู้เกี่ยวกับโครงสร้างและประโยชน์ของ กพช. ระดับใด</td><td class="text-center"><input type="radio" name="eval_q2" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q2" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q2" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">3</td><td>ท่านมีความรู้ในเรื่องแนวทางการพัฒนาตนเอง ครอบครัว ชุมชน สังคมในระดับใด</td><td class="text-center"><input type="radio" name="eval_q3" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q3" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q3" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">4</td><td>ท่านได้รับความรู้เกี่ยวกับกระบวนการกลุ่มในระดับใด</td><td class="text-center"><input type="radio" name="eval_q4" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q4" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q4" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">5</td><td>ท่านได้รับความรู้ในเรื่องกระบวนการคิดเป็น ทำเป็น แก้ปัญหาเป็น และการนำไปใช้ในการดำเนินชีวิตในระดับใด</td><td class="text-center"><input type="radio" name="eval_q5" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q5" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q5" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">6</td><td>ท่านได้รับความรู้ในเรื่องการประสานเครือข่ายในระดับใด</td><td class="text-center"><input type="radio" name="eval_q6" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q6" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q6" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">7</td><td>ท่านได้รับความรู้ในเรื่องการเป็นผู้นำผู้ตามในระดับใด</td><td class="text-center"><input type="radio" name="eval_q7" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q7" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q7" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">8</td><td>ท่านมีความรู้ในเรื่องการวางแผน และประโยชน์ของการวางแผนในระดับใด</td><td class="text-center"><input type="radio" name="eval_q8" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q8" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q8" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">9</td><td>ท่านมีความรู้ในเรื่องมนุษยสัมพันธ์ในระดับใด</td><td class="text-center"><input type="radio" name="eval_q9" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q9" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q9" value="น้อย"></td></tr>
+                        <tr><td class="text-center fw-bold">10</td><td>ท่านได้รับความรู้ในเรื่องการเขียนโครงการในระดับใด</td><td class="text-center"><input type="radio" name="eval_q10" value="มาก"></td><td class="text-center"><input type="radio" name="eval_q10" value="ปานกลาง"></td><td class="text-center"><input type="radio" name="eval_q10" value="น้อย"></td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Step 3: Student Online Signature -->
+                <div class="section-box">
+                  <div class="section-box-title">
+                    <span class="step-number-dot">3</span> ลายเซ็นนักศึกษาผู้ยื่นคำขอ <span class="text-danger">*</span>
+                  </div>
+                  <p class="small text-muted mb-2">
+                    กรุณาเซ็นชื่อด้วยนิ้วมือหรือเมาส์ในกรอบด้านล่าง (หรืออัปโหลดรูปถ่ายลายเซ็น) เพื่อแสดงบนแบบฟอร์ม กพช. 1-4 อัตโนมัติทุกเครื่อง
+                  </p>
+                  <div class="sig-pad-wrap">
+                    <canvas id="p12_sig_canvas" class="sig-pad-canvas"></canvas>
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
+                      <div id="p12_sig_status" class="small text-muted">ยังไม่ได้ลงลายเซ็น</div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <input type="file" id="p12_sig_upload" accept="image/*" class="d-none" onchange="handleSignatureImageUpload(this, 'p12_sig_canvas')">
+                        <label for="p12_sig_upload" class="btn btn-outline-primary btn-sm rounded-3 mb-0" style="cursor: pointer;">
+                          <i class="bi bi-image me-1"></i>อัปโหลดรูปลายเซ็น
+                        </label>
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-3" onclick="clearSignaturePad('p12_sig_canvas')">
+                          <i class="bi bi-eraser me-1"></i>ล้างลายเซ็น
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="p-3 rounded-4 border bg-white mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="p12_self_eval_ok">
+                    <label class="form-check-label small fw-semibold" for="p12_self_eval_ok">
+                      ข้าพเจ้าขอลงทะเบียนเข้าร่วมกิจกรรมพัฒนาคุณภาพชีวิต (กพช.1-2) และรับรองว่าข้อมูลการประเมินตนเองเป็นความจริง <span class="text-danger">*</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="d-grid d-md-flex justify-content-md-end">
+                  <button type="submit" class="btn btn-cute-submit px-4 py-2">
+                    <i class="bi bi-send-check me-2"></i>ยื่นคำขออนุมัติทำกิจกรรม (กพช. 1-2)
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
                   <span class="step-badge bg-indigo-soft mb-1"><i class="bi bi-1-circle-fill"></i> ขั้นตอนที่ 1 : ขออนุมัติก่อนทำกิจกรรม</span>
                   <h5 class="fw-bold mb-0">แบบยื่นคำขอทำกิจกรรมพัฒนาคุณภาพชีวิต (กพช. 1-2)</h5>
                 </div>
@@ -1191,13 +1368,112 @@
   </div>
 
   <!-- Doc 5-6 (Memo KPCH 3) Modal -->
+  <!-- Doc 5-6 (Memo + KPCH 3) Modal -->
   <div class="modal fade no-print" id="doc56Modal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content rounded-4 border-0 shadow">
-        <div class="modal-header">
-          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-richtext me-2 text-primary"></i>สร้างบันทึกข้อความขออนุมัติโครงการ (กพช. 3)</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold"><i class="bi bi-printer me-2"></i>พิมพ์ชุด กพช. 3 + บันทึกข้อความ (เอกสาร 56)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
+        <div class="modal-body">
+          <div id="d56_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-2" style="display: none;">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
+              <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'gdoc')">Google Docs</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'docx')">.DOCX</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo56', 'pdf')">PDF</button>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-info small py-2 mb-2">
+            รวมรายชื่อนักศึกษาที่ผ่านการอนุมัติ กพช.1-2 แล้ว จำนวน <strong id="d56_count">0</strong> คน (จัดพิมพ์เป็น 1 ชุดเอกสาร)
+          </div>
+          <div class="row g-2">
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d56_doc_no" value="ศธ 07058.02/"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">วันที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d56_doc_date"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d56_advisor_pos" value="บรรณารักษ์ / ครูประจำกลุ่ม"></div>
+            <div class="col-12 col-md-8"><label class="form-label fw-semibold small">1. ชื่อโครงการ</label><input type="text" class="form-control form-control-sm" id="d56_project_name"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประมาณค่าหน่วยกิจกรรม (ชม.)</label><input type="number" class="form-control form-control-sm" id="d56_hours" value="25"></div>
+            <div class="col-12"><label class="form-label fw-semibold small">2. หลักการและเหตุผล</label><textarea class="form-control form-control-sm" id="d56_rationale" rows="2"></textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">3. วัตถุประสงค์</label><textarea class="form-control form-control-sm" id="d56_objectives" rows="2"></textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4. เป้าหมาย</label><textarea class="form-control form-control-sm" id="d56_target" rows="2"></textarea></div>
+            <div class="col-12"><label class="form-label fw-semibold small">5. ขั้นตอน/แผนการปฏิบัติโครงการ</label><textarea class="form-control form-control-sm" id="d56_steps" rows="2"></textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">6. สถานที่ดำเนินการ</label><input type="text" class="form-control form-control-sm" id="d56_location"></div>
+            <div class="col-6 col-md-3"><label class="form-label fw-semibold small">7. วันที่เริ่ม</label><input type="date" class="form-control form-control-sm" id="d56_start_date"></div>
+            <div class="col-6 col-md-3"><label class="form-label fw-semibold small">วันที่สิ้นสุด</label><input type="date" class="form-control form-control-sm" id="d56_end_date"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.1 เงิน</label><input type="text" class="form-control form-control-sm" id="d56_budget" value="-"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.2 วัสดุ</label><input type="text" class="form-control form-control-sm" id="d56_material" value="หนังสือ"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.3 แรงงาน</label><input type="text" class="form-control form-control-sm" id="d56_labor" value="นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง"></div>
+            <div class="col-12"><label class="form-label fw-semibold small">9. ผลที่คาดว่าจะได้รับ</label><textarea class="form-control form-control-sm" id="d56_expected" rows="2"></textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">12. ที่ปรึกษาโครงการ / ครูผู้รับผิดชอบ</label><input type="text" class="form-control form-control-sm" id="d56_advisor"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ความเห็นครูผู้รับผิดชอบกลุ่ม</label><input type="text" class="form-control form-control-sm" id="d56_teacher_opinion" value="เป็นกิจกรรมที่มีประโยชน์ต่อนักศึกษา ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก เพื่อเป็นการพัฒนาตนเอง ในการดำเนินชีวิต"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประธานคณะกรรมการ</label><input type="text" class="form-control form-control-sm" id="d56_comm1"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กรรมการ</label><input type="text" class="form-control form-control-sm" id="d56_comm2"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กรรมการและเลขานุการ</label><input type="text" class="form-control form-control-sm" id="d56_comm3"></div>
+            <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control form-control-sm" id="d56_director"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-3" onclick="executeOutputDoc56('word')">
+            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
+          </button>
+          <button type="button" class="btn btn-primary btn-sm rounded-3" onclick="executeOutputDoc56('print')">
+            <i class="bi bi-printer me-1"></i>สั่งพิมพ์ชุด กพช. 3 + บันทึกข้อความ (A4)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Doc 5-7 (Memo + KPCH 4-6) Modal -->
+  <div class="modal fade no-print" id="doc57Modal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title fw-bold"><i class="bi bi-printer me-2"></i>พิมพ์ชุด กพช. 4-6 + บันทึกข้อความ (เอกสาร 57)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="d57_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-2" style="display: none;">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
+              <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo46', 'gdoc')">Google Docs</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo46', 'docx')">.DOCX</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo46', 'pdf')">PDF</button>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-success small py-2">จำนวนรายการที่ติ๊กเลือก: <strong id="d57_count">0</strong> คน</div>
+          <div class="row g-2">
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d57_doc_no" value="ศธ 07058.02/"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">วันที่บันทึกข้อความ</label><input type="text" class="form-control form-control-sm" id="d57_doc_date"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">โครงการ/กิจกรรม</label><input type="text" class="form-control form-control-sm" id="d57_project_name"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">สถานที่ปฏิบัติกิจกรรม</label><input type="text" class="form-control form-control-sm" id="d57_location"></div>
+            <div class="col-4"><label class="form-label fw-semibold small">ผ่านกิจกรรม (คน)</label><input type="number" class="form-control form-control-sm" id="d57_pass_count"></div>
+            <div class="col-4"><label class="form-label fw-semibold small">ไม่ผ่านกิจกรรม (คน)</label><input type="number" class="form-control form-control-sm" id="d57_fail_count" value="0"></div>
+            <div class="col-4"><label class="form-label fw-semibold small">ชั่วโมงที่อนุมัติ</label><input type="number" class="form-control form-control-sm" id="d57_hours" value="25"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ชื่อครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d57_teacher_name"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d57_teacher_pos" value="ครูประจำกลุ่ม / บรรณารักษ์"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ผู้กรอก (กพช.6)</label><input type="text" class="form-control form-control-sm" id="d57_filler"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ผู้ทาน (กพช.6)</label><input type="text" class="form-control form-control-sm" id="d57_checker"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">นายทะเบียน</label><input type="text" class="form-control form-control-sm" id="d57_registrar"></div>
+            <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control form-control-sm" id="d57_director"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-success btn-sm rounded-3" onclick="executeOutputDoc57('word')">
+            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
+          </button>
+          <button type="button" class="btn btn-success btn-sm rounded-3" onclick="executeOutputDoc57('print')">
+            <i class="bi bi-printer me-1"></i>สั่งพิมพ์ชุด กพช. 4-6 + บันทึกข้อความ (A4)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
         <div class="modal-body">
           <div id="d56_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-3" style="display: none;">
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -1261,13 +1537,112 @@
   </div>
 
   <!-- Doc 5-7 (Memo KPCH 4-6) Modal -->
+  <!-- Doc 5-6 (Memo + KPCH 3) Modal -->
+  <div class="modal fade no-print" id="doc56Modal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold"><i class="bi bi-printer me-2"></i>พิมพ์ชุด กพช. 3 + บันทึกข้อความ (เอกสาร 56)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="d56_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-2" style="display: none;">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
+              <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'gdoc')">Google Docs</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'docx')">.DOCX</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo56', 'pdf')">PDF</button>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-info small py-2 mb-2">
+            รวมรายชื่อนักศึกษาที่ผ่านการอนุมัติ กพช.1-2 แล้ว จำนวน <strong id="d56_count">0</strong> คน (จัดพิมพ์เป็น 1 ชุดเอกสาร)
+          </div>
+          <div class="row g-2">
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d56_doc_no" value="ศธ 07058.02/"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">วันที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d56_doc_date"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d56_advisor_pos" value="บรรณารักษ์ / ครูประจำกลุ่ม"></div>
+            <div class="col-12 col-md-8"><label class="form-label fw-semibold small">1. ชื่อโครงการ</label><input type="text" class="form-control form-control-sm" id="d56_project_name"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประมาณค่าหน่วยกิจกรรม (ชม.)</label><input type="number" class="form-control form-control-sm" id="d56_hours" value="25"></div>
+            <div class="col-12"><label class="form-label fw-semibold small">2. หลักการและเหตุผล</label><textarea class="form-control form-control-sm" id="d56_rationale" rows="2"></textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">3. วัตถุประสงค์</label><textarea class="form-control form-control-sm" id="d56_objectives" rows="2"></textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4. เป้าหมาย</label><textarea class="form-control form-control-sm" id="d56_target" rows="2"></textarea></div>
+            <div class="col-12"><label class="form-label fw-semibold small">5. ขั้นตอน/แผนการปฏิบัติโครงการ</label><textarea class="form-control form-control-sm" id="d56_steps" rows="2"></textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">6. สถานที่ดำเนินการ</label><input type="text" class="form-control form-control-sm" id="d56_location"></div>
+            <div class="col-6 col-md-3"><label class="form-label fw-semibold small">7. วันที่เริ่ม</label><input type="date" class="form-control form-control-sm" id="d56_start_date"></div>
+            <div class="col-6 col-md-3"><label class="form-label fw-semibold small">วันที่สิ้นสุด</label><input type="date" class="form-control form-control-sm" id="d56_end_date"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.1 เงิน</label><input type="text" class="form-control form-control-sm" id="d56_budget" value="-"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.2 วัสดุ</label><input type="text" class="form-control form-control-sm" id="d56_material" value="หนังสือ"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.3 แรงงาน</label><input type="text" class="form-control form-control-sm" id="d56_labor" value="นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง"></div>
+            <div class="col-12"><label class="form-label fw-semibold small">9. ผลที่คาดว่าจะได้รับ</label><textarea class="form-control form-control-sm" id="d56_expected" rows="2"></textarea></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">12. ที่ปรึกษาโครงการ / ครูผู้รับผิดชอบ</label><input type="text" class="form-control form-control-sm" id="d56_advisor"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ความเห็นครูผู้รับผิดชอบกลุ่ม</label><input type="text" class="form-control form-control-sm" id="d56_teacher_opinion" value="เป็นกิจกรรมที่มีประโยชน์ต่อนักศึกษา ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก เพื่อเป็นการพัฒนาตนเอง ในการดำเนินชีวิต"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประธานคณะกรรมการ</label><input type="text" class="form-control form-control-sm" id="d56_comm1"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กรรมการ</label><input type="text" class="form-control form-control-sm" id="d56_comm2"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กรรมการและเลขานุการ</label><input type="text" class="form-control form-control-sm" id="d56_comm3"></div>
+            <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control form-control-sm" id="d56_director"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-3" onclick="executeOutputDoc56('word')">
+            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
+          </button>
+          <button type="button" class="btn btn-primary btn-sm rounded-3" onclick="executeOutputDoc56('print')">
+            <i class="bi bi-printer me-1"></i>สั่งพิมพ์ชุด กพช. 3 + บันทึกข้อความ (A4)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Doc 5-7 (Memo + KPCH 4-6) Modal -->
   <div class="modal fade no-print" id="doc57Modal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content rounded-4 border-0 shadow">
-        <div class="modal-header">
-          <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-check me-2 text-primary"></i>สร้างบันทึกข้อความรายงานผล (กพช. 4-6)</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title fw-bold"><i class="bi bi-printer me-2"></i>พิมพ์ชุด กพช. 4-6 + บันทึกข้อความ (เอกสาร 57)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
+        <div class="modal-body">
+          <div id="d57_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-2" style="display: none;">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
+              <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo46', 'gdoc')">Google Docs</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo46', 'docx')">.DOCX</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo46', 'pdf')">PDF</button>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-success small py-2">จำนวนรายการที่ติ๊กเลือก: <strong id="d57_count">0</strong> คน</div>
+          <div class="row g-2">
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d57_doc_no" value="ศธ 07058.02/"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">วันที่บันทึกข้อความ</label><input type="text" class="form-control form-control-sm" id="d57_doc_date"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">โครงการ/กิจกรรม</label><input type="text" class="form-control form-control-sm" id="d57_project_name"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">สถานที่ปฏิบัติกิจกรรม</label><input type="text" class="form-control form-control-sm" id="d57_location"></div>
+            <div class="col-4"><label class="form-label fw-semibold small">ผ่านกิจกรรม (คน)</label><input type="number" class="form-control form-control-sm" id="d57_pass_count"></div>
+            <div class="col-4"><label class="form-label fw-semibold small">ไม่ผ่านกิจกรรม (คน)</label><input type="number" class="form-control form-control-sm" id="d57_fail_count" value="0"></div>
+            <div class="col-4"><label class="form-label fw-semibold small">ชั่วโมงที่อนุมัติ</label><input type="number" class="form-control form-control-sm" id="d57_hours" value="25"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ชื่อครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d57_teacher_name"></div>
+            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d57_teacher_pos" value="ครูประจำกลุ่ม / บรรณารักษ์"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ผู้กรอก (กพช.6)</label><input type="text" class="form-control form-control-sm" id="d57_filler"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ผู้ทาน (กพช.6)</label><input type="text" class="form-control form-control-sm" id="d57_checker"></div>
+            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">นายทะเบียน</label><input type="text" class="form-control form-control-sm" id="d57_registrar"></div>
+            <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control form-control-sm" id="d57_director"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-success btn-sm rounded-3" onclick="executeOutputDoc57('word')">
+            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
+          </button>
+          <button type="button" class="btn btn-success btn-sm rounded-3" onclick="executeOutputDoc57('print')">
+            <i class="bi bi-printer me-1"></i>สั่งพิมพ์ชุด กพช. 4-6 + บันทึกข้อความ (A4)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
         <div class="modal-body">
           <div id="d57_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-3" style="display: none;">
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
