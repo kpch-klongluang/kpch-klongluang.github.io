@@ -6,7 +6,7 @@
   <title>ระบบ กพช. ออนไลน์ | สกร.ระดับอำเภอคลองหลวง</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20261124">
+  <link rel="stylesheet" href="style.css?v=20261125">
 </head>
 <body>
 
@@ -44,7 +44,6 @@
 
   <!-- Main App Shell -->
   <div id="appShell" class="app-shell no-print">
-
     <!-- Desktop Left Sidebar -->
     <aside id="appSidebar" class="org-sidebar">
       <div class="org-sidebar-header">
@@ -155,7 +154,6 @@
 
     <!-- Main Content Column -->
     <div class="app-main">
-
       <!-- Mobile Topbar -->
       <header class="mobile-topbar">
         <div class="d-flex align-items-center gap-2 min-w-0">
@@ -179,7 +177,6 @@
 
       <!-- Content Area -->
       <main class="org-content">
-
         <!-- Admin Maintenance Warning Banner -->
         <div id="adminMaintenanceBanner" class="alert alert-danger border-0 shadow-sm rounded-4 d-none flex-wrap align-items-center justify-content-between gap-2 mb-3">
           <div class="d-flex align-items-center gap-2">
@@ -196,7 +193,6 @@
 
         <!-- ==================== PUBLIC SECTION ==================== -->
         <section id="publicSection">
-
           <!-- System Announcement -->
           <div id="annPublicBox" class="ann-content-box mb-3 shadow-sm" style="display: none;">
             <div class="fw-bold mb-1"><i class="bi bi-megaphone-fill me-2 text-warning"></i>ประกาศจากงานกิจกรรมพัฒนาคุณภาพชีวิต (กพช.)</div>
@@ -204,8 +200,6 @@
           </div>
 
           <!-- 1. Public Pre-Approval 1-2 Form -->
-          <div id="publicPre12View">
-            <!-- 1. Public Pre-Approval 1-2 Form -->
           <div id="publicPre12View">
             <div class="cute-card p-3 p-md-4">
               <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
@@ -385,7 +379,7 @@
               </form>
             </div>
           </div>
-           
+
           <!-- 2. Public Submit KPCH 4 Form -->
           <div id="publicSubmitView" style="display: none;">
             <div class="cute-card p-3 p-md-4">
@@ -529,11 +523,10 @@
             </div>
             <div id="statusResultArea"></div>
           </div>
-
         </section>
+
         <!-- ==================== DASHBOARD SECTION (STAFF) ==================== -->
         <section id="dashboardSection" style="display: none;">
-
           <!-- Mobile Staff Navigation Grids -->
           <div id="teacherMobileTabs" class="mobile-staff-grid mb-3 d-lg-none" style="display: none;">
             <button type="button" class="mobile-staff-tab-btn active" data-teacher-tab="subs" onclick="switchTeacherTab('subs')">
@@ -593,7 +586,7 @@
             </div>
             <div class="col-6 col-md-3">
               <div class="cute-card p-3">
-                <div class="small text-muted" id="statLabel3">ผ่านอนุมัติ</div>
+                <div class="small text-muted" id="statLabel3">ผ่านอนุมติ</div>
                 <div class="fs-4 fw-bold text-primary" id="statApproved">0</div>
               </div>
             </div>
@@ -650,7 +643,6 @@
                   </button>
                 </div>
               </div>
-
               <div id="subBatchBar" class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 pt-2 border-top">
                 <div class="d-flex align-items-center gap-2">
                   <input type="checkbox" id="checkAllSubs" class="form-check-input" onchange="toggleSelectAllSubs(this.checked)">
@@ -681,7 +673,6 @@
             </div>
             <div id="subsMobileList" class="d-md-none"></div>
           </div>
-
           <!-- View B: Requests 1-2 -->
           <div id="dashReq12View" style="display: none;">
             <div class="cute-card p-3 mb-3">
@@ -711,7 +702,6 @@
                   </button>
                 </div>
               </div>
-
               <div id="req12BatchBar" class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 pt-2 border-top">
                 <div class="d-flex align-items-center gap-2">
                   <input type="checkbox" id="checkAll12" class="form-check-input" onchange="toggleSelectAll12(this.checked)">
@@ -802,7 +792,6 @@
                 <i class="bi bi-save me-1"></i>บันทึกประกาศ
               </button>
             </div>
-
             <div class="cute-card p-3 p-md-4">
               <h6 class="fw-bold mb-1"><i class="bi bi-file-earmark-word me-2 text-primary"></i>ตั้งค่าลิงก์ฟอร์มบันทึกข้อความ Google Docs</h6>
               <p class="small text-muted mb-3">
@@ -930,9 +919,7 @@
               </div>
             </div>
           </div>
-
         </section>
-
       </main>
     </div>
   </div>
@@ -954,7 +941,6 @@
   </nav>
 
   <!-- ==================== MODALS ==================== -->
-
   <!-- Login Modal -->
   <div class="modal fade no-print" id="loginModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -1190,21 +1176,9 @@
               </div>
             </div>
 
-            <!-- Extra fields for KPCH 1-2 (Plan + Online Signature) -->
-            <div id="se_p12_wrap" class="mt-3 pt-2 border-top" style="display: none;">
-              <div class="row g-2 mb-3">
-                <div class="col-12">
-                  <label class="form-label small fw-semibold">วัตถุประสงค์ / แผนการดำเนินงาน</label>
-                  <textarea id="se_plan_detail" class="form-control" rows="2"></textarea>
-                </div>
-                <div class="col-12">
-                  <label class="form-label small fw-semibold">ผลที่คาดว่าจะได้รับ</label>
-                  <textarea id="se_expected_outcome" class="form-control" rows="2"></textarea>
-                </div>
-              </div>
-            </div>
-
-            <div id="se_sig_wrap" class="mt-2" style="display: none;">
+            <!-- Extra fields for KPCH 1-2 (Online Signature) -->
+            <div id="se_p12_wrap" style="display: none;"></div>
+            <div id="se_sig_wrap" class="mt-3 pt-2 border-top" style="display: none;">
               <label class="form-label small fw-semibold">ลายเซ็นนักศึกษาผู้ยื่นคำขอ</label>
               <div class="sig-pad-wrap">
                 <canvas id="se_sig_canvas" class="sig-pad-canvas"></canvas>
@@ -1231,7 +1205,6 @@
     </div>
   </div>
 
-  <!-- Doc 5-6 (Memo KPCH 3) Modal -->
   <!-- Doc 5-6 (Memo + KPCH 3) Modal -->
   <div class="modal fade no-print" id="doc56Modal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1338,180 +1311,12 @@
       </div>
     </div>
   </div>
-        <div class="modal-body">
-          <div id="d56_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-3" style="display: none;">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
-              <div class="d-flex flex-wrap gap-1">
-                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'gdoc')">Google Docs</button>
-                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'docx')">.DOCX</button>
-                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo56', 'pdf')">PDF</button>
-              </div>
-            </div>
-          </div>
-          <div class="row g-2">
-            <div class="col-md-5">
-              <label class="form-label small fw-semibold">ที่ (เลขที่หนังสือ)</label>
-              <input type="text" id="d56_doc_no" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-7">
-              <label class="form-label small fw-semibold">วันที่</label>
-              <input type="text" id="d56_doc_date" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-8">
-              <label class="form-label small fw-semibold">ชื่อโครงการ</label>
-              <input type="text" id="d56_project_name" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">จำนวนนักศึกษา (คน)</label>
-              <input type="number" id="d56_student_count" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">วันที่เริ่ม</label>
-              <input type="text" id="d56_start_date" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">วันที่สิ้นสุด</label>
-              <input type="text" id="d56_end_date" class="form-control form-control-sm">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">ครูที่ปรึกษา / ผู้เสนอ</label>
-              <input type="text" id="d56_advisor_name" class="form-control form-control-sm">
-            </div>
-            <div class="col-12">
-              <label class="form-label small fw-semibold">สถานที่ดำเนินโครงการ</label>
-              <input type="text" id="d56_location" class="form-control form-control-sm">
-            </div>
-            <div class="col-12">
-              <label class="form-label small fw-semibold">รายชื่อนักศึกษา (แก้ไขได้)</label>
-              <textarea id="d56_student_list" class="form-control form-control-sm" rows="4"></textarea>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-primary btn-sm rounded-3" onclick="executeOutputDoc56('word')">
-            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
-          </button>
-          <button type="button" class="btn btn-primary btn-sm rounded-3" onclick="executeOutputDoc56('print')">
-            <i class="bi bi-printer me-1"></i>พิมพ์เอกสาร (A4)
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Doc 5-7 (Memo KPCH 4-6) Modal -->
-  <!-- Doc 5-6 (Memo + KPCH 3) Modal -->
-  <div class="modal fade no-print" id="doc56Modal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content rounded-4 border-0 shadow">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title fw-bold"><i class="bi bi-printer me-2"></i>พิมพ์ชุด กพช. 3 + บันทึกข้อความ (เอกสาร 56)</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div id="d56_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-2" style="display: none;">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
-              <div class="d-flex flex-wrap gap-1">
-                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'gdoc')">Google Docs</button>
-                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo56', 'docx')">.DOCX</button>
-                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo56', 'pdf')">PDF</button>
-              </div>
-            </div>
-          </div>
-          <div class="alert alert-info small py-2 mb-2">
-            รวมรายชื่อนักศึกษาที่ผ่านการอนุมัติ กพช.1-2 แล้ว จำนวน <strong id="d56_count">0</strong> คน (จัดพิมพ์เป็น 1 ชุดเอกสาร)
-          </div>
-          <div class="row g-2">
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d56_doc_no" value="ศธ 07058.02/"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">วันที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d56_doc_date"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d56_advisor_pos" value="บรรณารักษ์ / ครูประจำกลุ่ม"></div>
-            <div class="col-12 col-md-8"><label class="form-label fw-semibold small">1. ชื่อโครงการ</label><input type="text" class="form-control form-control-sm" id="d56_project_name"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประมาณค่าหน่วยกิจกรรม (ชม.)</label><input type="number" class="form-control form-control-sm" id="d56_hours" value="25"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">2. หลักการและเหตุผล</label><textarea class="form-control form-control-sm" id="d56_rationale" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">3. วัตถุประสงค์</label><textarea class="form-control form-control-sm" id="d56_objectives" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">4. เป้าหมาย</label><textarea class="form-control form-control-sm" id="d56_target" rows="2"></textarea></div>
-            <div class="col-12"><label class="form-label fw-semibold small">5. ขั้นตอน/แผนการปฏิบัติโครงการ</label><textarea class="form-control form-control-sm" id="d56_steps" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">6. สถานที่ดำเนินการ</label><input type="text" class="form-control form-control-sm" id="d56_location"></div>
-            <div class="col-6 col-md-3"><label class="form-label fw-semibold small">7. วันที่เริ่ม</label><input type="date" class="form-control form-control-sm" id="d56_start_date"></div>
-            <div class="col-6 col-md-3"><label class="form-label fw-semibold small">วันที่สิ้นสุด</label><input type="date" class="form-control form-control-sm" id="d56_end_date"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.1 เงิน</label><input type="text" class="form-control form-control-sm" id="d56_budget" value="-"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.2 วัสดุ</label><input type="text" class="form-control form-control-sm" id="d56_material" value="หนังสือ"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">8.3 แรงงาน</label><input type="text" class="form-control form-control-sm" id="d56_labor" value="นักศึกษา ศูนย์ส่งเสริมการเรียนรู้ระดับอำเภอคลองหลวง"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">9. ผลที่คาดว่าจะได้รับ</label><textarea class="form-control form-control-sm" id="d56_expected" rows="2"></textarea></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">12. ที่ปรึกษาโครงการ / ครูผู้รับผิดชอบ</label><input type="text" class="form-control form-control-sm" id="d56_advisor"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ความเห็นครูผู้รับผิดชอบกลุ่ม</label><input type="text" class="form-control form-control-sm" id="d56_teacher_opinion" value="เป็นกิจกรรมที่มีประโยชน์ต่อนักศึกษา ได้รับการพัฒนาตนเอง ในด้านการคิด การกระทำ และการฝึกบันทึก เพื่อเป็นการพัฒนาตนเอง ในการดำเนินชีวิต"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ประธานคณะกรรมการ</label><input type="text" class="form-control form-control-sm" id="d56_comm1"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กรรมการ</label><input type="text" class="form-control form-control-sm" id="d56_comm2"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">กรรมการและเลขานุการ</label><input type="text" class="form-control form-control-sm" id="d56_comm3"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control form-control-sm" id="d56_director"></div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-primary btn-sm rounded-3" onclick="executeOutputDoc56('word')">
-            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
-          </button>
-          <button type="button" class="btn btn-primary btn-sm rounded-3" onclick="executeOutputDoc56('print')">
-            <i class="bi bi-printer me-1"></i>สั่งพิมพ์ชุด กพช. 3 + บันทึกข้อความ (A4)
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Doc 5-7 (Memo + KPCH 4-6) Modal -->
-  <div class="modal fade no-print" id="doc57Modal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content rounded-4 border-0 shadow">
-        <div class="modal-header bg-success text-white">
-          <h5 class="modal-title fw-bold"><i class="bi bi-printer me-2"></i>พิมพ์ชุด กพช. 4-6 + บันทึกข้อความ (เอกสาร 57)</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div id="d57_gdoc_bar" class="alert alert-primary border-0 rounded-3 py-2 px-3 mb-2" style="display: none;">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-              <div class="small fw-semibold"><i class="bi bi-google me-1"></i>ส่งออกด้วยแม่แบบ Google Docs ที่ตั้งค่าไว้:</div>
-              <div class="d-flex flex-wrap gap-1">
-                <button type="button" class="btn btn-primary btn-sm" onclick="generateDocFromTemplateUI('memo46', 'gdoc')">Google Docs</button>
-                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateDocFromTemplateUI('memo46', 'docx')">.DOCX</button>
-                <button type="button" class="btn btn-outline-danger btn-sm" onclick="generateDocFromTemplateUI('memo46', 'pdf')">PDF</button>
-              </div>
-            </div>
-          </div>
-          <div class="alert alert-success small py-2">จำนวนรายการที่ติ๊กเลือก: <strong id="d57_count">0</strong> คน</div>
-          <div class="row g-2">
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ที่ (บันทึกข้อความ)</label><input type="text" class="form-control form-control-sm" id="d57_doc_no" value="ศธ 07058.02/"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">วันที่บันทึกข้อความ</label><input type="text" class="form-control form-control-sm" id="d57_doc_date"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">โครงการ/กิจกรรม</label><input type="text" class="form-control form-control-sm" id="d57_project_name"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">สถานที่ปฏิบัติกิจกรรม</label><input type="text" class="form-control form-control-sm" id="d57_location"></div>
-            <div class="col-4"><label class="form-label fw-semibold small">ผ่านกิจกรรม (คน)</label><input type="number" class="form-control form-control-sm" id="d57_pass_count"></div>
-            <div class="col-4"><label class="form-label fw-semibold small">ไม่ผ่านกิจกรรม (คน)</label><input type="number" class="form-control form-control-sm" id="d57_fail_count" value="0"></div>
-            <div class="col-4"><label class="form-label fw-semibold small">ชั่วโมงที่อนุมัติ</label><input type="number" class="form-control form-control-sm" id="d57_hours" value="25"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ชื่อครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d57_teacher_name"></div>
-            <div class="col-12 col-md-6"><label class="form-label fw-semibold small">ตำแหน่งครูผู้เสนอ</label><input type="text" class="form-control form-control-sm" id="d57_teacher_pos" value="ครูประจำกลุ่ม / บรรณารักษ์"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ผู้กรอก (กพช.6)</label><input type="text" class="form-control form-control-sm" id="d57_filler"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">ผู้ทาน (กพช.6)</label><input type="text" class="form-control form-control-sm" id="d57_checker"></div>
-            <div class="col-12 col-md-4"><label class="form-label fw-semibold small">นายทะเบียน</label><input type="text" class="form-control form-control-sm" id="d57_registrar"></div>
-            <div class="col-12"><label class="form-label fw-semibold small">ผู้อำนวยการสถานศึกษา</label><input type="text" class="form-control form-control-sm" id="d57_director"></div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-success btn-sm rounded-3" onclick="executeOutputDoc57('word')">
-            <i class="bi bi-file-earmark-word me-1"></i>โหลด Word (.doc)
-          </button>
-          <button type="button" class="btn btn-success btn-sm rounded-3" onclick="executeOutputDoc57('print')">
-            <i class="bi bi-printer me-1"></i>สั่งพิมพ์ชุด กพช. 4-6 + บันทึกข้อความ (A4)
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
   <!-- Print Area -->
   <div id="printOnlyContainer"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="app.js?v=20261124"></script>
+  <script src="app.js?v=20261125"></script>
 </body>
 </html>
